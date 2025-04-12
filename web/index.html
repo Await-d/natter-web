@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Natter 管理界面</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>Natter 管理界面</h1>
+            <p>管理您的Natter服务</p>
+        </header>
+
+        <main>
+            <section class="card" id="services-panel">
+                <h2>运行中的服务</h2>
+                <div class="services-list" id="services-list">
+                    <div class="loading">加载中...</div>
+                </div>
+            </section>
+
+            <section class="card" id="new-service-panel">
+                <h2>新建服务</h2>
+                <form id="new-service-form">
+                    <div class="form-group">
+                        <label for="service-mode">服务模式:</label>
+                        <select id="service-mode">
+                            <option value="basic">基础模式</option>
+                            <option value="advanced">高级模式</option>
+                        </select>
+                    </div>
+
+                    <div id="basic-mode-options">
+                        <div class="form-group">
+                            <label for="target-port">目标端口:</label>
+                            <input type="number" id="target-port" placeholder="例如: 80">
+                            <small>要转发的本地端口</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="udp-mode">
+                                <input type="checkbox" id="udp-mode">
+                                使用UDP模式
+                            </label>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="forward-method">转发方法:</label>
+                            <select id="forward-method">
+                                <option value="socket">socket (内置)</option>
+                                <option value="iptables">iptables (需要root权限)</option>
+                                <option value="nftables">nftables (需要root权限)</option>
+                                <option value="socat">socat (需要安装)</option>
+                                <option value="gost">gost (需要安装)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="advanced-mode-options" style="display:none;">
+                        <div class="form-group">
+                            <label for="command-args">命令参数:</label>
+                            <input type="text" id="command-args" placeholder="例如: -p 80 -m socket">
+                            <small>完整的命令行参数，如同直接运行natter.py</small>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary">启动服务</button>
+                    </div>
+                </form>
+            </section>
+
+            <section class="card" id="service-details-panel" style="display:none;">
+                <h2>服务详情 <span id="service-id"></span></h2>
+                <div class="service-info">
+                    <div class="info-item">
+                        <span class="label">状态:</span>
+                        <span id="service-status" class="value">未知</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">运行时间:</span>
+                        <span id="service-runtime" class="value">0秒</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">映射地址:</span>
+                        <span id="service-mapped-address" class="value">未知</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">命令参数:</span>
+                        <span id="service-cmd-args" class="value">无</span>
+                    </div>
+                </div>
+
+                <div class="output-container">
+                    <h3>输出日志</h3>
+                    <pre id="service-output" class="output-log"></pre>
+                </div>
+
+                <div class="action-buttons">
+                    <button id="refresh-service-btn" class="btn-secondary">刷新</button>
+                    <button id="stop-service-btn" class="btn-danger">停止服务</button>
+                    <button id="back-to-list-btn" class="btn-secondary">返回列表</button>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>Natter Web管理界面 &copy; 2023</p>
+        </footer>
+    </div>
+
+    <!-- 服务卡片模板 -->
+    <template id="service-card-template">
+        <div class="service-card" data-id="">
+            <div class="service-card-header">
+                <h3 class="service-mapped-address">未知地址</h3>
+                <span class="service-status badge">未知</span>
+            </div>
+            <div class="service-card-body">
+                <div class="service-cmd-args">命令: </div>
+                <div class="service-runtime">运行时间: 0秒</div>
+            </div>
+            <div class="service-card-footer">
+                <button class="btn-secondary view-details-btn">查看详情</button>
+                <button class="btn-danger stop-service-btn">停止</button>
+            </div>
+        </div>
+    </template>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
