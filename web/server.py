@@ -510,9 +510,9 @@ def get_free_port():
 def run_server(port=8080):
     """运行Web服务器"""
     try:
-        server_address = ('', port)
+        server_address = ('0.0.0.0', port)  # 修改为明确绑定0.0.0.0，确保监听所有网络接口
         httpd = HTTPServer(server_address, NatterHttpHandler)
-        print(f"Natter管理界面已启动: http://localhost:{port}")
+        print(f"Natter管理界面已启动: http://0.0.0.0:{port}")
         print(f"使用的Natter路径: {NATTER_PATH}")
         print(f"数据存储目录: {DATA_DIR}")
         httpd.serve_forever()
