@@ -513,6 +513,8 @@ def run_server(port=8080):
         server_address = ('', port)
         httpd = HTTPServer(server_address, NatterHttpHandler)
         print(f"Natter管理界面已启动: http://localhost:{port}")
+        print(f"使用的Natter路径: {NATTER_PATH}")
+        print(f"数据存储目录: {DATA_DIR}")
         httpd.serve_forever()
     except OSError as e:
         if "Address already in use" in str(e):
@@ -520,7 +522,11 @@ def run_server(port=8080):
             new_port = get_free_port()
             run_server(new_port)
         else:
+            print(f"启动服务器时发生错误: {e}")
             raise
+    except Exception as e:
+        print(f"启动服务器时发生未知错误: {e}")
+        raise
 
 def cleanup():
     """清理资源，停止所有运行中的服务"""
@@ -531,10 +537,32 @@ if __name__ == "__main__":
     # 注册清理函数
     signal.signal(signal.SIGINT, lambda sig, frame: (cleanup(), sys.exit(0)))
     
+    # 显示系统信息
+    print(f"Python版本: {sys.version}")
+    print(f"操作系统: {os.name}, {sys.platform}")
+    
     # 检查natter.py是否存在
     if not os.path.exists(NATTER_PATH):
         print(f"错误: 找不到Natter程序 '{NATTER_PATH}'")
+        print(f"当前工作目录: {os.getcwd()}")
+        print(f"目录内容:")
+        for path, dirs, files in os.walk("..", topdown=False):
+            for name in files:
+                if "natter.py" in name:
+                    print(os.path.join(path, name))
         sys.exit(1)
+    else:
+        print(f"找到Natter程序: {NATTER_PATH}")
+    
+    # 检查数据目录
+    if not os.path.exists(DATA_DIR):
+        print(f"注意: 数据目录 '{DATA_DIR}' 不存在，将创建")
+        try:
+            os.makedirs(DATA_DIR, exist_ok=True)
+            print(f"数据目录已创建: {DATA_DIR}")
+        except Exception as e:
+            print(f"创建数据目录时发生错误: {e}")
+            sys.exit(1)
     
     # 默认使用8080端口，可通过命令行参数修改
     port = 8080
@@ -544,4 +572,5 @@ if __name__ == "__main__":
         except ValueError:
             print(f"警告: 无效的端口号 '{sys.argv[1]}'，使用默认端口 8080")
     
+    print(f"尝试在端口 {port} 启动Web服务器...")
     run_server(port)
