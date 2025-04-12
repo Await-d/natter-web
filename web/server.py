@@ -8,16 +8,30 @@ import subprocess
 import threading
 import signal
 import psutil
+import re
+import shutil
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 import socket
 
-# 确保能够访问到natter.py
-NATTER_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "natter", "natter.py")
+# 确保能够访问到natter.py，优先使用环境变量定义的路径
+NATTER_PATH = os.environ.get('NATTER_PATH') or os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "natter", "natter.py")
+
+# 数据存储目录，优先使用环境变量定义的路径
+DATA_DIR = os.environ.get('DATA_DIR') or os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+TEMPLATES_FILE = os.path.join(DATA_DIR, "templates.json")
+
+# 确保数据目录存在
+os.makedirs(DATA_DIR, exist_ok=True)
 
 # 存储运行中的Natter服务进程
 running_services = {}
 service_lock = threading.Lock()
+
+# NAT类型和端口状态的正则表达式
+NAT_TYPE_PATTERN = re.compile(r"NAT type: ([^\n]+)")
+LAN_STATUS_PATTERN = re.compile(r"LAN > ([^\[]+)\[ ([^\]]+) \]")
+WAN_STATUS_PATTERN = re.compile(r"WAN > ([^\[]+)\[ ([^\]]+) \]")
 
 class NatterService:
     def __init__(self, service_id, cmd_args):
@@ -28,6 +42,11 @@ class NatterService:
         self.output_lines = []
         self.mapped_address = None
         self.status = "初始化中"
+        self.lan_status = "未知"
+        self.wan_status = "未知"
+        self.nat_type = "未知"
+        self.auto_restart = False
+        self.restart_thread = None
         
     def start(self):
         """启动Natter服务"""
@@ -65,13 +84,47 @@ class NatterService:
                 parts = line.split('<--Natter-->')
                 if len(parts) == 2:
                     self.mapped_address = parts[1].strip()
+            
+            # 提取NAT类型
+            nat_match = NAT_TYPE_PATTERN.search(line)
+            if nat_match:
+                self.nat_type = nat_match.group(1).strip()
+            
+            # 提取LAN状态
+            lan_match = LAN_STATUS_PATTERN.search(line)
+            if lan_match:
+                self.lan_status = lan_match.group(2).strip()
+            
+            # 提取WAN状态
+            wan_match = WAN_STATUS_PATTERN.search(line)
+            if wan_match:
+                self.wan_status = wan_match.group(2).strip()
         
         # 进程结束后更新状态
         self.status = "已停止"
+        
+        # 如果启用了自动重启，则重新启动服务
+        if self.auto_restart:
+            # 使用新线程进行重启，避免阻塞当前线程
+            self.restart_thread = threading.Thread(target=self._restart_service)
+            self.restart_thread.daemon = True
+            self.restart_thread.start()
+    
+    def _restart_service(self):
+        """自动重启服务"""
+        time.sleep(1)  # 等待一秒钟后重启
+        self.start()
+    
+    def set_auto_restart(self, enabled):
+        """设置是否自动重启"""
+        self.auto_restart = enabled
     
     def stop(self):
         """停止Natter服务"""
         if self.process and self.process.poll() is None:
+            # 禁用自动重启
+            self.auto_restart = False
+            
             # 尝试优雅地终止进程
             try:
                 parent = psutil.Process(self.process.pid)
@@ -102,6 +155,18 @@ class NatterService:
             return True
         return False
     
+    def restart(self):
+        """重启Natter服务"""
+        if self.stop():
+            time.sleep(1)  # 等待一秒再启动
+            return self.start()
+        return False
+    
+    def clear_logs(self):
+        """清空日志"""
+        self.output_lines = []
+        return True
+    
     def get_info(self):
         """获取服务信息"""
         running = self.process and self.process.poll() is None
@@ -115,21 +180,90 @@ class NatterService:
             "start_time": self.start_time,
             "runtime": runtime,
             "mapped_address": self.mapped_address,
-            "last_output": self.output_lines[-10:] if self.output_lines else []
+            "last_output": self.output_lines[-10:] if self.output_lines else [],
+            "lan_status": self.lan_status,
+            "wan_status": self.wan_status,
+            "nat_type": self.nat_type,
+            "auto_restart": self.auto_restart
         }
 
 def generate_service_id():
     """生成唯一的服务ID"""
     return str(int(time.time() * 1000))
 
+class TemplateManager:
+    @staticmethod
+    def load_templates():
+        """加载所有配置模板"""
+        if not os.path.exists(TEMPLATES_FILE):
+            return []
+        
+        try:
+            with open(TEMPLATES_FILE, 'r') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"加载模板文件出错: {e}")
+            return []
+    
+    @staticmethod
+    def save_template(name, description, cmd_args):
+        """保存新模板"""
+        templates = TemplateManager.load_templates()
+        
+        # 生成唯一ID
+        template_id = generate_service_id()
+        
+        # 创建新模板
+        new_template = {
+            "id": template_id,
+            "name": name,
+            "description": description,
+            "cmd_args": cmd_args,
+            "created_at": time.time()
+        }
+        
+        # 添加到模板列表
+        templates.append(new_template)
+        
+        # 保存到文件
+        try:
+            with open(TEMPLATES_FILE, 'w') as f:
+                json.dump(templates, f, indent=2)
+            return template_id
+        except Exception as e:
+            print(f"保存模板出错: {e}")
+            return None
+    
+    @staticmethod
+    def delete_template(template_id):
+        """删除指定模板"""
+        templates = TemplateManager.load_templates()
+        
+        # 过滤出除了要删除的模板之外的所有模板
+        filtered_templates = [t for t in templates if t.get("id") != template_id]
+        
+        # 如果模板数量没变，说明未找到要删除的模板
+        if len(templates) == len(filtered_templates):
+            return False
+        
+        # 保存更新后的模板列表
+        try:
+            with open(TEMPLATES_FILE, 'w') as f:
+                json.dump(filtered_templates, f, indent=2)
+            return True
+        except Exception as e:
+            print(f"删除模板出错: {e}")
+            return False
+
 class NatterManager:
     @staticmethod
-    def start_service(args):
+    def start_service(args, auto_restart=False):
         """启动新的Natter服务"""
         service_id = generate_service_id()
         
         with service_lock:
             service = NatterService(service_id, args)
+            service.set_auto_restart(auto_restart)
             if service.start():
                 running_services[service_id] = service
                 return service_id
@@ -143,6 +277,35 @@ class NatterManager:
                 service = running_services[service_id]
                 if service.stop():
                     return True
+        return False
+    
+    @staticmethod
+    def restart_service(service_id):
+        """重启指定的Natter服务"""
+        with service_lock:
+            if service_id in running_services:
+                service = running_services[service_id]
+                if service.restart():
+                    return True
+        return False
+    
+    @staticmethod
+    def set_auto_restart(service_id, enabled):
+        """设置服务自动重启"""
+        with service_lock:
+            if service_id in running_services:
+                service = running_services[service_id]
+                service.set_auto_restart(enabled)
+                return True
+        return False
+    
+    @staticmethod
+    def clear_service_logs(service_id):
+        """清空服务日志"""
+        with service_lock:
+            if service_id in running_services:
+                service = running_services[service_id]
+                return service.clear_logs()
         return False
     
     @staticmethod
@@ -161,6 +324,16 @@ class NatterManager:
             for service_id in running_services:
                 services.append(running_services[service_id].get_info())
         return services
+    
+    @staticmethod
+    def stop_all_services():
+        """停止所有服务"""
+        stopped_count = 0
+        with service_lock:
+            for service_id in list(running_services.keys()):
+                if running_services[service_id].stop():
+                    stopped_count += 1
+        return stopped_count
 
 class NatterHttpHandler(BaseHTTPRequestHandler):
     def _set_headers(self, content_type="application/json"):
@@ -209,6 +382,10 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                     self._error(404, "Service not found")
             else:
                 self._error(400, "Missing service id")
+        elif path == "/api/templates":
+            self._set_headers()
+            templates = TemplateManager.load_templates()
+            self.wfile.write(json.dumps({"templates": templates}).encode())
         else:
             self._error(404, "Not found")
     
@@ -228,7 +405,8 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
         if path == "/api/services/start":
             if "args" in data:
                 args = data["args"]
-                service_id = NatterManager.start_service(args)
+                auto_restart = data.get("auto_restart", False)
+                service_id = NatterManager.start_service(args, auto_restart)
                 if service_id:
                     self._set_headers()
                     self.wfile.write(json.dumps({"service_id": service_id}).encode())
@@ -246,6 +424,64 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                     self._error(500, "Failed to stop service")
             else:
                 self._error(400, "Missing service id")
+        elif path == "/api/services/restart":
+            if "id" in data:
+                service_id = data["id"]
+                if NatterManager.restart_service(service_id):
+                    self._set_headers()
+                    self.wfile.write(json.dumps({"success": True}).encode())
+                else:
+                    self._error(500, "Failed to restart service")
+            else:
+                self._error(400, "Missing service id")
+        elif path == "/api/services/stop-all":
+            count = NatterManager.stop_all_services()
+            self._set_headers()
+            self.wfile.write(json.dumps({"success": True, "stopped_count": count}).encode())
+        elif path == "/api/services/auto-restart":
+            if "id" in data and "enabled" in data:
+                service_id = data["id"]
+                enabled = data["enabled"]
+                if NatterManager.set_auto_restart(service_id, enabled):
+                    self._set_headers()
+                    self.wfile.write(json.dumps({"success": True}).encode())
+                else:
+                    self._error(500, "Failed to set auto-restart")
+            else:
+                self._error(400, "Missing parameters")
+        elif path == "/api/services/clear-logs":
+            if "id" in data:
+                service_id = data["id"]
+                if NatterManager.clear_service_logs(service_id):
+                    self._set_headers()
+                    self.wfile.write(json.dumps({"success": True}).encode())
+                else:
+                    self._error(500, "Failed to clear logs")
+            else:
+                self._error(400, "Missing service id")
+        elif path == "/api/templates/save":
+            if "name" in data and "cmd_args" in data:
+                name = data["name"]
+                description = data.get("description", "")
+                cmd_args = data["cmd_args"]
+                template_id = TemplateManager.save_template(name, description, cmd_args)
+                if template_id:
+                    self._set_headers()
+                    self.wfile.write(json.dumps({"template_id": template_id}).encode())
+                else:
+                    self._error(500, "Failed to save template")
+            else:
+                self._error(400, "Missing required parameters")
+        elif path == "/api/templates/delete":
+            if "id" in data:
+                template_id = data["id"]
+                if TemplateManager.delete_template(template_id):
+                    self._set_headers()
+                    self.wfile.write(json.dumps({"success": True}).encode())
+                else:
+                    self._error(500, "Failed to delete template")
+            else:
+                self._error(400, "Missing template id")
         else:
             self._error(404, "Not found")
     
@@ -286,7 +522,15 @@ def run_server(port=8080):
         else:
             raise
 
+def cleanup():
+    """清理资源，停止所有运行中的服务"""
+    print("正在停止所有Natter服务...")
+    NatterManager.stop_all_services()
+
 if __name__ == "__main__":
+    # 注册清理函数
+    signal.signal(signal.SIGINT, lambda sig, frame: (cleanup(), sys.exit(0)))
+    
     # 检查natter.py是否存在
     if not os.path.exists(NATTER_PATH):
         print(f"错误: 找不到Natter程序 '{NATTER_PATH}'")

@@ -1,0 +1,18 @@
+version: '3'
+
+services:
+  natter-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: natter-web
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/app/data
+    network_mode: "host" # 使用主机网络模式，确保Natter可以正确检测网络接口
+    cap_add:
+      - NET_ADMIN # 允许使用iptables等网络管理工具
+    environment:
+      - TZ=Asia/Shanghai # 设置时区 

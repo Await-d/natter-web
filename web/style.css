@@ -1,0 +1,554 @@
+/* 基本样式设置 */
+:root {
+    --primary-color: #4a6fa5;
+    --secondary-color: #6c757d;
+    --success-color: #28a745;
+    --danger-color: #dc3545;
+    --warning-color: #ffc107;
+    --info-color: #17a2b8;
+    --light-color: #f8f9fa;
+    --dark-color: #343a40;
+    --border-color: #dee2e6;
+    --shadow-color: rgba(0, 0, 0, 0.1);
+    --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--font-family);
+    line-height: 1.5;
+    color: #333;
+    background-color: #f5f7fa;
+    padding: 20px;
+}
+
+/* 容器样式 */
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* 头部样式 */
+header {
+    margin-bottom: 2rem;
+    text-align: center;
+    padding: 1rem;
+}
+
+header h1 {
+    color: var(--primary-color);
+    margin-bottom: 0.5rem;
+}
+
+/* 卡片样式 */
+.card {
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px var(--shadow-color);
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.card h2 {
+    color: var(--primary-color);
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.card h3 {
+    color: var(--dark-color);
+    margin: 1.5rem 0 0.75rem;
+    font-size: 1.1rem;
+}
+
+/* 服务列表样式 */
+.services-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.loading {
+    text-align: center;
+    font-style: italic;
+    color: var(--secondary-color);
+    grid-column: 1 / -1;
+    padding: 2rem;
+}
+
+.no-services {
+    text-align: center;
+    grid-column: 1 / -1;
+    padding: 2rem;
+    color: var(--secondary-color);
+}
+
+/* 批量操作按钮 */
+.bulk-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+}
+
+/* 服务卡片样式 */
+.service-card, .template-card {
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.service-card:hover, .template-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.service-card-header, .template-card-header {
+    background-color: #f8f9fa;
+    padding: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.service-card-header h3, .template-card-header h3 {
+    font-size: 1rem;
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.service-card-body, .template-card-body {
+    padding: 1rem;
+}
+
+.service-card-body div, .template-card-body div {
+    margin-bottom: 0.5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.service-card-footer, .template-card-footer {
+    padding: 1rem;
+    display: flex;
+    justify-content: space-between;
+    border-top: 1px solid var(--border-color);
+}
+
+/* 表单样式 */
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+}
+
+.form-group input[type="text"],
+.form-group input[type="number"],
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 1rem;
+}
+
+.form-group textarea {
+    min-height: 100px;
+    resize: vertical;
+}
+
+.form-group small {
+    display: block;
+    margin-top: 0.5rem;
+    color: var(--secondary-color);
+}
+
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-top: 2rem;
+}
+
+/* 表单选项卡 */
+.form-tabs {
+    display: flex;
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.tab {
+    padding: 0.75rem 1.25rem;
+    cursor: pointer;
+    font-weight: 500;
+    color: var(--secondary-color);
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+}
+
+.tab:hover {
+    color: var(--primary-color);
+}
+
+.tab.active {
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+}
+
+/* 配置保存加载 */
+.config-save-load {
+    display: flex;
+    justify-content: flex-start;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+/* 按钮样式 */
+button {
+    cursor: pointer;
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    transition: background-color 0.2s, transform 0.1s;
+}
+
+button:active {
+    transform: translateY(1px);
+}
+
+.btn-primary {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: #3d5d8a;
+}
+
+.btn-secondary {
+    background-color: var(--secondary-color);
+    color: white;
+}
+
+.btn-secondary:hover {
+    background-color: #5a6268;
+}
+
+.btn-danger {
+    background-color: var(--danger-color);
+    color: white;
+}
+
+.btn-danger:hover {
+    background-color: #c82333;
+}
+
+.btn-warning {
+    background-color: var(--warning-color);
+    color: #212529;
+}
+
+.btn-warning:hover {
+    background-color: #e0a800;
+}
+
+.btn-info {
+    background-color: var(--info-color);
+    color: white;
+}
+
+.btn-info:hover {
+    background-color: #138496;
+}
+
+.btn-small {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.8rem;
+    margin-left: 0.5rem;
+}
+
+/* 详情页样式 */
+.service-info {
+    margin-bottom: 1.5rem;
+}
+
+.info-item {
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+}
+
+.info-item .label {
+    font-weight: 500;
+    margin-right: 0.5rem;
+    min-width: 100px;
+}
+
+/* 状态面板 */
+.status-panel {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    margin-bottom: 1.5rem;
+    gap: 1rem;
+}
+
+.status-item {
+    flex: 1;
+    min-width: 150px;
+    padding: 1rem;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    text-align: center;
+}
+
+.status-label {
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+    color: var(--secondary-color);
+}
+
+.status-value {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--dark-color);
+}
+
+/* 输出日志区域 */
+.output-container {
+    margin-bottom: 1.5rem;
+}
+
+.output-container h3 {
+    margin-bottom: 0.5rem;
+    font-size: 1.1rem;
+    color: var(--dark-color);
+}
+
+.output-log {
+    background-color: #f8f9fa;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 1rem;
+    max-height: 300px;
+    overflow-y: auto;
+    font-family: monospace;
+    font-size: 0.9rem;
+    white-space: pre-wrap;
+}
+
+.log-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 0.5rem;
+}
+
+.log-controls label {
+    display: flex;
+    align-items: center;
+}
+
+.log-controls input[type="checkbox"] {
+    margin-right: 0.5rem;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+/* 状态徽章 */
+.badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.badge-success {
+    background-color: #e6f7ee;
+    color: var(--success-color);
+}
+
+.badge-warning {
+    background-color: #fff8e6;
+    color: var(--warning-color);
+}
+
+.badge-danger {
+    background-color: #fbeaec;
+    color: var(--danger-color);
+}
+
+/* 帮助面板 */
+.help-content {
+    line-height: 1.6;
+}
+
+.help-content h3 {
+    margin-top: 1.5rem;
+    margin-bottom: 0.75rem;
+    color: var(--primary-color);
+}
+
+.help-content p {
+    margin-bottom: 1rem;
+}
+
+.help-content ul {
+    margin-bottom: 1rem;
+    margin-left: 1.5rem;
+}
+
+.help-content li {
+    margin-bottom: 0.5rem;
+}
+
+/* FAQ样式 */
+.faq-item {
+    margin-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 1rem;
+}
+
+.faq-question {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: var(--dark-color);
+}
+
+.faq-answer {
+    color: var(--secondary-color);
+}
+
+#close-help-btn {
+    margin-top: 1.5rem;
+}
+
+/* 模板面板 */
+.templates-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.templates-actions {
+    margin-top: 1.5rem;
+    display: flex;
+    justify-content: flex-end;
+}
+
+/* 对话框 */
+.dialog {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+}
+
+.dialog.active {
+    display: flex;
+}
+
+.dialog-content {
+    background-color: white;
+    padding: 2rem;
+    border-radius: 8px;
+    max-width: 500px;
+    width: 100%;
+}
+
+.dialog-content h3 {
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+}
+
+.dialog-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-top: 1.5rem;
+}
+
+/* 文本样式 */
+.text-success {
+    color: var(--success-color);
+}
+
+.text-danger {
+    color: var(--danger-color);
+}
+
+.text-warning {
+    color: var(--warning-color);
+}
+
+.text-info {
+    color: var(--info-color);
+}
+
+/* 页脚样式 */
+footer {
+    text-align: center;
+    padding: 1rem;
+    color: var(--secondary-color);
+    font-size: 0.9rem;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .services-list, .templates-list {
+        grid-template-columns: 1fr;
+    }
+    
+    .action-buttons {
+        flex-direction: column;
+    }
+    
+    .action-buttons button {
+        width: 100%;
+        margin-bottom: 0.5rem;
+    }
+    
+    .status-panel {
+        flex-direction: column;
+    }
+    
+    .form-tabs {
+        flex-wrap: wrap;
+    }
+    
+    .tab {
+        flex: 1;
+        text-align: center;
+        padding: 0.75rem 0.5rem;
+    }
+} 
