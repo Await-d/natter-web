@@ -52,6 +52,31 @@ class NatterService:
         self.nat_type = "未知"
         self.auto_restart = False
         self.restart_thread = None
+        self.local_port = None   # 添加本地端口属性
+        self.remote_port = None  # 添加远程端口属性
+        
+        # 尝试从命令参数中解析端口信息
+        self._parse_ports_from_args()
+        
+    def _parse_ports_from_args(self):
+        """从命令参数中解析端口信息"""
+        try:
+            # 查找 -p 参数后面的端口号
+            for i, arg in enumerate(self.cmd_args):
+                if arg == '-p' and i + 1 < len(self.cmd_args):
+                    self.local_port = int(self.cmd_args[i + 1])
+                    break
+                    
+            # 在映射地址中寻找远程端口
+            if self.mapped_address and ':' in self.mapped_address:
+                parts = self.mapped_address.split(':')
+                if len(parts) >= 2:
+                    try:
+                        self.remote_port = int(parts[-1])
+                    except ValueError:
+                        pass
+        except Exception as e:
+            print(f"解析端口信息出错: {e}")
         
     def start(self):
         """启动Natter服务"""
@@ -106,6 +131,14 @@ class NatterService:
                 parts = line.split('<--Natter-->')
                 if len(parts) == 2:
                     self.mapped_address = parts[1].strip()
+                    # 解析远程端口
+                    try:
+                        if self.mapped_address and ':' in self.mapped_address:
+                            addr_parts = self.mapped_address.split(':')
+                            if len(addr_parts) >= 2:
+                                self.remote_port = int(addr_parts[-1])
+                    except Exception as e:
+                        print(f"解析远程端口出错: {e}")
             
             # 检测nftables错误
             if "nftables" in line and "not available" in line:
@@ -410,14 +443,31 @@ class NatterManager:
             with service_lock:
                 services_config = {}
                 for service_id, service in running_services.items():
-                    services_config[service_id] = {
+                    # 确保获取端口信息
+                    if hasattr(service, 'mapped_address') and service.mapped_address and not service.remote_port and ':' in service.mapped_address:
+                        try:
+                            addr_parts = service.mapped_address.split(':')
+                            if len(addr_parts) >= 2:
+                                service.remote_port = int(addr_parts[-1])
+                        except:
+                            pass
+                    
+                    # 创建配置对象，只包含一定存在的属性
+                    service_data = {
                         'args': service.cmd_args,
                         'status': service.status,
                         'auto_restart': service.auto_restart,
-                        'start_time': service.start_time,
-                        'local_port': service.local_port,
-                        'remote_port': service.remote_port
+                        'start_time': service.start_time
                     }
+                    
+                    # 添加可能不存在的属性
+                    if hasattr(service, 'local_port') and service.local_port is not None:
+                        service_data['local_port'] = service.local_port
+                    
+                    if hasattr(service, 'remote_port') and service.remote_port is not None:
+                        service_data['remote_port'] = service.remote_port
+                    
+                    services_config[service_id] = service_data
             
             with open(SERVICES_DB_FILE, 'w', encoding='utf-8') as f:
                 json.dump(services_config, f, indent=2, ensure_ascii=False)
@@ -449,6 +499,13 @@ class NatterManager:
                         # 创建并启动服务
                         service = NatterService(service_id, args)
                         service.auto_restart = auto_restart
+                        
+                        # 设置可能存在的端口信息
+                        if 'local_port' in config:
+                            service.local_port = config['local_port']
+                        if 'remote_port' in config:
+                            service.remote_port = config['remote_port']
+                        
                         if service.start():
                             running_services[service_id] = service
                             print(f"服务 {service_id} 已从配置文件加载并启动")
