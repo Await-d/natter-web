@@ -549,6 +549,9 @@ document.addEventListener('DOMContentLoaded', function () {
             autoRestartStatus.className = enabled ? 'status-enabled' : 'status-disabled';
         });
     }
+
+    // 获取版本号
+    fetchVersion();
 });
 
 // 加载服务列表
@@ -610,7 +613,7 @@ function renderServicesList(services) {
         const detailsBtn = card.querySelector('.btn-details');
         if (detailsBtn) {
             detailsBtn.addEventListener('click', () => {
-                fetchServiceDetails(service.id);
+                showServiceDetails(service.id);
             });
         }
 
@@ -619,6 +622,14 @@ function renderServicesList(services) {
         if (stopBtn) {
             stopBtn.addEventListener('click', () => {
                 stopService(service.id);
+            });
+        }
+
+        // 绑定删除按钮事件
+        const deleteBtn = card.querySelector('.btn-delete');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', () => {
+                deleteService(service.id);
             });
         }
 
@@ -1933,4 +1944,17 @@ function startDetailRefresh() {
             refreshIntervalId = null;
         }
     }, 5000);
+}
+
+// 获取版本号
+function fetchVersion() {
+    fetch('/api/version')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('version').textContent = data.version;
+        })
+        .catch(error => {
+            console.error('获取版本号失败:', error);
+            document.getElementById('version').textContent = '未知';
+        });
 }

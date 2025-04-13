@@ -15,6 +15,9 @@ from urllib.parse import urlparse, parse_qs
 
 import psutil
 
+# 版本号定义
+VERSION = "1.0.0"
+
 # 确保能够访问到natter.py，优先使用环境变量定义的路径
 NATTER_PATH = os.environ.get('NATTER_PATH') or os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "natter", "natter.py")
 
@@ -554,64 +557,75 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
         self._set_headers()
     
     def do_GET(self):
-        parsed_url = urlparse(self.path)
-        path = parsed_url.path
-        query = parse_qs(parsed_url.query)
-        
-        # 总是允许访问登录页和静态资源
-        if path == "/" or path == "" or path.endswith('.html') or path.endswith('.css') or path.endswith('.js'):
-            # 为前端文件提供静态服务
-            if path == "/" or path == "":
-                self._serve_file("index.html", "text/html")
-                return
-            elif path.endswith(".html"):
-                self._serve_file(path[1:], "text/html")
-                return
-            elif path.endswith(".css"):
-                self._serve_file(path[1:], "text/css")
-                return
-            elif path.endswith(".js"):
-                self._serve_file(path[1:], "application/javascript")
-                return
-        
-        # API请求需要验证
-        if not self._authenticate():
-            return
+        try:
+            # 解析路径和查询参数
+            parsed_url = urlparse(self.path)
+            path = parsed_url.path
+            query_params = parse_qs(parsed_url.query)
             
-        # API端点
-        if path == "/api/services":
-            self._set_headers()
-            services = NatterManager.list_services()
-            self.wfile.write(json.dumps({"services": services}).encode())
-        elif path == "/api/service":
-            if "id" in query:
-                service_id = query["id"][0]
-                service = NatterManager.get_service(service_id)
-                if service:
-                    self._set_headers()
-                    self.wfile.write(json.dumps({"service": service}).encode())
-                else:
-                    self._error(404, "Service not found")
-            else:
-                self._error(400, "Missing service id")
-        elif path == "/api/templates":
-            self._set_headers()
-            templates = TemplateManager.load_templates()
-            self.wfile.write(json.dumps({"templates": templates}).encode())
-        elif path == "/api/tools/check":
-            if "tool" in query:
-                tool = query["tool"][0]
-                result = self._check_tool_installed(tool)
+            # 如果访问的是版本号API
+            if path == '/api/version':
+                self._set_headers(200)
+                response = {'version': VERSION}
+                self.wfile.write(json.dumps(response).encode())
+                return
+            
+            # 总是允许访问登录页和静态资源
+            if path == "/" or path == "" or path.endswith('.html') or path.endswith('.css') or path.endswith('.js'):
+                # 为前端文件提供静态服务
+                if path == "/" or path == "":
+                    self._serve_file("index.html", "text/html")
+                    return
+                elif path.endswith(".html"):
+                    self._serve_file(path[1:], "text/html")
+                    return
+                elif path.endswith(".css"):
+                    self._serve_file(path[1:], "text/css")
+                    return
+                elif path.endswith(".js"):
+                    self._serve_file(path[1:], "application/javascript")
+                    return
+            
+            # API请求需要验证
+            if not self._authenticate():
+                return
+            
+            # API端点
+            if path == "/api/services":
                 self._set_headers()
-                self.wfile.write(json.dumps(result).encode())
+                services = NatterManager.list_services()
+                self.wfile.write(json.dumps({"services": services}).encode())
+            elif path == "/api/service":
+                if "id" in query_params:
+                    service_id = query_params["id"][0]
+                    service = NatterManager.get_service(service_id)
+                    if service:
+                        self._set_headers()
+                        self.wfile.write(json.dumps({"service": service}).encode())
+                    else:
+                        self._error(404, "Service not found")
+                else:
+                    self._error(400, "Missing service id")
+            elif path == "/api/templates":
+                self._set_headers()
+                templates = TemplateManager.load_templates()
+                self.wfile.write(json.dumps({"templates": templates}).encode())
+            elif path == "/api/tools/check":
+                if "tool" in query_params:
+                    tool = query_params["tool"][0]
+                    result = self._check_tool_installed(tool)
+                    self._set_headers()
+                    self.wfile.write(json.dumps(result).encode())
+                else:
+                    self._error(400, "Missing tool parameter")
+            elif path == "/api/auth/check":
+                # 检查密码是否已设置
+                self._set_headers()
+                self.wfile.write(json.dumps({"auth_required": PASSWORD is not None}).encode())
             else:
-                self._error(400, "Missing tool parameter")
-        elif path == "/api/auth/check":
-            # 检查密码是否已设置
-            self._set_headers()
-            self.wfile.write(json.dumps({"auth_required": PASSWORD is not None}).encode())
-        else:
-            self._error(404, "Not found")
+                self._error(404, "Not found")
+        except Exception as e:
+            self._error(500, f"服务器内部错误: {e}")
     
     def do_POST(self):
         parsed_url = urlparse(self.path)
