@@ -285,9 +285,27 @@ function renderServicesList(services) {
         // 设置服务ID
         card.setAttribute('data-id', service.id);
 
+        // 格式化地址显示
+        const addressDisplay = service.mapped_address || '等待映射...';
+
         // 填充服务信息
         const mappedAddress = card.querySelector('.service-mapped-address');
-        mappedAddress.textContent = service.mapped_address || '等待映射...';
+        // 在标题处显示简短地址（只保留主机名/IP和端口）
+        mappedAddress.textContent = formatAddressShort(addressDisplay);
+
+        // 在卡片体中显示完整地址
+        const mappedAddressFull = card.querySelector('.service-mapped-address-full');
+        mappedAddressFull.textContent = addressDisplay;
+
+        // 添加复制按钮事件
+        const copyBtn = card.querySelector('.copy-address-btn');
+        if (copyBtn) {
+            copyBtn.addEventListener('click', function (e) {
+                e.stopPropagation(); // 阻止事件冒泡
+                copyToClipboard(addressDisplay);
+                showNotification('地址已复制到剪贴板', 'success');
+            });
+        }
 
         const status = card.querySelector('.service-status');
         status.textContent = service.status;
@@ -689,13 +707,38 @@ function loadServiceDetails(id) {
             serviceStatus.className = 'value ' + (service.running ? 'text-success' : 'text-danger');
 
             // 更新映射地址
-            serviceMappedAddress.textContent = service.mapped_address || '未知';
+            const addressDisplay = service.mapped_address || '未知';
+            serviceMappedAddress.textContent = addressDisplay;
+
+            // 更改复制按钮样式和行为
+            if (copyAddressBtn) {
+                if (addressDisplay === '未知' || !service.running) {
+                    copyAddressBtn.disabled = true;
+                    copyAddressBtn.classList.add('btn-disabled');
+                } else {
+                    copyAddressBtn.disabled = false;
+                    copyAddressBtn.classList.remove('btn-disabled');
+
+                    // 重新绑定事件监听器
+                    copyAddressBtn.onclick = function () {
+                        copyToClipboard(addressDisplay);
+                    };
+                }
+            }
 
             // 更新命令参数
             serviceCmdArgs.textContent = `python natter.py ${service.cmd_args.join(' ')}`;
 
-            // 更新输出日志
-            serviceOutput.textContent = service.last_output.join('\n');
+            // 更新输出日志，限制最多显示100条
+            let outputLines = service.last_output;
+            if (outputLines.length > 100) {
+                // 只保留最新的100条日志
+                outputLines = outputLines.slice(-100);
+                serviceOutput.textContent = `[显示最新100条日志，共${service.last_output.length}条]\n` + outputLines.join('\n');
+            } else {
+                serviceOutput.textContent = outputLines.join('\n');
+            }
+
             if (autoScroll && autoScroll.checked) {
                 serviceOutput.scrollTop = serviceOutput.scrollHeight;
             }
@@ -1018,22 +1061,48 @@ function saveTemplateToServer(name, description, cmd_args) {
 
 // 复制文本到剪贴板
 function copyToClipboard(text) {
-    if (!text) return;
+    if (!text || text === '等待映射...' || text === '未知') {
+        showNotification('暂无可复制的地址', 'warning');
+        return;
+    }
 
-    // 创建临时输入框
-    const tempInput = document.createElement('input');
-    tempInput.value = text;
-    document.body.appendChild(tempInput);
+    // 尝试使用现代Clipboard API
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text)
+            .then(() => {
+                showNotification('已复制到剪贴板: ' + text, 'success');
+            })
+            .catch(err => {
+                console.error('复制失败:', err);
+                fallbackCopyToClipboard(text);
+            });
+    } else {
+        // 回退到传统方法
+        fallbackCopyToClipboard(text);
+    }
+}
 
-    // 选择并复制
-    tempInput.select();
-    document.execCommand('copy');
+// 传统复制方法（回退方案）
+function fallbackCopyToClipboard(text) {
+    try {
+        // 创建临时输入框
+        const tempInput = document.createElement('input');
+        tempInput.value = text;
+        document.body.appendChild(tempInput);
 
-    // 移除临时输入框
-    document.body.removeChild(tempInput);
+        // 选择并复制
+        tempInput.select();
+        document.execCommand('copy');
 
-    // 提示用户
-    alert('已复制到剪贴板: ' + text);
+        // 移除临时输入框
+        document.body.removeChild(tempInput);
+
+        // 提示用户
+        showNotification('已复制到剪贴板: ' + text, 'success');
+    } catch (err) {
+        console.error('复制失败:', err);
+        showNotification('复制失败，请手动复制', 'error');
+    }
 }
 
 /**
@@ -1123,4 +1192,43 @@ function installTool(tool) {
             console.error(`安装 ${tool} 出错:`, error);
             showNotification(`安装 ${tool} 时发生错误`, 'error');
         });
+}
+
+/**
+ * 格式化地址为简短显示
+ * @param {string} address - 完整地址
+ * @returns {string} - 简短格式的地址
+ */
+function formatAddressShort(address) {
+    if (!address || address === '等待映射...' || address === '未知') {
+        return address;
+    }
+
+    try {
+        // 从地址中提取主机名/IP和端口
+        let result = address;
+
+        // 移除协议部分 (tcp://, udp://)
+        if (address.includes('://')) {
+            result = address.split('://')[1];
+        }
+
+        // 如果地址过长，只保留主要部分
+        if (result.length > 25) {
+            const parts = result.split(':');
+            if (parts.length > 1) {
+                // 获取最后一部分作为端口
+                const port = parts[parts.length - 1];
+                // 获取IP或主机名的前15个字符
+                const host = parts.slice(0, -1).join(':');
+                const shortHost = host.length > 15 ? host.substring(0, 12) + '...' : host;
+                return shortHost + ':' + port;
+            }
+        }
+
+        return result;
+    } catch (e) {
+        console.error('格式化地址出错:', e);
+        return address;
+    }
 }
