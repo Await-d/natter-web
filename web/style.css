@@ -12,7 +12,6 @@
     --shadow-color: rgba(0, 0, 0, 0.1);
     --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
-
 * {
     margin: 0;
     padding: 0;
@@ -528,24 +527,24 @@ footer {
     .services-list, .templates-list {
         grid-template-columns: 1fr;
     }
-    
+
     .action-buttons {
         flex-direction: column;
     }
-    
+
     .action-buttons button {
         width: 100%;
         margin-bottom: 0.5rem;
     }
-    
+
     .status-panel {
         flex-direction: column;
     }
-    
+
     .form-tabs {
         flex-wrap: wrap;
     }
-    
+
     .tab {
         flex: 1;
         text-align: center;
@@ -589,4 +588,4 @@ footer {
 
 .notification.info {
     background-color: #17a2b8;
-} 
+}
