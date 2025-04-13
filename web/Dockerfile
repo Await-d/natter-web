@@ -10,7 +10,7 @@ RUN apt-get update && \
     iptables \
     iptables-persistent \
     libpcap-dev \
-    netcat \
+    netcat-openbsd \
     net-tools \
     iproute2 \
     wget \
