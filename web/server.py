@@ -1,28 +1,19 @@
 #!/usr/bin/env python3
 
-import os
-import sys
-import json
-import time
-import subprocess
-import threading
-import signal
-import psutil
-import re
-import shutil
-import hashlib
 import base64
+import json
+import os
+import re
+import signal
+import socket
+import subprocess
+import sys
+import threading
+import time
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
-import socket
-import random
-import string
-import urllib.parse
-import mimetypes
-import http.client
-from socketserver import ThreadingMixIn
-from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
+
+import psutil
 
 # 确保能够访问到natter.py，优先使用环境变量定义的路径
 NATTER_PATH = os.environ.get('NATTER_PATH') or os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "natter", "natter.py")
@@ -46,13 +37,6 @@ WAN_STATUS_PATTERN = re.compile(r"WAN > ([^\[]+)\[ ([^\]]+) \]")
 
 # 默认密码为None，表示不启用验证
 PASSWORD = None
-
-# 定义全局变量
-PORT = 8080
-AUTH_USERNAME = "admin"
-AUTH_PASSWORD = "admin"
-STATIC_DIR = os.path.dirname(os.path.abspath(__file__))
-NETSH_PATH = "netsh"
 
 class NatterService:
     def __init__(self, service_id, cmd_args):
