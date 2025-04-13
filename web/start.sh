@@ -3,7 +3,7 @@
  # @Author: Await
  # @Date: 2025-04-12 15:27:12
  # @LastEditors: Await
- # @LastEditTime: 2025-04-13 17:26:55
+ # @LastEditTime: 2025-04-13 17:29:32
  # @Description: 请填写简介
 ### 
 
@@ -74,3 +74,4 @@ if [ -n "$WEB_PASSWORD" ]; then
 else
     echo "未配置访问密码，所有人均可访问"
     python3 -u "$APP_DIR/server.py" "$WEB_PORT" 
+fi 
