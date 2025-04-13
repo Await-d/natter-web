@@ -121,7 +121,7 @@ function checkToolInstalled(tool) {
 
     toolsStatus[tool].checking = true;
 
-    fetchWithAuth(`${API.checkTool}?tool=${tool}`)
+    fetchWithAuth(`${API.toolsCheck}?tool=${tool}`)
         .then(response => response.json())
         .then(data => {
             toolsStatus[tool].installed = data.installed;
@@ -1020,10 +1020,17 @@ function showServiceDetailsPanel(service) {
     saveRemarkBtn.onclick = null;
     // 添加新的点击事件处理程序，在点击时获取最新的输入值
     saveRemarkBtn.onclick = function () {
-        // 获取当前输入框中的最新值
-        const currentValue = document.getElementById('service-remark').value;
+        // 获取当前输入框中的最新值（直接从DOM中获取以确保是最新值）
+        const remarkInput = document.getElementById('service-remark');
+        const currentValue = remarkInput.value;
         // 获取当前服务ID
-        const serviceId = document.getElementById('service-remark').dataset.serviceId;
+        const serviceId = remarkInput.dataset.serviceId;
+
+        // 在控制台输出调试信息
+        console.log('保存备注 - 服务ID:', serviceId);
+        console.log('保存备注 - 备注值:', currentValue);
+
+        // 确保在备注输入后立即获取最新值
         saveServiceRemark(serviceId, currentValue);
     };
 
@@ -1976,25 +1983,34 @@ function fetchVersion() {
 
 // 保存服务备注
 function saveServiceRemark(serviceId, remark) {
+    // 调试日志
+    console.log('发送备注请求 - 服务ID:', serviceId);
+    console.log('发送备注请求 - 备注值:', remark);
+
+    const requestBody = {
+        id: serviceId,
+        remark: remark
+    };
+
+    console.log('请求体:', JSON.stringify(requestBody));
+
     fetchWithAuth(API.setRemark, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                id: serviceId,
-                remark: remark
-            })
+            body: JSON.stringify(requestBody)
         })
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                showNotification('备注已保存', 'success');
+                showNotification('备注已保存: ' + remark, 'success');
 
                 // 更新输入框的值，确保显示最新的备注
                 const remarkInput = document.getElementById('service-remark');
                 if (remarkInput) {
                     remarkInput.value = remark;
+                    console.log('成功后更新输入框值为:', remark);
                 }
 
                 // 更新内存中的服务对象
@@ -2002,14 +2018,12 @@ function saveServiceRemark(serviceId, remark) {
                     // 如果有缓存的服务数据，也更新它
                     if (window.currentServiceData) {
                         window.currentServiceData.remark = remark;
+                        console.log('更新内存中服务数据的备注为:', remark);
                     }
                 }
 
-                // 刷新服务列表
+                // 刷新服务列表但不刷新详情页
                 loadServices();
-
-                // 由于loadServiceDetails会完全重新加载并可能覆盖用户输入，
-                // 所以在这里我们不调用它，而是依赖上面的直接更新
             } else {
                 showNotification('保存备注失败：' + (data.error || '未知错误'), 'error');
             }
