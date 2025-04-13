@@ -994,10 +994,10 @@ function loadServiceDetails(id) {
 
 // 显示服务详情面板
 function showServiceDetailsPanel(service) {
-    // 设置当前服务ID，用于后续刷新
-    currentServiceId = service.id;
-
     hideAllPanels();
+
+    // 存储当前服务数据供其他函数使用
+    window.currentServiceData = service;
 
     // 显示面板
     const detailsPanel = document.getElementById('service-details-panel');
@@ -1012,17 +1012,20 @@ function showServiceDetailsPanel(service) {
     // 设置备注
     const remarkInput = document.getElementById('service-remark');
     remarkInput.value = service.remark || '';
+    remarkInput.dataset.serviceId = service.id; // 存储服务ID到数据属性中
 
-    // 添加保存备注按钮事件
+    // 添加保存备注按钮事件 - 使用事件委托方式，而不是每次都重新绑定
     const saveRemarkBtn = document.getElementById('save-remark-btn');
-    if (saveRemarkBtn) {
-        saveRemarkBtn.onclick = function () {
-            console.log('保存备注按钮点击: ', service.id, remarkInput.value);
-            saveServiceRemark(service.id, remarkInput.value);
-        };
-    } else {
-        console.error('未找到保存备注按钮元素，ID: save-remark-btn');
-    }
+    // 移除旧的点击事件处理程序（如果有）
+    saveRemarkBtn.onclick = null;
+    // 添加新的点击事件处理程序，在点击时获取最新的输入值
+    saveRemarkBtn.onclick = function () {
+        // 获取当前输入框中的最新值
+        const currentValue = document.getElementById('service-remark').value;
+        // 获取当前服务ID
+        const serviceId = document.getElementById('service-remark').dataset.serviceId;
+        saveServiceRemark(serviceId, currentValue);
+    };
 
     // 设置状态文本和样式
     serviceStatus.textContent = service.status;
@@ -1988,13 +1991,25 @@ function saveServiceRemark(serviceId, remark) {
             if (data.success) {
                 showNotification('备注已保存', 'success');
 
-                // 刷新服务详情
-                loadServiceDetails(serviceId);
-
-                // 如果在服务列表中，也需要刷新
-                if (document.getElementById('services-panel').style.display !== 'none') {
-                    loadServices();
+                // 更新输入框的值，确保显示最新的备注
+                const remarkInput = document.getElementById('service-remark');
+                if (remarkInput) {
+                    remarkInput.value = remark;
                 }
+
+                // 更新内存中的服务对象
+                if (currentServiceId === serviceId) {
+                    // 如果有缓存的服务数据，也更新它
+                    if (window.currentServiceData) {
+                        window.currentServiceData.remark = remark;
+                    }
+                }
+
+                // 刷新服务列表
+                loadServices();
+
+                // 由于loadServiceDetails会完全重新加载并可能覆盖用户输入，
+                // 所以在这里我们不调用它，而是依赖上面的直接更新
             } else {
                 showNotification('保存备注失败：' + (data.error || '未知错误'), 'error');
             }
