@@ -8,6 +8,9 @@ RUN apt-get update && \
     procps \
     nftables \
     iptables \
+    iptables-persistent \
+    libpcap-dev \
+    netcat \
     net-tools \
     iproute2 \
     wget \

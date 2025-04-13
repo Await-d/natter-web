@@ -343,7 +343,13 @@ document.addEventListener('DOMContentLoaded', function () {
             const method = this.value;
             if (methodDescriptions[method]) {
                 const info = methodDescriptions[method];
-                showNotification(`${info.name}: ${info.desc}<br>适用于: ${info.bestFor}`, 'info');
+
+                // 对于nftables方法，增加特殊警告
+                if (method === 'nftables') {
+                    showNotification(`${info.name}: ${info.desc}<br>适用于: ${info.bestFor}<br><span style="color:#ff6b6b;font-weight:bold">⚠️ 警告：在Docker环境中nftables可能不可用。如出现问题，请改用socket或iptables方法。</span>`, 'warning');
+                } else {
+                    showNotification(`${info.name}: ${info.desc}<br>适用于: ${info.bestFor}`, 'info');
+                }
 
                 // 检查是否需要安装工具
                 if (method === 'socat' || method === 'gost') {

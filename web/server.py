@@ -84,6 +84,8 @@ class NatterService:
     
     def _capture_output(self):
         """捕获并解析Natter输出"""
+        nftables_error_detected = False
+        
         for line in self.process.stdout:
             self.output_lines.append(line.strip())
             # 限制保存的日志行数为100行
@@ -95,6 +97,18 @@ class NatterService:
                 parts = line.split('<--Natter-->')
                 if len(parts) == 2:
                     self.mapped_address = parts[1].strip()
+            
+            # 检测nftables错误
+            if "nftables" in line and "not available" in line:
+                nftables_error_detected = True
+                self.output_lines.append("⚠️ 检测到nftables不可用错误！Docker容器可能缺少所需权限或内核支持。")
+                self.output_lines.append("💡 建议：尝试使用其他转发方法，如'socket'（内置）或'iptables'。")
+                self.output_lines.append("📋 步骤：停止此服务，重新创建服务并在'转发方法'中选择'socket'或'iptables'。")
+            
+            # 检测pcap初始化错误
+            if "pcap initialization failed" in line:
+                self.output_lines.append("⚠️ 检测到pcap初始化错误！这通常与nftables功能有关。")
+                self.output_lines.append("💡 建议：尝试使用其他转发方法，如'socket'（内置）或'iptables'。")
             
             # 提取NAT类型
             nat_match = NAT_TYPE_PATTERN.search(line)
@@ -114,12 +128,14 @@ class NatterService:
         # 进程结束后更新状态
         self.status = "已停止"
         
-        # 如果启用了自动重启，则重新启动服务
-        if self.auto_restart:
+        # 如果启用了自动重启，且不是由于nftables错误导致的退出，则重新启动服务
+        if self.auto_restart and not nftables_error_detected:
             # 使用新线程进行重启，避免阻塞当前线程
             self.restart_thread = threading.Thread(target=self._restart_service)
             self.restart_thread.daemon = True
             self.restart_thread.start()
+        elif nftables_error_detected:
+            self.output_lines.append("🔄 因nftables错误，已禁用自动重启。请使用其他转发方法重新配置。")
     
     def _restart_service(self):
         """自动重启服务"""

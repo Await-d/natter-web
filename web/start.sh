@@ -3,7 +3,7 @@
  # @Author: Await
  # @Date: 2025-04-12 15:27:12
  # @LastEditors: Await
- # @LastEditTime: 2025-04-13 17:34:41
+ # @LastEditTime: 2025-04-13 17:46:20
  # @Description: 请填写简介
 ### 
 
@@ -25,34 +25,61 @@ fi
 
 # 确保nftables正常工作
 echo "检查nftables..."
+
+# 尝试不同的方法确保nftables工作
 if command -v nft &> /dev/null; then
-  # 尝试加载nftables模块
-  modprobe nf_tables || echo "无法加载nf_tables模块，可能是容器限制"
+  echo "nftables已安装，尝试初始化..."
   
-  # 尝试启动nftables服务
-  systemctl start nftables 2>/dev/null || echo "无法通过systemctl启动nftables服务"
+  # 尝试加载内核模块 - 在某些容器环境中可能会失败
+  modprobe nf_tables &>/dev/null || echo "无法加载nf_tables模块 (在容器中这是正常的)"
   
-  # 创建一个测试表，然后删除，以检查nftables是否真正工作
+  # 手动创建nftables配置目录
+  mkdir -p /etc/nftables
+  touch /etc/nftables/nftables.conf
+  
+  # 尝试不同的方法启动nftables
+  systemctl start nftables &>/dev/null || \
+  service nftables start &>/dev/null || \
+  nft -f /etc/nftables/nftables.conf &>/dev/null || \
+  echo "无法启动nftables服务 (在容器中这是正常的)"
+  
+  # 测试nftables是否可用
   echo "测试nftables功能..."
-  if nft add table inet test_table 2>/dev/null && nft delete table inet test_table 2>/dev/null; then
-    echo "nftables功能正常"
+  if nft list tables &>/dev/null; then
+    echo "✅ nftables功能正常"
   else
-    echo "nftables功能测试失败，可能需要特权或模块支持"
+    echo "⚠️ nftables不可用。这可能是由于容器限制，请尝试使用其他转发方法。"
+    echo "   推荐使用 socket 或 iptables 方法替代。"
   fi
 else
   echo "未找到nftables命令，尝试安装..."
-  apt-get update && apt-get install -y nftables
-  # 安装后再次尝试
+  apt-get update && apt-get install -y nftables libpcap-dev
+  
+  # 安装后再次测试
   if command -v nft &> /dev/null; then
     echo "nftables已安装，尝试测试功能..."
-    if nft add table inet test_table 2>/dev/null && nft delete table inet test_table 2>/dev/null; then
-      echo "nftables功能正常"
+    if nft list tables &>/dev/null; then
+      echo "✅ nftables功能已成功安装"
     else
-      echo "nftables功能测试失败，可能需要特权或模块支持"
+      echo "⚠️ nftables安装成功但不可用。请使用其他转发方法。"
+      echo "   推荐使用 socket 或 iptables 方法替代。"
     fi
   else
-    echo "nftables安装失败"
+    echo "⚠️ nftables安装失败，请使用其他转发方法。"
   fi
+fi
+
+# 尝试安装socat
+if ! command -v socat &> /dev/null; then
+  echo "尝试安装socat工具..."
+  apt-get update && apt-get install -y socat && echo "✅ socat安装成功" || echo "⚠️ socat安装失败"
+fi
+
+# 尝试安装gost
+if ! command -v gost &> /dev/null; then
+  echo "尝试安装gost工具..."
+  wget -qO- https://github.com/ginuerzh/gost/releases/download/v2.11.2/gost-linux-amd64-2.11.2.gz 2>/dev/null | gunzip > /usr/local/bin/gost 2>/dev/null && \
+  chmod +x /usr/local/bin/gost && echo "✅ gost安装成功" || echo "⚠️ gost安装失败"
 fi
 
 # 设置应用路径变量
