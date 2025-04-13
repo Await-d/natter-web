@@ -89,6 +89,64 @@ const API = {
 
 // 事件监听器设置
 document.addEventListener('DOMContentLoaded', function () {
+    // 获取DOM元素
+    servicesList = document.getElementById('services-list');
+    templatesList = document.getElementById('templates-list');
+    servicesPanel = document.getElementById('services-panel');
+    newServicePanel = document.getElementById('new-service-panel');
+    serviceDetailsPanel = document.getElementById('service-details-panel');
+    helpPanel = document.getElementById('help-panel');
+    templatesPanel = document.getElementById('templates-panel');
+    serviceOutput = document.getElementById('service-output');
+
+    // 服务详情页面元素
+    serviceId = document.getElementById('service-id');
+    serviceStatus = document.getElementById('service-status');
+    serviceMappedAddress = document.getElementById('service-mapped-address');
+    serviceRuntime = document.getElementById('service-runtime');
+    serviceCmdArgs = document.getElementById('service-cmd-args');
+    lanStatus = document.getElementById('lan-status');
+    wanStatus = document.getElementById('wan-status');
+
+    // 获取表单元素
+    newServiceForm = document.getElementById('new-service-form');
+    serviceMode = document.getElementById('service-mode');
+    basicModeOptions = document.getElementById('basic-mode-options');
+    advancedModeOptions = document.getElementById('advanced-mode-options');
+    targetPort = document.getElementById('target-port');
+    udpMode = document.getElementById('udp-mode');
+    forwardMethod = document.getElementById('forward-method');
+    bindInterface = document.getElementById('bind-interface');
+    bindPort = document.getElementById('bind-port');
+    useUpnp = document.getElementById('use-upnp');
+    stunServer = document.getElementById('stun-server');
+    keepaliveServer = document.getElementById('keepalive-server');
+    keepaliveInterval = document.getElementById('keepalive-interval');
+    notificationScript = document.getElementById('notification-script');
+    retryMode = document.getElementById('retry-mode');
+    quitOnChange = document.getElementById('quit-on-change');
+    autoRestart = document.getElementById('auto-restart');
+    commandArgs = document.getElementById('command-args');
+
+    // 按钮元素
+    saveConfigBtn = document.getElementById('save-config-btn');
+    loadConfigBtn = document.getElementById('load-config-btn');
+    helpBtn = document.getElementById('help-btn');
+    closeHelpBtn = document.getElementById('close-help-btn');
+    refreshAllBtn = document.getElementById('refresh-all-btn');
+    stopAllBtn = document.getElementById('stop-all-btn');
+    refreshServiceBtn = document.getElementById('refresh-service-btn');
+    restartServiceBtn = document.getElementById('restart-service-btn');
+    stopServiceBtn = document.getElementById('stop-service-btn');
+    saveAsTemplateBtn = document.getElementById('save-as-template-btn');
+    backToListBtn = document.getElementById('back-btn');
+    copyAddressBtn = document.getElementById('copy-address-btn');
+    clearLogBtn = document.getElementById('clear-log-btn');
+    backFromTemplatesBtn = document.getElementById('back-from-templates-btn');
+    confirmSaveTemplate = document.getElementById('confirm-save-template');
+    cancelSaveTemplate = document.getElementById('cancel-save-template');
+    deleteServiceBtn = document.getElementById('delete-service-btn');
+
     // 加载服务列表
     loadServices();
 
@@ -648,7 +706,7 @@ function clearServiceLogs(id) {
         });
 }
 
-// 显示服务详情页
+// 显示服务详情
 function showServiceDetails(id) {
     currentServiceId = id;
 
@@ -658,19 +716,22 @@ function showServiceDetails(id) {
     helpPanel.style.display = 'none';
     templatesPanel.style.display = 'none';
 
-    // 显示详情面板
+    // 显示服务详情面板
     serviceDetailsPanel.style.display = 'block';
 
-    // 加载服务详情
+    // 设置服务ID显示
+    serviceId.textContent = id;
+
+    // 初始加载
     loadServiceDetails(id);
 
-    // 设置自动刷新
+    // 设置定时刷新
     if (refreshIntervalId) {
         clearInterval(refreshIntervalId);
     }
     refreshIntervalId = setInterval(() => loadServiceDetails(id), 3000);
 
-    // 更新运行时间
+    // 设置运行时间更新
     if (runtimeIntervalId) {
         clearInterval(runtimeIntervalId);
     }
@@ -710,7 +771,7 @@ function loadServiceDetails(id) {
             const addressDisplay = service.mapped_address || '未知';
             serviceMappedAddress.textContent = addressDisplay;
 
-            // 更改复制按钮样式和行为
+            // 设置复制按钮状态
             if (copyAddressBtn) {
                 if (addressDisplay === '未知' || !service.running) {
                     copyAddressBtn.disabled = true;
@@ -718,11 +779,6 @@ function loadServiceDetails(id) {
                 } else {
                     copyAddressBtn.disabled = false;
                     copyAddressBtn.classList.remove('btn-disabled');
-
-                    // 重新绑定事件监听器
-                    copyAddressBtn.onclick = function () {
-                        copyToClipboard(addressDisplay);
-                    };
                 }
             }
 
@@ -1066,24 +1122,28 @@ function copyToClipboard(text) {
         return;
     }
 
+    // 获取事件源（按钮）
+    const button = event ? event.currentTarget : null;
+
     // 尝试使用现代Clipboard API
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(text)
             .then(() => {
                 showNotification('已复制到剪贴板: ' + text, 'success');
+                showCopyFeedback(button);
             })
             .catch(err => {
                 console.error('复制失败:', err);
-                fallbackCopyToClipboard(text);
+                fallbackCopyToClipboard(text, button);
             });
     } else {
         // 回退到传统方法
-        fallbackCopyToClipboard(text);
+        fallbackCopyToClipboard(text, button);
     }
 }
 
 // 传统复制方法（回退方案）
-function fallbackCopyToClipboard(text) {
+function fallbackCopyToClipboard(text, button) {
     try {
         // 创建临时输入框
         const tempInput = document.createElement('input');
@@ -1099,10 +1159,28 @@ function fallbackCopyToClipboard(text) {
 
         // 提示用户
         showNotification('已复制到剪贴板: ' + text, 'success');
+        showCopyFeedback(button);
     } catch (err) {
         console.error('复制失败:', err);
         showNotification('复制失败，请手动复制', 'error');
     }
+}
+
+// 显示复制成功的视觉反馈
+function showCopyFeedback(button) {
+    if (!button) return;
+
+    // 保存原始文本
+    const originalText = button.textContent;
+    // 修改按钮文本和样式
+    button.textContent = '已复制！';
+    button.classList.add('copy-success');
+
+    // 恢复原始状态
+    setTimeout(() => {
+        button.textContent = originalText;
+        button.classList.remove('copy-success');
+    }, 1500);
 }
 
 /**

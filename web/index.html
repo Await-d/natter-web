@@ -182,8 +182,10 @@
                     </div>
                     <div class="info-item">
                         <span class="label">映射地址:</span>
-                        <span id="service-mapped-address" class="value">未知</span>
-                        <button id="copy-address-btn" class="btn-small">复制</button>
+                        <div class="service-address-container">
+                            <span id="service-mapped-address" class="service-mapped-address-full">未知</span>
+                            <button id="copy-address-btn" class="copy-address-btn">复制</button>
+                        </div>
                     </div>
                     <div class="info-item">
                         <span class="label">命令参数:</span>
@@ -274,7 +276,7 @@
         </main>
 
         <footer>
-            <p>Natter Web管理界面 &copy; 2023</p>
+            <p>Natter Web管理界面 &copy; 2025</p>
         </footer>
     </div>
 
@@ -288,7 +290,7 @@
             <div class="service-card-body">
                 <div class="service-address-container">
                     <span class="service-mapped-address-full"></span>
-                    <button class="btn-small copy-address-btn">复制</button>
+                    <button class="copy-address-btn">复制</button>
                 </div>
                 <div class="service-cmd-args">命令: </div>
                 <div class="service-runtime">运行时间: 0秒</div>

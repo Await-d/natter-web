@@ -221,17 +221,21 @@ header h1 {
 }
 
 /* 按钮样式 */
-button {
-    cursor: pointer;
+.btn-primary, .btn-secondary, .btn-danger, .btn-info, .btn-small, .btn-disabled {
     padding: 0.5rem 1rem;
     border: none;
     border-radius: 4px;
-    font-size: 0.9rem;
+    cursor: pointer;
+    font-size: 1rem;
     transition: background-color 0.2s, transform 0.1s;
 }
 
-button:active {
-    transform: translateY(1px);
+.btn-primary:hover, .btn-secondary:hover, .btn-danger:hover, .btn-info:hover, .btn-small:hover {
+    transform: translateY(-1px);
+}
+
+.btn-primary:active, .btn-secondary:active, .btn-danger:active, .btn-info:active, .btn-small:active {
+    transform: translateY(0);
 }
 
 .btn-primary {
@@ -240,7 +244,7 @@ button:active {
 }
 
 .btn-primary:hover {
-    background-color: #3d5d8a;
+    background-color: #3a5a8c;
 }
 
 .btn-secondary {
@@ -261,15 +265,6 @@ button:active {
     background-color: #c82333;
 }
 
-.btn-warning {
-    background-color: var(--warning-color);
-    color: #212529;
-}
-
-.btn-warning:hover {
-    background-color: #e0a800;
-}
-
 .btn-info {
     background-color: var(--info-color);
     color: white;
@@ -281,25 +276,48 @@ button:active {
 
 .btn-small {
     padding: 0.25rem 0.5rem;
-    font-size: 0.8rem;
-    margin-left: 0.5rem;
+    font-size: 0.875rem;
 }
 
-/* 详情页样式 */
+.btn-disabled, .copy-address-btn:disabled {
+    background-color: #e9ecef;
+    color: #6c757d;
+    cursor: not-allowed;
+    opacity: 0.65;
+}
+
+.btn-disabled:hover, .copy-address-btn:disabled:hover {
+    transform: none;
+    background-color: #e9ecef;
+}
+
+/* 服务详情样式 */
 .service-info {
     margin-bottom: 1.5rem;
 }
 
 .info-item {
-    margin-bottom: 0.5rem;
-    display: flex;
-    align-items: center;
+    margin-bottom: 1rem;
 }
 
 .info-item .label {
+    display: block;
     font-weight: 500;
-    margin-right: 0.5rem;
-    min-width: 100px;
+    margin-bottom: 0.5rem;
+    color: var(--secondary-color);
+}
+
+.info-item .value {
+    padding: 0.5rem;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    display: block;
+    word-break: break-all;
+}
+
+.info-item .service-address-container {
+    margin-top: 0.5rem;
 }
 
 /* 状态面板 */
@@ -603,38 +621,60 @@ footer {
     font-size: 0.85rem;
 }
 
-/* 服务地址容器 */
+/* 服务地址容器样式 */
 .service-address-container {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    margin-bottom: 8px;
-    padding: 6px 10px;
-    background-color: #f5f7fa;
+    margin-bottom: 0.5rem;
+    position: relative;
+    padding: 0.5rem;
+    background-color: #f8f9fa;
     border-radius: 4px;
-    border: 1px dashed var(--border-color);
-}
-
-.service-mapped-address-full {
-    font-family: monospace;
-    font-size: 0.9rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 80%;
-    color: var(--primary-color);
-    font-weight: 500;
-}
-
-.copy-address-btn {
-    padding: 3px 8px;
-    font-size: 0.75rem;
-    background-color: var(--light-color);
-    color: var(--dark-color);
     border: 1px solid var(--border-color);
 }
 
-.copy-address-btn:hover {
+.service-mapped-address-full {
+    flex-grow: 1;
+    margin-right: 0.5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: monospace;
+    color: var(--dark-color);
+}
+
+.copy-address-btn {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.25rem 0.5rem;
     background-color: var(--primary-color);
     color: white;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: background-color 0.2s;
+}
+
+.copy-address-btn:hover {
+    background-color: #3a5a8c;
+}
+
+.copy-address-btn::before {
+    content: "📋";
+    margin-right: 0.25rem;
+}
+
+/* 复制成功提示样式 */
+.copy-success {
+    animation: fade-in-out 1.5s ease;
+}
+
+@keyframes fade-in-out {
+    0% { opacity: 0; }
+    20% { opacity: 1; }
+    80% { opacity: 1; }
+    100% { opacity: 0; }
 }

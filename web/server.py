@@ -54,6 +54,12 @@ class NatterService:
             return False
         
         cmd = [sys.executable, NATTER_PATH] + self.cmd_args
+
+        # 如果没有指定keepalive间隔，添加默认值
+        if not any(arg == '-k' for arg in self.cmd_args):
+            cmd.extend(['-k', '30'])
+            print(f"自动添加保活间隔: 30秒")
+        
         self.process = subprocess.Popen(
             cmd, 
             stdout=subprocess.PIPE, 
@@ -75,8 +81,8 @@ class NatterService:
         """捕获并解析Natter输出"""
         for line in self.process.stdout:
             self.output_lines.append(line.strip())
-            # 限制保存的日志行数
-            if len(self.output_lines) > 1000:
+            # 限制保存的日志行数为100行
+            if len(self.output_lines) > 100:
                 self.output_lines.pop(0)
             
             # 尝试提取映射地址
@@ -180,7 +186,7 @@ class NatterService:
             "start_time": self.start_time,
             "runtime": runtime,
             "mapped_address": self.mapped_address,
-            "last_output": self.output_lines[-10:] if self.output_lines else [],
+            "last_output": self.output_lines,
             "lan_status": self.lan_status,
             "wan_status": self.wan_status,
             "nat_type": self.nat_type,
@@ -569,6 +575,23 @@ def get_free_port():
 def run_server(port=8080):
     """运行Web服务器"""
     try:
+        # 在Docker环境中自动安装nftables和gost
+        if os.path.exists('/.dockerenv'):
+            print("检测到Docker环境，正在自动安装需要的工具...")
+            try:
+                # 尝试安装nftables
+                subprocess.run(["apt-get", "update"], check=False)
+                subprocess.run(["apt-get", "install", "-y", "nftables"], check=False)
+                print("nftables安装完成")
+                
+                # 尝试安装gost
+                subprocess.run(["bash", "-c", 
+                    "wget -qO- https://github.com/ginuerzh/gost/releases/download/v2.11.2/gost-linux-amd64-2.11.2.gz | gunzip > /usr/local/bin/gost && chmod +x /usr/local/bin/gost"
+                ], check=False)
+                print("gost安装完成")
+            except Exception as e:
+                print(f"工具安装过程出错: {e}")
+        
         server_address = ('0.0.0.0', port)  # 修改为明确绑定0.0.0.0，确保监听所有网络接口
         httpd = HTTPServer(server_address, NatterHttpHandler)
         print(f"Natter管理界面已启动: http://0.0.0.0:{port}")
