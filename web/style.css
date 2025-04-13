@@ -1240,34 +1240,45 @@ input:checked + .slider:before {
 .service-card-actions {
     display: flex;
     justify-content: flex-end;
+    margin-top: 10px;
     gap: 8px;
 }
 
 .service-card-actions button {
-    background: transparent;
-    border: 1px solid #d9d9d9;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 8px;
+    font-size: 0.8rem;
     border-radius: 4px;
-    padding: 5px 8px;
+    border: none;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: background-color 0.3s;
+    background-color: var(--light-color);
+    color: var(--dark-color);
 }
 
 .service-card-actions .btn-details {
-    color: #1890ff;
-}
-
-.service-card-actions .btn-details:hover {
-    background-color: rgba(24, 144, 255, 0.1);
-    border-color: #1890ff;
+    background-color: var(--info-color);
+    color: white;
 }
 
 .service-card-actions .btn-stop {
-    color: #ff4d4f;
+    background-color: var(--warning-color);
+    color: var(--dark-color);
 }
 
-.service-card-actions .btn-stop:hover {
-    background-color: rgba(255, 77, 79, 0.1);
-    border-color: #ff4d4f;
+.service-card-actions .btn-delete {
+    background-color: var(--danger-color);
+    color: white;
+}
+
+.service-card-actions button:hover {
+    opacity: 0.9;
+}
+
+.service-card-actions i {
+    font-size: 0.85rem;
 }
 
 .empty-services-message {
