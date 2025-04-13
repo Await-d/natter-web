@@ -15,6 +15,14 @@ import base64
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 import socket
+import random
+import string
+import urllib.parse
+import mimetypes
+import http.client
+from socketserver import ThreadingMixIn
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
 
 # 确保能够访问到natter.py，优先使用环境变量定义的路径
 NATTER_PATH = os.environ.get('NATTER_PATH') or os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "natter", "natter.py")
@@ -22,13 +30,14 @@ NATTER_PATH = os.environ.get('NATTER_PATH') or os.path.join(os.path.dirname(os.p
 # 数据存储目录，优先使用环境变量定义的路径
 DATA_DIR = os.environ.get('DATA_DIR') or os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 TEMPLATES_FILE = os.path.join(DATA_DIR, "templates.json")
+SERVICES_DB_FILE = os.path.join(DATA_DIR, "services.json")
 
 # 确保数据目录存在
 os.makedirs(DATA_DIR, exist_ok=True)
 
 # 存储运行中的Natter服务进程
 running_services = {}
-service_lock = threading.Lock()
+service_lock = threading.RLock()
 
 # NAT类型和端口状态的正则表达式
 NAT_TYPE_PATTERN = re.compile(r"NAT type: ([^\n]+)")
@@ -37,6 +46,13 @@ WAN_STATUS_PATTERN = re.compile(r"WAN > ([^\[]+)\[ ([^\]]+) \]")
 
 # 默认密码为None，表示不启用验证
 PASSWORD = None
+
+# 定义全局变量
+PORT = 8080
+AUTH_USERNAME = "admin"
+AUTH_PASSWORD = "admin"
+STATIC_DIR = os.path.dirname(os.path.abspath(__file__))
+NETSH_PATH = "netsh"
 
 class NatterService:
     def __init__(self, service_id, cmd_args):
@@ -222,6 +238,15 @@ class NatterService:
             "nat_type": self.nat_type,
             "auto_restart": self.auto_restart
         }
+    
+    def to_dict(self):
+        """获取服务配置，用于持久化存储"""
+        return {
+            "id": self.service_id,
+            "cmd_args": self.cmd_args,
+            "auto_restart": self.auto_restart,
+            "created_at": self.start_time or time.time()
+        }
 
 def generate_service_id():
     """生成唯一的服务ID"""
@@ -294,7 +319,7 @@ class TemplateManager:
 class NatterManager:
     @staticmethod
     def start_service(args, auto_restart=False):
-        """启动新的Natter服务"""
+        """启动一个新的Natter服务"""
         service_id = generate_service_id()
         
         with service_lock:
@@ -302,6 +327,8 @@ class NatterManager:
             service.set_auto_restart(auto_restart)
             if service.start():
                 running_services[service_id] = service
+                # 保存服务配置
+                NatterManager.save_services()
                 return service_id
         return None
     
@@ -312,6 +339,8 @@ class NatterManager:
             if service_id in running_services:
                 service = running_services[service_id]
                 if service.stop():
+                    # 保存服务配置（移除服务后）
+                    NatterManager.save_services()
                     return True
         return False
     
@@ -325,6 +354,8 @@ class NatterManager:
                 service.stop()
                 # 从字典中删除服务
                 del running_services[service_id]
+                # 保存服务配置（移除服务后）
+                NatterManager.save_services()
                 return True
         return False
     
@@ -335,6 +366,8 @@ class NatterManager:
             if service_id in running_services:
                 service = running_services[service_id]
                 if service.restart():
+                    # 保存服务配置（移除服务后）
+                    NatterManager.save_services()
                     return True
         return False
     
@@ -345,6 +378,8 @@ class NatterManager:
             if service_id in running_services:
                 service = running_services[service_id]
                 service.set_auto_restart(enabled)
+                # 保存服务配置
+                NatterManager.save_services()
                 return True
         return False
     
@@ -383,6 +418,60 @@ class NatterManager:
                 if running_services[service_id].stop():
                     stopped_count += 1
         return stopped_count
+    
+    @staticmethod
+    def save_services():
+        """保存当前运行的服务到数据库文件"""
+        try:
+            with service_lock:
+                services_config = {}
+                for service_id, service in running_services.items():
+                    services_config[service_id] = {
+                        'args': service.cmd_args,
+                        'status': service.status,
+                        'auto_restart': service.auto_restart,
+                        'start_time': service.start_time,
+                        'local_port': service.local_port,
+                        'remote_port': service.remote_port
+                    }
+            
+            with open(SERVICES_DB_FILE, 'w', encoding='utf-8') as f:
+                json.dump(services_config, f, indent=2, ensure_ascii=False)
+            print(f"服务配置已保存到 {SERVICES_DB_FILE}")
+        except Exception as e:
+            print(f"保存服务配置失败: {str(e)}")
+    
+    @staticmethod
+    def load_services():
+        """从数据库文件加载服务配置"""
+        if not os.path.exists(SERVICES_DB_FILE):
+            print(f"服务配置文件不存在: {SERVICES_DB_FILE}")
+            return
+        
+        try:
+            with open(SERVICES_DB_FILE, 'r', encoding='utf-8') as f:
+                services_config = json.load(f)
+            
+            with service_lock:
+                for service_id, config in services_config.items():
+                    # 检查服务是否已运行
+                    if service_id in running_services:
+                        continue
+                    
+                    args = config.get('args')
+                    auto_restart = config.get('auto_restart', False)
+                    
+                    if args:
+                        # 创建并启动服务
+                        service = NatterService(service_id, args)
+                        service.auto_restart = auto_restart
+                        if service.start():
+                            running_services[service_id] = service
+                            print(f"服务 {service_id} 已从配置文件加载并启动")
+            
+            print(f"成功从 {SERVICES_DB_FILE} 加载服务配置")
+        except Exception as e:
+            print(f"加载服务配置失败: {str(e)}")
 
 class NatterHttpHandler(BaseHTTPRequestHandler):
     def _set_headers(self, content_type="application/json"):
@@ -718,6 +807,9 @@ def run_server(port=8080, password=None):
         else:
             print("未设置密码，所有人均可访问")
             
+        # 加载已保存的服务配置
+        NatterManager.load_services()
+        
         httpd.serve_forever()
     except OSError as e:
         if "Address already in use" in str(e):

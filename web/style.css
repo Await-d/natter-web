@@ -653,58 +653,63 @@ footer {
 .service-address-container {
     display: flex;
     align-items: center;
-    margin-bottom: 0.5rem;
-    position: relative;
-    padding: 0.5rem;
-    background-color: #f8f9fa;
+    margin-bottom: 10px;
+    background-color: #f5f5f5;
     border-radius: 4px;
+    padding: 8px;
+    gap: 8px;
     border: 1px solid var(--border-color);
 }
 
 .service-mapped-address-full {
-    flex-grow: 1;
-    margin-right: 0.5rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    flex: 1;
+    word-break: break-all;
     font-family: monospace;
+    font-size: 14px;
+    padding: 4px 8px;
     color: var(--dark-color);
 }
 
 .copy-address-btn {
-    flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 0.25rem 0.5rem;
-    background-color: var(--primary-color);
-    color: white;
+    gap: 5px;
+    padding: 4px 8px;
+    transition: all 0.2s ease;
+    cursor: pointer;
     border: none;
     border-radius: 3px;
-    cursor: pointer;
-    font-size: 0.8rem;
-    transition: background-color 0.2s;
 }
 
-.copy-address-btn:hover {
-    background-color: #3a5a8c;
-}
-
-.copy-address-btn::before {
-    content: "📋";
-    margin-right: 0.25rem;
-}
-
-/* 复制成功提示样式 */
 .copy-success {
-    animation: fade-in-out 1.5s ease;
+    background-color: #4CAF50 !important;
+    color: white !important;
 }
 
-@keyframes fade-in-out {
-    0% { opacity: 0; }
-    20% { opacity: 1; }
-    80% { opacity: 1; }
-    100% { opacity: 0; }
+/* 图标样式 */
+.icon-copy:before {
+    content: "\1F4CB"; /* 使用Unicode字符表示剪贴板图标 */
+    margin-right: 4px;
+}
+
+.icon-check:before {
+    content: "\2714"; /* 使用Unicode字符表示对号图标 */
+    margin-right: 4px;
+}
+
+/* 服务详情页的复制按钮样式 */
+#service-mapped-address {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#copy-address-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
 }
 
 /* 服务状态样式 */
@@ -903,4 +908,90 @@ footer {
 
 .logout-btn:hover {
     background-color: var(--danger-color);
+}
+
+/* 服务详情页样式 */
+.service-details {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.detail-row {
+    display: flex;
+    align-items: flex-start;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 8px;
+}
+
+.detail-row label {
+    width: 120px;
+    font-weight: bold;
+    color: var(--dark-color);
+}
+
+.service-address-detail {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 10px;
+}
+
+/* 自动重启开关 */
+.auto-restart-toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 24px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: .4s;
+}
+
+input:checked + .slider {
+    background-color: var(--primary-color);
+}
+
+input:checked + .slider:before {
+    transform: translateX(26px);
+}
+
+.slider.round {
+    border-radius: 24px;
+}
+
+.slider.round:before {
+    border-radius: 50%;
 }

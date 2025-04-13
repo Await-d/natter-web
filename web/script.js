@@ -109,6 +109,10 @@ const toolsStatus = {
     }
 };
 
+// 添加自动重启切换功能
+const autoRestartToggle = document.getElementById('auto-restart-toggle');
+const autoRestartStatus = document.getElementById('auto-restart-status');
+
 // 检查工具是否已安装
 function checkToolInstalled(tool) {
     if (toolsStatus[tool].checking) return;
@@ -451,7 +455,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (copyAddressBtn) {
         copyAddressBtn.addEventListener('click', function () {
-            copyToClipboard(serviceMappedAddress.textContent);
+            const address = serviceMappedAddress.textContent;
+            copyToClipboard(address);
+            showNotification('地址已复制到剪贴板', 'success');
         });
     }
 
@@ -503,6 +509,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // 检查Docker环境并显示nftables警告
     checkDockerEnvironment();
+
+    // 添加自动重启切换功能
+    if (autoRestartToggle) {
+        autoRestartToggle.addEventListener('change', function () {
+            const enabled = this.checked;
+            toggleAutoRestart(currentServiceId, enabled);
+            autoRestartStatus.textContent = enabled ? '已启用' : '已禁用';
+        });
+    }
 });
 
 // 加载服务列表
@@ -973,70 +988,77 @@ function loadServiceDetails(id) {
     fetchWithAuth(`${API.getService}?id=${id}`)
         .then(response => response.json())
         .then(data => {
-            if (!data.service) {
-                alert('无法找到该服务，可能已被删除。');
-                showServicesList();
-                return;
-            }
-
-            const service = data.service;
-
-            // 更新服务ID
-            serviceId.textContent = `#${service.id}`;
-
-            // 更新状态
-            serviceStatus.textContent = service.running ? '运行中' : '已停止';
-            serviceStatus.className = 'value ' + (service.running ? 'text-success' : 'text-danger');
-
-            // 更新映射地址
-            const addressDisplay = service.mapped_address || '未知';
-            serviceMappedAddress.textContent = addressDisplay;
-
-            // 设置复制按钮状态
-            if (copyAddressBtn) {
-                if (addressDisplay === '未知' || !service.running) {
-                    copyAddressBtn.disabled = true;
-                    copyAddressBtn.classList.add('btn-disabled');
-                } else {
-                    copyAddressBtn.disabled = false;
-                    copyAddressBtn.classList.remove('btn-disabled');
-                }
-            }
-
-            // 更新命令参数
-            serviceCmdArgs.textContent = `python natter.py ${service.cmd_args.join(' ')}`;
-
-            // 更新输出日志，限制最多显示100条
-            let outputLines = service.last_output;
-            if (outputLines.length > 100) {
-                // 只保留最新的100条日志
-                outputLines = outputLines.slice(-100);
-                serviceOutput.textContent = `[显示最新100条日志，共${service.last_output.length}条]\n` + outputLines.join('\n');
+            if (data.service) {
+                showServiceDetailsPanel(data.service);
             } else {
-                serviceOutput.textContent = outputLines.join('\n');
+                showNotification('加载服务详情失败', 'error');
             }
-
-            if (autoScroll && autoScroll.checked) {
-                serviceOutput.scrollTop = serviceOutput.scrollHeight;
-            }
-
-            // 更新状态面板
-            lanStatus.textContent = service.lan_status || '未知';
-            wanStatus.textContent = service.wan_status || '未知';
-            natType.textContent = service.nat_type || '未知';
-
-            // 根据状态设置颜色
-            setStatusColor(lanStatus, service.lan_status);
-            setStatusColor(wanStatus, service.wan_status);
-
-            // 保存开始时间以便更新运行时间
-            servicesRuntime[service.id] = service.start_time;
-            updateDetailRuntime();
         })
         .catch(error => {
-            console.error('加载服务详情出错:', error);
-            serviceOutput.textContent = '加载服务详情失败，请刷新重试。';
+            console.error('获取服务详情出错:', error);
+            showNotification('获取服务详情时发生错误', 'error');
         });
+}
+
+// 显示服务详情面板
+function showServiceDetailsPanel(service) {
+    currentServiceId = service.id;
+    hideAllPanels();
+    serviceDetailsPanel.style.display = 'block';
+
+    // 更新服务详情
+    serviceId.textContent = service.id;
+
+    // 设置状态文本和样式
+    serviceStatus.textContent = service.status;
+    setStatusColor(serviceStatus, service.status);
+
+    // 设置映射地址
+    serviceMappedAddress.textContent = service.mapped_address || '未映射';
+
+    // 设置命令参数
+    serviceCmdArgs.textContent = service.cmd_args.join(' ');
+
+    // 设置运行时间并启动定时更新
+    updateDetailPanelRuntime(service);
+    if (runtimeIntervalId) {
+        clearInterval(runtimeIntervalId);
+    }
+    runtimeIntervalId = setInterval(() => {
+        updateDetailPanelRuntime(service);
+    }, 1000);
+
+    // 设置LAN/WAN状态
+    lanStatus.textContent = service.lan_status || '未知';
+    wanStatus.textContent = service.wan_status || '未知';
+
+    // 设置NAT类型
+    natType.textContent = service.nat_type || '未知';
+
+    // 设置自动重启状态
+    if (autoRestartToggle) {
+        autoRestartToggle.checked = service.auto_restart;
+        autoRestartStatus.textContent = service.auto_restart ? '已启用' : '已禁用';
+    }
+
+    // 显示输出日志
+    updateServiceLog(service.last_output);
+
+    // 设置服务详情页标题
+    document.querySelector('#service-details-panel h2').textContent =
+        `服务详情: ${formatAddressShort(service.mapped_address || '未映射')}`;
+
+    // 如果服务已停止，禁用某些按钮
+    if (service.status === '已停止' || !service.running) {
+        stopServiceBtn.disabled = true;
+        restartServiceBtn.disabled = true;
+    } else {
+        stopServiceBtn.disabled = false;
+        restartServiceBtn.disabled = false;
+    }
+
+    // 启动自动刷新
+    startDetailRefresh();
 }
 
 // 设置状态显示的颜色
@@ -1363,6 +1385,25 @@ function copyToClipboard(text) {
     }
 }
 
+// 显示复制成功的视觉反馈
+function showCopyFeedback(button) {
+    if (!button) return;
+
+    // 保存原始文本
+    const originalText = button.textContent;
+    const originalHTML = button.innerHTML;
+
+    // 修改按钮文本和样式
+    button.innerHTML = '<i class="icon-check"></i> 已复制！';
+    button.classList.add('copy-success');
+
+    // 恢复原始状态
+    setTimeout(() => {
+        button.innerHTML = originalHTML;
+        button.classList.remove('copy-success');
+    }, 1500);
+}
+
 // 传统复制方法（回退方案）
 function fallbackCopyToClipboard(text, button) {
     try {
@@ -1385,23 +1426,6 @@ function fallbackCopyToClipboard(text, button) {
         console.error('复制失败:', err);
         showNotification('复制失败，请手动复制', 'error');
     }
-}
-
-// 显示复制成功的视觉反馈
-function showCopyFeedback(button) {
-    if (!button) return;
-
-    // 保存原始文本
-    const originalText = button.textContent;
-    // 修改按钮文本和样式
-    button.textContent = '已复制！';
-    button.classList.add('copy-success');
-
-    // 恢复原始状态
-    setTimeout(() => {
-        button.textContent = originalText;
-        button.classList.remove('copy-success');
-    }, 1500);
 }
 
 /**
@@ -1750,5 +1774,65 @@ function checkDockerEnvironment() {
             Docker容器缺少运行nftables所需的内核权限。<br>
             请使用<strong>socket</strong>或<strong>iptables</strong>转发方法。
         `, 'warning', 10000); // 显示10秒
+    }
+}
+
+// 切换服务的自动重启功能
+function toggleAutoRestart(serviceId, enabled) {
+    fetchWithAuth(API.setAutoRestart, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                id: serviceId,
+                enabled: enabled
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification(`服务自动重启已${enabled ? '启用' : '禁用'}`, 'success');
+            } else {
+                showNotification('设置自动重启失败', 'error');
+                // 回滚UI状态
+                autoRestartToggle.checked = !enabled;
+                autoRestartStatus.textContent = !enabled ? '已启用' : '已禁用';
+            }
+        })
+        .catch(error => {
+            console.error('设置自动重启出错:', error);
+            showNotification('设置自动重启时发生错误', 'error');
+            // 回滚UI状态
+            autoRestartToggle.checked = !enabled;
+            autoRestartStatus.textContent = !enabled ? '已启用' : '已禁用';
+        });
+}
+
+// 更新服务详情面板的运行时间
+function updateDetailPanelRuntime(service) {
+    if (!service.start_time) {
+        serviceRuntime.textContent = 'N/A';
+        return;
+    }
+
+    const runtime = formatRuntime(Date.now() / 1000 - service.start_time);
+    serviceRuntime.textContent = runtime;
+}
+
+// 更新服务日志
+function updateServiceLog(logs) {
+    // 更新输出日志，限制最多显示100条
+    let outputLines = logs || [];
+    if (outputLines.length > 100) {
+        // 只保留最新的100条日志
+        outputLines = outputLines.slice(-100);
+        serviceOutput.textContent = `[显示最新100条日志，共${logs.length}条]\n` + outputLines.join('\n');
+    } else {
+        serviceOutput.textContent = outputLines.join('\n');
+    }
+
+    if (autoScroll && autoScroll.checked) {
+        serviceOutput.scrollTop = serviceOutput.scrollHeight;
     }
 }

@@ -211,25 +211,51 @@
 
             <section class="card" id="service-details-panel" style="display:none;">
                 <h2>服务详情 <span id="service-id"></span></h2>
-                <div class="service-info">
-                    <div class="info-item">
-                        <span class="label">状态:</span>
-                        <span id="service-status" class="value">未知</span>
+                <div class="service-details">
+                    <div class="detail-row">
+                        <label>服务ID:</label>
+                        <span id="service-id"></span>
                     </div>
-                    <div class="info-item">
-                        <span class="label">运行时间:</span>
-                        <span id="service-runtime" class="value">0秒</span>
+                    <div class="detail-row">
+                        <label>状态:</label>
+                        <span id="service-status"></span>
                     </div>
-                    <div class="info-item">
-                        <span class="label">映射地址:</span>
-                        <div class="service-address-container">
-                            <span id="service-mapped-address" class="service-mapped-address-full">未知</span>
-                            <button id="copy-address-btn" class="copy-address-btn">复制</button>
+                    <div class="detail-row">
+                        <label>映射地址:</label>
+                        <div class="service-address-detail">
+                            <span id="service-mapped-address"></span>
+                            <button id="copy-address-btn" class="btn-primary"><i class="icon-copy"></i> 复制地址</button>
                         </div>
                     </div>
-                    <div class="info-item">
-                        <span class="label">命令参数:</span>
-                        <span id="service-cmd-args" class="value">无</span>
+                    <div class="detail-row">
+                        <label>运行时间:</label>
+                        <span id="service-runtime"></span>
+                    </div>
+                    <div class="detail-row">
+                        <label>命令参数:</label>
+                        <span id="service-cmd-args"></span>
+                    </div>
+                    <div class="detail-row">
+                        <label>LAN状态:</label>
+                        <span id="lan-status"></span>
+                    </div>
+                    <div class="detail-row">
+                        <label>WAN状态:</label>
+                        <span id="wan-status"></span>
+                    </div>
+                    <div class="detail-row">
+                        <label>NAT类型:</label>
+                        <span id="nat-type"></span>
+                    </div>
+                    <div class="detail-row">
+                        <label>自动重启:</label>
+                        <div class="auto-restart-toggle">
+                            <label class="switch">
+                                <input type="checkbox" id="auto-restart-toggle">
+                                <span class="slider round"></span>
+                            </label>
+                            <span id="auto-restart-status">已禁用</span>
+                        </div>
                     </div>
                 </div>
 
@@ -331,7 +357,7 @@
             <div class="service-card-body">
                 <div class="service-address-container">
                     <span class="service-mapped-address-full"></span>
-                    <button class="copy-address-btn">复制</button>
+                    <button class="copy-address-btn btn-primary"><i class="icon-copy"></i> 复制地址</button>
                 </div>
                 <div class="service-cmd-args">命令: </div>
                 <div class="service-runtime">运行时间: 0秒</div>
