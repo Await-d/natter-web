@@ -8,10 +8,8 @@ steps:
     volumes:
       - name: docker-socket
         path: /var/run/docker.sock
-      - name: app-data
-        path: /data/natter-web
     commands:
-      - docker build -t natter-web:latest .
+      - docker build -t natter-web:latest ./web
       - docker stop natter-web-container || true
       - docker rm natter-web-container || true
       - >
