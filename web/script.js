@@ -994,6 +994,9 @@ function loadServiceDetails(id) {
 
 // 显示服务详情面板
 function showServiceDetailsPanel(service) {
+    // 设置当前服务ID，用于后续刷新
+    currentServiceId = service.id;
+
     hideAllPanels();
 
     // 显示面板
@@ -1012,7 +1015,14 @@ function showServiceDetailsPanel(service) {
 
     // 添加保存备注按钮事件
     const saveRemarkBtn = document.getElementById('save-remark-btn');
-    saveRemarkBtn.onclick = () => saveServiceRemark(service.id, remarkInput.value);
+    if (saveRemarkBtn) {
+        saveRemarkBtn.onclick = function () {
+            console.log('保存备注按钮点击: ', service.id, remarkInput.value);
+            saveServiceRemark(service.id, remarkInput.value);
+        };
+    } else {
+        console.error('未找到保存备注按钮元素，ID: save-remark-btn');
+    }
 
     // 设置状态文本和样式
     serviceStatus.textContent = service.status;
