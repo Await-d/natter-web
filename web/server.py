@@ -387,12 +387,12 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
             except Exception as e:
                 print(f"认证解析出错: {e}")
         
-        # 如果没有验证头或验证失败，返回401
+        # 如果是API请求，返回JSON格式的401错误
+        # 但不发送WWW-Authenticate头，避免触发浏览器内置认证弹窗
         self.send_response(401)
-        self.send_header('WWW-Authenticate', 'Basic realm="Natter Web Management"')
         self.send_header('Content-type', 'application/json')
         self.end_headers()
-        self.wfile.write(json.dumps({"error": "需要认证"}).encode())
+        self.wfile.write(json.dumps({"error": "需要认证", "auth_required": True}).encode())
         return False
     
     def do_OPTIONS(self):

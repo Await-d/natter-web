@@ -1688,10 +1688,28 @@ function fetchWithAuth(url, options = {}) {
 
     return fetch(url, newOptions)
         .then(response => {
-            // 处理401未授权响应
+            // 对于401响应，先检查是否是API认证错误信息
             if (response.status === 401) {
-                logout();
-                throw new Error('认证失败，请重新登录');
+                // 先复制响应，以便能够多次读取内容
+                const responseClone = response.clone();
+
+                // 尝试解析JSON响应
+                return responseClone.json()
+                    .then(data => {
+                        // 如果包含auth_required字段，则正常返回响应
+                        if (data.auth_required) {
+                            return response;
+                        } else {
+                            // 否则执行登出
+                            logout();
+                            throw new Error('认证失败，请重新登录');
+                        }
+                    })
+                    .catch(() => {
+                        // 如果无法解析JSON，则执行登出
+                        logout();
+                        throw new Error('认证失败，请重新登录');
+                    });
             }
             return response;
         });
