@@ -1009,30 +1009,18 @@ function showServiceDetailsPanel(service) {
     document.getElementById('service-mapped-address').textContent = service.mapped_address || '未映射';
     document.getElementById('service-cmd-args').textContent = service.cmd_args.join(' ');
 
-    // 设置常规备注输入框
-    const remarkInput = document.getElementById('service-remark');
-    remarkInput.value = service.remark || '';
-    remarkInput.dataset.serviceId = service.id;
-
-    // 设置备用备注区域
+    // 设置备注区域
     const debugRemarkArea = document.getElementById('remark-debug-area');
     if (debugRemarkArea) {
         debugRemarkArea.value = service.remark || '';
     }
 
-    // 完全替换保存按钮，以避免事件绑定问题
-    replaceButtonAndAddListener('save-remark-btn', function (event) {
-        event.preventDefault();
-        const currentValue = remarkInput.value;
-        saveServiceRemark(service.id, currentValue);
-    });
-
-    // 添加备用保存按钮事件监听
+    // 添加备注保存按钮事件监听
     replaceButtonAndAddListener('save-debug-remark-btn', function (event) {
         event.preventDefault();
         if (debugRemarkArea) {
             const debugValue = debugRemarkArea.value;
-            console.log('从备用输入区域获取值:', debugValue);
+            console.log('获取备注值:', debugValue);
             saveServiceRemark(service.id, debugValue);
         }
     });
@@ -1171,12 +1159,6 @@ function saveServiceRemark(serviceId, remark) {
 
 // 更新所有备注显示
 function updateAllRemarkDisplays(serviceId, remarkValue) {
-    // 更新输入框
-    const remarkInput = document.getElementById('service-remark');
-    if (remarkInput) {
-        remarkInput.value = remarkValue;
-    }
-
     // 更新备用输入区域
     const debugRemarkArea = document.getElementById('remark-debug-area');
     if (debugRemarkArea) {

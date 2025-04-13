@@ -1304,18 +1304,20 @@ input:checked + .slider:before {
 
 .service-remark-edit {
     display: flex;
-    align-items: center;
-    gap: 10px;
+    flex-direction: column;
+    gap: 5px;
+    width: 100%;
 }
 
-.service-remark-edit input {
-    flex: 1;
-    padding: 6px 10px;
-    border: 1px solid var(--border-color);
+.service-remark-edit textarea {
+    width: 100%;
+    padding: 8px;
     border-radius: 4px;
-    font-size: 14px;
+    border: 1px solid #d9d9d9;
+    resize: vertical;
 }
 
 .service-remark-edit button {
-    white-space: nowrap;
+    align-self: flex-end;
+    padding: 4px 12px;
 }
