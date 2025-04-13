@@ -1,0 +1,39 @@
+kind: pipeline
+type: docker
+name: natter-web-deployment
+
+steps:
+  - name: build-and-deploy
+    image: docker:dind
+    volumes:
+      - name: docker-socket
+        path: /var/run/docker.sock
+      - name: app-data
+        path: /data/natter-web
+    commands:
+      - docker build -t natter-web:latest .
+      - docker stop natter-web-container || true
+      - docker rm natter-web-container || true
+      - >
+        docker run -d --name natter-web-container 
+        --network host
+        -v /data/natter-web/data:/app/data
+        --cap-add NET_ADMIN
+        --restart always
+        -e TZ=Asia/Shanghai
+        -e PYTHONUNBUFFERED=1
+        -e NATTER_PATH=/app/natter/natter.py
+        -e DATA_DIR=/app/data
+        natter-web:latest
+
+volumes:
+  - name: docker-socket
+    host:
+      path: /var/run/docker.sock
+  - name: app-data
+    host:
+      path: /data/natter-web
+
+trigger:
+  branch:
+    - main 
