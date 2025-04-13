@@ -221,7 +221,7 @@ header h1 {
 }
 
 /* 按钮样式 */
-.btn-primary, .btn-secondary, .btn-danger, .btn-info, .btn-small, .btn-disabled {
+.btn-primary, .btn-secondary, .btn-danger, .btn-info, .btn-warning, .btn-small, .btn-disabled {
     padding: 0.5rem 1rem;
     border: none;
     border-radius: 4px;
@@ -230,11 +230,11 @@ header h1 {
     transition: background-color 0.2s, transform 0.1s;
 }
 
-.btn-primary:hover, .btn-secondary:hover, .btn-danger:hover, .btn-info:hover, .btn-small:hover {
+.btn-primary:hover, .btn-secondary:hover, .btn-danger:hover, .btn-info:hover, .btn-warning:hover, .btn-small:hover {
     transform: translateY(-1px);
 }
 
-.btn-primary:active, .btn-secondary:active, .btn-danger:active, .btn-info:active, .btn-small:active {
+.btn-primary:active, .btn-secondary:active, .btn-danger:active, .btn-info:active, .btn-warning:active, .btn-small:active {
     transform: translateY(0);
 }
 
@@ -263,6 +263,15 @@ header h1 {
 
 .btn-danger:hover {
     background-color: #c82333;
+}
+
+.btn-warning {
+    background-color: var(--warning-color);
+    color: #212529;
+}
+
+.btn-warning:hover {
+    background-color: #e0a800;
 }
 
 .btn-info {
@@ -584,7 +593,8 @@ footer {
     transform: translateY(-20px);
     transition: opacity 0.3s, transform 0.3s;
     z-index: 9999;
-    max-width: 300px;
+    max-width: 350px;
+    line-height: 1.5;
 }
 
 .notification.show {
@@ -607,6 +617,10 @@ footer {
 
 .notification.info {
     background-color: #17a2b8;
+}
+
+.notification br {
+    margin-bottom: 5px;
 }
 
 /* 工具安装按钮 */
@@ -677,4 +691,112 @@ footer {
     20% { opacity: 1; }
     80% { opacity: 1; }
     100% { opacity: 0; }
+}
+
+/* 服务状态样式 */
+.service-status-running {
+    color: var(--success-color);
+    font-weight: bold;
+    padding: 2px 8px;
+    background-color: rgba(40, 167, 69, 0.1);
+    border-radius: 3px;
+    border: 1px solid rgba(40, 167, 69, 0.2);
+}
+
+.service-status-stopped {
+    color: var(--danger-color);
+    font-weight: bold;
+    padding: 2px 8px;
+    background-color: rgba(220, 53, 69, 0.1);
+    border-radius: 3px;
+    border: 1px solid rgba(220, 53, 69, 0.2);
+}
+
+.service-status-waiting {
+    color: var(--warning-color);
+    font-weight: bold;
+    padding: 2px 8px;
+    background-color: rgba(255, 193, 7, 0.1);
+    border-radius: 3px;
+    border: 1px solid rgba(255, 193, 7, 0.2);
+}
+
+/* 转发方法说明样式 */
+.forward-method-info {
+    position: relative;
+    display: inline-block;
+    margin-left: 6px;
+}
+
+.forward-method-info .info-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background-color: var(--primary-color);
+    color: white;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.forward-method-info .info-tooltip {
+    visibility: hidden;
+    position: absolute;
+    z-index: 100;
+    width: 320px;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: 30px;
+    background-color: white;
+    border-radius: 6px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    padding: 1rem;
+    opacity: 0;
+    transition: opacity 0.3s, visibility 0.3s;
+}
+
+.forward-method-info:hover .info-tooltip {
+    visibility: visible;
+    opacity: 1;
+}
+
+.info-tooltip h4 {
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 0.5rem;
+    color: var(--primary-color);
+}
+
+.info-tooltip ul {
+    margin: 0;
+    padding-left: 1.2rem;
+}
+
+.info-tooltip li {
+    margin-bottom: 0.3rem;
+}
+
+.info-tooltip .method-name {
+    font-weight: bold;
+}
+
+.info-tooltip .best-for {
+    margin-top: 0.3rem;
+    font-style: italic;
+    color: var(--secondary-color);
+}
+
+.info-tooltip::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    margin-left: -5px;
+    border-width: 5px;
+    border-style: solid;
+    border-color: white transparent transparent transparent;
 }

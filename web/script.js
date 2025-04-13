@@ -48,7 +48,7 @@ let restartServiceBtn = document.getElementById('restart-service-btn');
 let stopServiceBtn = document.getElementById('stop-service-btn');
 let deleteServiceBtn = document.getElementById('delete-service-btn');
 let saveAsTemplateBtn = document.getElementById('save-as-template-btn');
-let backToListBtn = document.getElementById('back-btn');
+let backToListBtn = document.getElementById('back-to-list-btn');
 let refreshAllBtn = document.getElementById('refresh-all-btn');
 let stopAllBtn = document.getElementById('stop-all-btn');
 let helpBtn = document.getElementById('help-btn');
@@ -139,7 +139,7 @@ document.addEventListener('DOMContentLoaded', function () {
     restartServiceBtn = document.getElementById('restart-service-btn');
     stopServiceBtn = document.getElementById('stop-service-btn');
     saveAsTemplateBtn = document.getElementById('save-as-template-btn');
-    backToListBtn = document.getElementById('back-btn');
+    backToListBtn = document.getElementById('back-to-list-btn');
     copyAddressBtn = document.getElementById('copy-address-btn');
     clearLogBtn = document.getElementById('clear-log-btn');
     backFromTemplatesBtn = document.getElementById('back-from-templates-btn');
@@ -178,6 +178,46 @@ document.addEventListener('DOMContentLoaded', function () {
             advancedModeOptions.style.display = 'block';
         }
     });
+
+    // 转发方法说明
+    const methodDescriptions = {
+        'socket': {
+            name: 'socket (内置)',
+            desc: '纯Python实现，无需额外依赖',
+            bestFor: '通用场景，最简单的设置'
+        },
+        'iptables': {
+            name: 'iptables',
+            desc: '使用Linux的iptables进行转发，需要root权限',
+            bestFor: 'Linux系统，需要高性能转发'
+        },
+        'nftables': {
+            name: 'nftables',
+            desc: '使用Linux的nftables进行转发，需要root权限',
+            bestFor: '新版Linux系统，功能更强大'
+        },
+        'socat': {
+            name: 'socat',
+            desc: '使用socat工具转发，需要安装socat',
+            bestFor: '需要高级转发功能但无root权限'
+        },
+        'gost': {
+            name: 'gost',
+            desc: '使用gost工具转发，需要安装gost',
+            bestFor: '需要加密转发、代理等高级功能'
+        }
+    };
+
+    // 转发方法选择改变事件
+    if (forwardMethod) {
+        forwardMethod.addEventListener('change', function () {
+            const method = this.value;
+            if (methodDescriptions[method]) {
+                const info = methodDescriptions[method];
+                showNotification(`${info.name}: ${info.desc}<br>适用于: ${info.bestFor}`, 'info');
+            }
+        });
+    }
 
     // 选项卡切换
     document.querySelectorAll('.tab').forEach(tab => {
@@ -365,8 +405,22 @@ function renderServicesList(services) {
             });
         }
 
+        // 设置服务状态和颜色
         const status = card.querySelector('.service-status');
         status.textContent = service.status;
+
+        // 根据状态添加不同的样式类
+        if (service.status === 'OPEN' || service.running) {
+            status.classList.add('service-status-running');
+            status.textContent = '运行中';
+        } else if (service.status === 'CLOSED' || !service.running) {
+            status.classList.add('service-status-stopped');
+            status.textContent = '已停止';
+        } else {
+            status.classList.add('service-status-waiting');
+            status.textContent = '等待中';
+        }
+
         setStatusColor(status, service.status);
 
         const cmdArgs = card.querySelector('.service-cmd-args');
@@ -1216,14 +1270,14 @@ function deleteService(id) {
 
 /**
  * 显示通知消息
- * @param {string} message - 通知消息
+ * @param {string} message - 通知消息，可包含HTML
  * @param {string} type - 通知类型 ('success', 'error', 'warning', 'info')
  */
 function showNotification(message, type = 'info') {
     // 创建通知元素
     const notification = document.createElement('div');
     notification.className = `notification ${type}`;
-    notification.textContent = message;
+    notification.innerHTML = message; // 使用innerHTML支持HTML内容
 
     // 添加到页面
     document.body.appendChild(notification);
@@ -1239,7 +1293,7 @@ function showNotification(message, type = 'info') {
         setTimeout(() => {
             document.body.removeChild(notification);
         }, 300);
-    }, 3000);
+    }, 5000); // 增加显示时间到5秒，因为可能有更多内容需要阅读
 }
 
 /**

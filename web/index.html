@@ -62,6 +62,39 @@
 
                             <div class="form-group">
                                 <label for="forward-method">转发方法:</label>
+                                <span class="forward-method-info">
+                                    <span class="info-icon">?</span>
+                                    <div class="info-tooltip">
+                                        <h4>转发方法说明</h4>
+                                        <ul>
+                                            <li>
+                                                <span class="method-name">socket (内置)</span>
+                                                <div>纯Python实现，无需额外依赖</div>
+                                                <div class="best-for">适用于: 通用场景，最简单的设置</div>
+                                            </li>
+                                            <li>
+                                                <span class="method-name">iptables</span>
+                                                <div>使用Linux的iptables进行转发，需要root权限</div>
+                                                <div class="best-for">适用于: Linux系统，需要高性能转发</div>
+                                            </li>
+                                            <li>
+                                                <span class="method-name">nftables</span>
+                                                <div>使用Linux的nftables进行转发，需要root权限</div>
+                                                <div class="best-for">适用于: 新版Linux系统，功能更强大</div>
+                                            </li>
+                                            <li>
+                                                <span class="method-name">socat</span>
+                                                <div>使用socat工具转发，需要安装socat</div>
+                                                <div class="best-for">适用于: 需要高级转发功能但无root权限</div>
+                                            </li>
+                                            <li>
+                                                <span class="method-name">gost</span>
+                                                <div>使用gost工具转发，需要安装gost</div>
+                                                <div class="best-for">适用于: 需要加密转发、代理等高级功能</div>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </span>
                                 <select id="forward-method">
                                     <option value="socket">socket (内置)</option>
                                     <option value="iptables">iptables (需要root权限)</option>
@@ -69,7 +102,7 @@
                                     <option value="socat">socat (需要安装)</option>
                                     <option value="gost">gost (需要安装)</option>
                                 </select>
-                                <small>不同转发方法适用于不同场景，详见帮助</small>
+                                <small>不同转发方法适用于不同场景，鼠标悬停在问号上查看详情</small>
                                 <div class="tool-install-buttons">
                                     <button type="button" id="install-socat-btn"
                                         class="btn-small btn-secondary">安装socat</button>
@@ -285,7 +318,7 @@
         <div class="service-card" data-id="">
             <div class="service-card-header">
                 <h3 class="service-mapped-address">未知地址</h3>
-                <span class="service-status badge">未知</span>
+                <span class="service-status">未知</span>
             </div>
             <div class="service-card-body">
                 <div class="service-address-container">
