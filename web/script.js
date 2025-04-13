@@ -1394,8 +1394,10 @@ function copyToClipboard(text, button) {
         return;
     }
 
-    // 获取事件源（按钮）
-    const button = event ? event.currentTarget : null;
+    // 如果没有传入button参数，尝试从事件中获取
+    if (!button && event) {
+        button = event.currentTarget;
+    }
 
     // 尝试使用现代Clipboard API
     if (navigator.clipboard && navigator.clipboard.writeText) {
