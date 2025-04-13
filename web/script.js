@@ -1011,28 +1011,54 @@ function showServiceDetailsPanel(service) {
 
     // 设置备注
     const remarkInput = document.getElementById('service-remark');
-    remarkInput.value = service.remark || '';
-    remarkInput.dataset.serviceId = service.id; // 存储服务ID到数据属性中
 
-    // 添加保存备注按钮事件 - 使用事件委托方式，而不是每次都重新绑定
+    // 清除之前的事件监听器
+    if (remarkInput._valueTracker) {
+        remarkInput._valueTracker = null;
+    }
+
+    // 设置输入框的值并存储服务ID
+    remarkInput.value = service.remark || '';
+    remarkInput.dataset.serviceId = service.id;
+
+    // 存储初始值，用于比较是否有变化
+    remarkInput.dataset.originalValue = service.remark || '';
+
+    // 使用全局变量跟踪当前输入值
+    window.currentRemarkValue = service.remark || '';
+
+    // 添加输入事件监听器，实时跟踪值的变化
+    remarkInput.addEventListener('input', function (e) {
+        window.currentRemarkValue = e.target.value;
+        console.log('备注输入更新为:', window.currentRemarkValue);
+    });
+
+    // 添加保存备注按钮事件 - 完全重写事件处理逻辑
     const saveRemarkBtn = document.getElementById('save-remark-btn');
-    // 移除旧的点击事件处理程序（如果有）
-    saveRemarkBtn.onclick = null;
-    // 添加新的点击事件处理程序，在点击时获取最新的输入值
-    saveRemarkBtn.onclick = function () {
-        // 获取当前输入框中的最新值（直接从DOM中获取以确保是最新值）
-        const remarkInput = document.getElementById('service-remark');
-        const currentValue = remarkInput.value;
-        // 获取当前服务ID
+
+    // 移除所有现有事件监听器
+    const newSaveBtn = saveRemarkBtn.cloneNode(true);
+    saveRemarkBtn.parentNode.replaceChild(newSaveBtn, saveRemarkBtn);
+
+    // 添加新的事件监听器
+    newSaveBtn.addEventListener('click', function (event) {
+        // 阻止默认行为和事件冒泡
+        event.preventDefault();
+        event.stopPropagation();
+
+        // 从全局变量获取最新值
+        const latestValue = window.currentRemarkValue;
+        // 获取服务ID
         const serviceId = remarkInput.dataset.serviceId;
 
-        // 在控制台输出调试信息
-        console.log('保存备注 - 服务ID:', serviceId);
-        console.log('保存备注 - 备注值:', currentValue);
+        // 记录调试信息
+        console.log('点击保存按钮时获取的原始值:', remarkInput.dataset.originalValue);
+        console.log('点击保存按钮时获取的输入框当前值:', remarkInput.value);
+        console.log('点击保存按钮时获取的全局变量跟踪值:', latestValue);
 
-        // 确保在备注输入后立即获取最新值
-        saveServiceRemark(serviceId, currentValue);
-    };
+        // 确保使用最新输入的值
+        saveServiceRemark(serviceId, latestValue || remarkInput.value);
+    });
 
     // 设置状态文本和样式
     serviceStatus.textContent = service.status;
@@ -1983,13 +2009,18 @@ function fetchVersion() {
 
 // 保存服务备注
 function saveServiceRemark(serviceId, remark) {
-    // 调试日志
+    // 更详细的调试日志
     console.log('发送备注请求 - 服务ID:', serviceId);
     console.log('发送备注请求 - 备注值:', remark);
+    console.log('原始请求参数类型检查 - serviceId类型:', typeof serviceId);
+    console.log('原始请求参数类型检查 - remark类型:', typeof remark);
+
+    // 确保remark是字符串类型
+    const remarkString = String(remark);
 
     const requestBody = {
         id: serviceId,
-        remark: remark
+        remark: remarkString
     };
 
     console.log('请求体:', JSON.stringify(requestBody));
@@ -2004,21 +2035,25 @@ function saveServiceRemark(serviceId, remark) {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                showNotification('备注已保存: ' + remark, 'success');
+                showNotification('备注已保存: ' + remarkString, 'success');
+
+                // 更新内存中的跟踪值
+                window.currentRemarkValue = remarkString;
 
                 // 更新输入框的值，确保显示最新的备注
                 const remarkInput = document.getElementById('service-remark');
                 if (remarkInput) {
-                    remarkInput.value = remark;
-                    console.log('成功后更新输入框值为:', remark);
+                    remarkInput.value = remarkString;
+                    remarkInput.dataset.originalValue = remarkString;
+                    console.log('成功后更新输入框值为:', remarkString);
                 }
 
                 // 更新内存中的服务对象
                 if (currentServiceId === serviceId) {
                     // 如果有缓存的服务数据，也更新它
                     if (window.currentServiceData) {
-                        window.currentServiceData.remark = remark;
-                        console.log('更新内存中服务数据的备注为:', remark);
+                        window.currentServiceData.remark = remarkString;
+                        console.log('更新内存中服务数据的备注为:', remarkString);
                     }
                 }
 
