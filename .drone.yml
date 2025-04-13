@@ -36,4 +36,4 @@ volumes:
 
 trigger:
   branch:
-    - main 
+    - master
