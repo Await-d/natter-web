@@ -389,7 +389,7 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
         
         # 如果没有验证头或验证失败，返回401
         self.send_response(401)
-        self.send_header('WWW-Authenticate', 'Basic realm="Natter Web管理界面"')
+        self.send_header('WWW-Authenticate', 'Basic realm="Natter Web Management"')
         self.send_header('Content-type', 'application/json')
         self.end_headers()
         self.wfile.write(json.dumps({"error": "需要认证"}).encode())
