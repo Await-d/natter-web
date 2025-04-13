@@ -671,20 +671,45 @@ footer {
 }
 
 .copy-address-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 5px;
-    padding: 4px 8px;
-    transition: all 0.2s ease;
-    cursor: pointer;
+    background-color: #4CAF50;
+    color: white;
     border: none;
-    border-radius: 3px;
+    border-radius: 4px;
+    padding: 3px 8px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    margin-left: 8px;
+    transition: background-color 0.3s;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
 }
 
-.copy-success {
-    background-color: #4CAF50 !important;
-    color: white !important;
+.copy-address-btn:hover {
+    background-color: #45a049;
+}
+
+.copy-address-btn i {
+    font-size: 0.85rem;
+}
+
+.copy-address-btn.copy-success {
+    background-color: #d4edda;
+    color: #155724;
+    border-color: #c3e6cb;
+}
+
+.service-mapped-address-full {
+    font-family: monospace;
+    padding: 2px 4px;
+    background-color: #f8f9fa;
+    border-radius: 3px;
+    border: 1px solid #eee;
+    max-width: 100%;
+    display: inline-block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 /* 图标样式 */
@@ -1125,4 +1150,129 @@ input:checked + .slider:before {
     background-color: rgba(255, 193, 7, 0.15);
     color: #ffc107;
     border: 1px solid rgba(255, 193, 7, 0.2);
+}
+
+/* 服务卡片样式增强 */
+.service-card {
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    margin-bottom: 16px;
+    overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.service-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+}
+
+.service-card-header {
+    padding: 12px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: #f5f7fa;
+    border-bottom: 1px solid #e8e8e8;
+}
+
+.service-card-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.service-status {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.service-card-body {
+    padding: 16px;
+}
+
+.service-address-container {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+    position: relative;
+}
+
+.service-address-label {
+    font-weight: 500;
+    margin-right: 5px;
+}
+
+.service-address {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.copy-address-btn {
+    background: transparent;
+    border: none;
+    color: #1890ff;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 5px;
+    margin-left: 5px;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.copy-address-btn:hover {
+    background-color: rgba(24, 144, 255, 0.1);
+}
+
+.service-cmd {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 15px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.service-card-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.service-card-actions button {
+    background: transparent;
+    border: 1px solid #d9d9d9;
+    border-radius: 4px;
+    padding: 5px 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.service-card-actions .btn-details {
+    color: #1890ff;
+}
+
+.service-card-actions .btn-details:hover {
+    background-color: rgba(24, 144, 255, 0.1);
+    border-color: #1890ff;
+}
+
+.service-card-actions .btn-stop {
+    color: #ff4d4f;
+}
+
+.service-card-actions .btn-stop:hover {
+    background-color: rgba(255, 77, 79, 0.1);
+    border-color: #ff4d4f;
+}
+
+.empty-services-message {
+    text-align: center;
+    padding: 40px 0;
+    color: #8c8c8c;
+    font-size: 16px;
 }

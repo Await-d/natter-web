@@ -454,10 +454,38 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     if (copyAddressBtn) {
-        copyAddressBtn.addEventListener('click', function () {
+        copyAddressBtn.addEventListener('click', function (event) {
+            event.stopPropagation(); // 防止事件冒泡
             const address = serviceMappedAddress.textContent;
-            copyToClipboard(address);
-            showNotification('地址已复制到剪贴板', 'success');
+
+            // 尝试使用新API
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(address)
+                    .then(() => {
+                        showCopyFeedback(copyAddressBtn);
+                        showNotification('地址已复制: ' + address, 'success');
+                    })
+                    .catch(err => {
+                        console.error('复制失败:', err);
+                        showNotification('复制失败，请手动复制', 'error');
+                    });
+            } else {
+                // 回退方法
+                try {
+                    const tempInput = document.createElement('input');
+                    tempInput.value = address;
+                    document.body.appendChild(tempInput);
+                    tempInput.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(tempInput);
+
+                    showCopyFeedback(copyAddressBtn);
+                    showNotification('地址已复制: ' + address, 'success');
+                } catch (err) {
+                    console.error('复制失败:', err);
+                    showNotification('复制失败，请手动复制', 'error');
+                }
+            }
         });
     }
 
@@ -538,110 +566,73 @@ function loadServices() {
 
 // 渲染服务列表
 function renderServicesList(services) {
-    // 清空列表
-    servicesList.innerHTML = '';
+    const container = document.getElementById('services-list');
+    container.innerHTML = '';
 
     if (services.length === 0) {
-        servicesList.innerHTML = '<div class="no-services">没有运行中的服务</div>';
+        const emptyMessage = document.createElement('div');
+        emptyMessage.className = 'empty-services-message';
+        emptyMessage.textContent = '没有正在运行的服务';
+        container.appendChild(emptyMessage);
         return;
     }
 
-    // 为每个服务创建卡片
+    const template = document.getElementById('service-card-template');
+
     services.forEach(service => {
-        const template = document.getElementById('service-card-template');
         const clone = document.importNode(template.content, true);
         const card = clone.querySelector('.service-card');
 
-        // 设置服务ID
         card.setAttribute('data-id', service.id);
 
-        // 根据服务状态设置data-status属性
-        if (service.status === 'OPEN' || service.running) {
-            card.setAttribute('data-status', 'running');
-        } else if (service.status === 'CLOSED' || !service.running) {
-            card.setAttribute('data-status', 'stopped');
-        } else {
-            card.setAttribute('data-status', 'waiting');
+        // 设置映射地址和状态
+        const mappedAddressHeader = card.querySelector('.service-mapped-address');
+        if (mappedAddressHeader) {
+            mappedAddressHeader.textContent = service.mapped_address || '未映射';
         }
 
-        // 格式化地址显示
-        const addressDisplay = service.mapped_address || '等待映射...';
+        const addressSpan = card.querySelector('.service-address');
+        if (addressSpan) {
+            addressSpan.textContent = service.mapped_address || '未映射';
+        }
 
-        // 填充服务信息
-        const mappedAddress = card.querySelector('.service-mapped-address');
-        // 在标题处显示简短地址（只保留主机名/IP和端口）
-        mappedAddress.textContent = formatAddressShort(addressDisplay);
+        const statusElem = card.querySelector('.service-status');
+        statusElem.textContent = service.status;
+        setStatusColor(statusElem, service.status);
 
-        // 在卡片体中显示完整地址
-        const mappedAddressFull = card.querySelector('.service-mapped-address-full');
-        mappedAddressFull.textContent = addressDisplay;
+        // 设置命令文本
+        const cmdText = card.querySelector('.service-cmd-text');
+        if (cmdText) {
+            cmdText.textContent = service.cmd_args.join(' ');
+        }
 
-        // 添加复制按钮事件
-        const copyBtn = card.querySelector('.copy-address-btn');
-        if (copyBtn) {
-            copyBtn.addEventListener('click', function (e) {
-                e.stopPropagation(); // 阻止事件冒泡
-                copyToClipboard(addressDisplay);
-                showNotification('地址已复制到剪贴板', 'success');
+        // 绑定详情按钮事件
+        const detailsBtn = card.querySelector('.btn-details');
+        if (detailsBtn) {
+            detailsBtn.addEventListener('click', () => {
+                fetchServiceDetails(service.id);
             });
         }
 
-        // 设置服务状态和颜色
-        const status = card.querySelector('.service-status');
-        status.textContent = service.status;
-
-        // 根据状态添加不同的样式类
-        if (service.status === 'OPEN' || service.running) {
-            status.classList.add('service-status-running');
-            status.textContent = '运行中';
-        } else if (service.status === 'CLOSED' || !service.running) {
-            status.classList.add('service-status-stopped');
-            status.textContent = '已停止';
-        } else {
-            status.classList.add('service-status-waiting');
-            status.textContent = '等待中';
+        // 绑定停止按钮事件
+        const stopBtn = card.querySelector('.btn-stop');
+        if (stopBtn) {
+            stopBtn.addEventListener('click', () => {
+                stopService(service.id);
+            });
         }
 
-        setStatusColor(status, service.status);
+        // 绑定复制地址按钮事件
+        const copyBtn = card.querySelector('.copy-address-btn');
+        if (copyBtn) {
+            copyBtn.addEventListener('click', (event) => {
+                event.stopPropagation(); // 防止冒泡触发其他事件
+                const address = service.mapped_address;
+                copyToClipboard(address);
+            });
+        }
 
-        const cmdArgs = card.querySelector('.service-cmd-args');
-        cmdArgs.textContent = '命令: ' + service.cmd_args.join(' ');
-
-        const runtime = card.querySelector('.service-runtime');
-        // 记录服务的启动时间
-        servicesRuntime[service.id] = service.start_time;
-        updateServiceRuntime(service, runtime);
-
-        // 添加查看详情按钮事件
-        const viewDetailsBtn = card.querySelector('.view-details-btn');
-        viewDetailsBtn.addEventListener('click', function () {
-            showServiceDetails(service.id);
-        });
-
-        // 添加停止服务按钮事件
-        const stopBtn = card.querySelector('.stop-service-btn');
-        stopBtn.addEventListener('click', function (e) {
-            e.stopPropagation(); // 阻止事件冒泡
-            stopService(service.id);
-        });
-
-        // 添加删除服务按钮
-        const deleteBtn = document.createElement('button');
-        deleteBtn.className = 'btn-danger delete-service-btn';
-        deleteBtn.textContent = '删除';
-        deleteBtn.addEventListener('click', function (e) {
-            e.stopPropagation(); // 阻止事件冒泡
-            if (confirm('确定要删除此服务吗？此操作不可恢复。')) {
-                deleteService(service.id);
-            }
-        });
-
-        // 将删除按钮添加到卡片底部
-        const cardFooter = card.querySelector('.service-card-footer');
-        cardFooter.appendChild(deleteBtn);
-
-        // 添加卡片到列表
-        servicesList.appendChild(card);
+        container.appendChild(clone);
     });
 }
 
@@ -1036,6 +1027,10 @@ function showServiceDetailsPanel(service) {
     wanStatus.textContent = service.wan_status || '未知';
     natType.textContent = service.nat_type || '未知';
 
+    // 设置LAN/WAN状态颜色
+    setStatusColor(lanStatus, service.lan_status);
+    setStatusColor(wanStatus, service.wan_status);
+
     // 更新状态面板中的可用性信息
     const statusPanelLanStatus = document.querySelector('.status-panel #lan-status');
     const statusPanelWanStatus = document.querySelector('.status-panel #wan-status');
@@ -1204,7 +1199,7 @@ function loadTemplates() {
         })
         .catch(error => {
             console.error('加载模板列表出错:', error);
-            templatesList.innerHTML = '<div class="no-services">加载模板失败，请刷新页面重试。</div>';
+            templatesList.innerHTML = '<div class="no-services">没有保存的模板。</div>';
         });
 }
 
