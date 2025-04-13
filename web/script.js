@@ -1569,17 +1569,23 @@ function createLoginForm() {
 
     const loginHtml = `
     <div class="card">
+        <div class="logo-container">
+            <div class="logo">N</div>
+        </div>
         <h2>Natter管理界面登录</h2>
         <form id="login-form">
             <div class="form-group">
-                <label for="password">请输入密码:</label>
-                <input type="password" id="password" required>
+                <label for="password">请输入管理密码:</label>
+                <input type="password" id="password" placeholder="输入密码" required autocomplete="current-password">
             </div>
             <div class="form-actions">
-                <button type="submit" class="btn-primary">登录</button>
+                <button type="submit" class="btn-primary">登 录</button>
             </div>
-            <div id="login-error" class="login-error" style="display:none; color: #dc3545; margin-top: 10px;"></div>
+            <div id="login-error" class="login-error" style="display:none;"></div>
         </form>
+        <div class="footer-text">
+            Natter Web管理界面 - 安全登录
+        </div>
     </div>
     `;
 
@@ -1591,8 +1597,28 @@ function createLoginForm() {
     loginForm.addEventListener('submit', function (e) {
         e.preventDefault();
         const password = document.getElementById('password').value;
-        login(password);
+
+        // 为按钮添加加载状态
+        const submitBtn = this.querySelector('button[type="submit"]');
+        const originalText = submitBtn.textContent;
+        submitBtn.textContent = '登录中...';
+        submitBtn.disabled = true;
+
+        login(password)
+            .catch(() => {
+                // 恢复按钮状态
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
+            });
     });
+
+    // 聚焦密码输入框
+    setTimeout(() => {
+        const passwordInput = document.getElementById('password');
+        if (passwordInput) {
+            passwordInput.focus();
+        }
+    }, 100);
 }
 
 // 检查是否需要认证
@@ -1650,7 +1676,7 @@ function login(password) {
     const loginError = document.getElementById('login-error');
     loginError.style.display = 'none';
 
-    fetchWithAuth(API.authLogin, {
+    return fetchWithAuth(API.authLogin, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -1676,18 +1702,39 @@ function login(password) {
                 // 隐藏登录面板
                 loginPanel.style.display = 'none';
 
+                // 显示成功通知
+                showNotification('登录成功，欢迎使用Natter管理界面', 'success');
+
                 // 显示服务列表
                 showServicesList();
             } else {
                 // 显示错误
-                loginError.textContent = data.error || '密码错误';
+                loginError.textContent = data.error || '密码错误，请重试';
                 loginError.style.display = 'block';
+
+                // 恢复按钮状态
+                const submitBtn = document.querySelector('#login-form button[type="submit"]');
+                if (submitBtn) {
+                    submitBtn.textContent = '登 录';
+                    submitBtn.disabled = false;
+                }
+
+                throw new Error('登录失败');
             }
         })
         .catch(error => {
             console.error('登录请求出错:', error);
-            loginError.textContent = '登录请求失败，请重试';
+            loginError.textContent = '登录请求失败，请检查网络连接';
             loginError.style.display = 'block';
+
+            // 恢复按钮状态
+            const submitBtn = document.querySelector('#login-form button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.textContent = '登 录';
+                submitBtn.disabled = false;
+            }
+
+            throw error;
         });
 }
 
@@ -1835,4 +1882,23 @@ function updateServiceLog(logs) {
     if (autoScroll && autoScroll.checked) {
         serviceOutput.scrollTop = serviceOutput.scrollHeight;
     }
+}
+
+// 启动服务详情自动刷新
+function startDetailRefresh() {
+    // 清除现有的刷新定时器
+    if (refreshIntervalId) {
+        clearInterval(refreshIntervalId);
+    }
+
+    // 设置新的刷新定时器，每5秒刷新一次服务详情
+    refreshIntervalId = setInterval(() => {
+        if (currentServiceId) {
+            loadServiceDetails(currentServiceId);
+        } else {
+            // 如果没有当前服务ID，停止刷新
+            clearInterval(refreshIntervalId);
+            refreshIntervalId = null;
+        }
+    }, 5000);
 }
