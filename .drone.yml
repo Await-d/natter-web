@@ -23,6 +23,7 @@ steps:
         -e NATTER_PATH=/app/natter/natter.py
         -e DATA_DIR=/app/data
         -e WEB_PORT=7111
+        -e WEB_PASSWORD=zd2580
         natter-web:latest
 
 volumes:

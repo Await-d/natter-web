@@ -10,6 +10,8 @@ import signal
 import psutil
 import re
 import shutil
+import hashlib
+import base64
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 import socket
@@ -32,6 +34,9 @@ service_lock = threading.Lock()
 NAT_TYPE_PATTERN = re.compile(r"NAT type: ([^\n]+)")
 LAN_STATUS_PATTERN = re.compile(r"LAN > ([^\[]+)\[ ([^\]]+) \]")
 WAN_STATUS_PATTERN = re.compile(r"WAN > ([^\[]+)\[ ([^\]]+) \]")
+
+# 默认密码为None，表示不启用验证
+PASSWORD = None
 
 class NatterService:
     def __init__(self, service_id, cmd_args):
@@ -360,8 +365,35 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
         self.send_header("Content-type", content_type)
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
         self.end_headers()
+    
+    def _authenticate(self):
+        """验证请求中的密码"""
+        # 如果未设置密码，则允许所有访问
+        if PASSWORD is None:
+            return True
+        
+        # 检查Authorization头
+        auth_header = self.headers.get('Authorization', '')
+        if auth_header.startswith('Basic '):
+            # 解析Basic认证头
+            try:
+                auth_decoded = base64.b64decode(auth_header[6:]).decode('utf-8')
+                username, password = auth_decoded.split(':', 1)
+                # 检查密码是否匹配
+                if password == PASSWORD:
+                    return True
+            except Exception as e:
+                print(f"认证解析出错: {e}")
+        
+        # 如果没有验证头或验证失败，返回401
+        self.send_response(401)
+        self.send_header('WWW-Authenticate', 'Basic realm="Natter Web管理界面"')
+        self.send_header('Content-type', 'application/json')
+        self.end_headers()
+        self.wfile.write(json.dumps({"error": "需要认证"}).encode())
+        return False
     
     def do_OPTIONS(self):
         self._set_headers()
@@ -371,20 +403,26 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
         path = parsed_url.path
         query = parse_qs(parsed_url.query)
         
-        # 为前端文件提供静态服务
-        if path == "/" or path == "":
-            self._serve_file("index.html", "text/html")
-            return
-        elif path.endswith(".html"):
-            self._serve_file(path[1:], "text/html")
-            return
-        elif path.endswith(".css"):
-            self._serve_file(path[1:], "text/css")
-            return
-        elif path.endswith(".js"):
-            self._serve_file(path[1:], "application/javascript")
-            return
+        # 总是允许访问登录页和静态资源
+        if path == "/" or path == "" or path.endswith('.html') or path.endswith('.css') or path.endswith('.js'):
+            # 为前端文件提供静态服务
+            if path == "/" or path == "":
+                self._serve_file("index.html", "text/html")
+                return
+            elif path.endswith(".html"):
+                self._serve_file(path[1:], "text/html")
+                return
+            elif path.endswith(".css"):
+                self._serve_file(path[1:], "text/css")
+                return
+            elif path.endswith(".js"):
+                self._serve_file(path[1:], "application/javascript")
+                return
         
+        # API请求需要验证
+        if not self._authenticate():
+            return
+            
         # API端点
         if path == "/api/services":
             self._set_headers()
@@ -413,12 +451,20 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps(result).encode())
             else:
                 self._error(400, "Missing tool parameter")
+        elif path == "/api/auth/check":
+            # 检查密码是否已设置
+            self._set_headers()
+            self.wfile.write(json.dumps({"auth_required": PASSWORD is not None}).encode())
         else:
             self._error(404, "Not found")
     
     def do_POST(self):
         parsed_url = urlparse(self.path)
         path = parsed_url.path
+        
+        # API请求需要验证，除了密码验证API
+        if path != "/api/auth/login" and not self._authenticate():
+            return
         
         # 读取请求体
         content_length = int(self.headers['Content-Length'])
@@ -427,6 +473,21 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
             data = json.loads(post_data)
         except:
             self._error(400, "Invalid JSON")
+            return
+        
+        # 密码验证API
+        if path == "/api/auth/login":
+            if "password" in data:
+                if data["password"] == PASSWORD:
+                    self._set_headers()
+                    # 返回base64编码的认证信息
+                    auth_string = f"user:{PASSWORD}"
+                    auth_token = base64.b64encode(auth_string.encode()).decode()
+                    self.wfile.write(json.dumps({"success": True, "token": auth_token}).encode())
+                else:
+                    self._error(401, "密码错误")
+            else:
+                self._error(400, "缺少密码参数")
             return
         
         if path == "/api/services/start":
@@ -598,8 +659,11 @@ def get_free_port():
         s.bind(('', 0))
         return s.getsockname()[1]
 
-def run_server(port=8080):
+def run_server(port=8080, password=None):
     """运行Web服务器"""
+    global PASSWORD
+    PASSWORD = password
+    
     try:
         # 在Docker环境中自动安装nftables和gost
         if os.path.exists('/.dockerenv'):
@@ -623,12 +687,18 @@ def run_server(port=8080):
         print(f"Natter管理界面已启动: http://0.0.0.0:{port}")
         print(f"使用的Natter路径: {NATTER_PATH}")
         print(f"数据存储目录: {DATA_DIR}")
+        
+        if PASSWORD:
+            print("已启用密码保护")
+        else:
+            print("未设置密码，所有人均可访问")
+            
         httpd.serve_forever()
     except OSError as e:
         if "Address already in use" in str(e):
             print(f"端口 {port} 已被占用，尝试其他端口...")
             new_port = get_free_port()
-            run_server(new_port)
+            run_server(new_port, password)
         else:
             print(f"启动服务器时发生错误: {e}")
             raise
@@ -674,11 +744,19 @@ if __name__ == "__main__":
     
     # 默认使用8080端口，可通过命令行参数修改
     port = 8080
+    password = None
+    
+    # 处理命令行参数
     if len(sys.argv) > 1:
         try:
             port = int(sys.argv[1])
         except ValueError:
             print(f"警告: 无效的端口号 '{sys.argv[1]}'，使用默认端口 8080")
     
+    # 获取密码
+    if len(sys.argv) > 2:
+        password = sys.argv[2]
+        print("已设置访问密码")
+    
     print(f"尝试在端口 {port} 启动Web服务器...")
-    run_server(port)
+    run_server(port, password)

@@ -825,3 +825,65 @@ footer {
 .btn-success:hover {
     background-color: #218838;
 }
+
+/* 登录面板样式 */
+.login-panel {
+    max-width: 400px;
+    margin: 100px auto;
+}
+
+.login-panel .card {
+    padding: 2rem;
+}
+
+.login-panel h2 {
+    margin-bottom: 1.5rem;
+    text-align: center;
+    color: var(--primary-color);
+}
+
+.login-panel .form-group {
+    margin-bottom: 1.5rem;
+}
+
+.login-panel input[type="password"] {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 1rem;
+}
+
+.login-panel .form-actions {
+    text-align: center;
+}
+
+.login-panel .btn-primary {
+    width: 100%;
+    padding: 10px;
+}
+
+.login-error {
+    background-color: rgba(220, 53, 69, 0.1);
+    padding: 10px;
+    border-radius: 4px;
+    margin-top: 15px;
+    border: 1px solid rgba(220, 53, 69, 0.2);
+}
+
+/* 登出按钮 */
+.logout-btn {
+    margin-left: auto;
+    margin-right: 1rem;
+    background-color: var(--secondary-color);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 5px 10px;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.logout-btn:hover {
+    background-color: var(--danger-color);
+}

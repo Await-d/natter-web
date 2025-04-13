@@ -7,6 +7,9 @@ let serviceDetailsPanel = document.getElementById('service-details-panel');
 let helpPanel = document.getElementById('help-panel');
 let templatesPanel = document.getElementById('templates-panel');
 let saveTemplateDialog = document.getElementById('save-template-dialog');
+let loginPanel = document.createElement('div');
+loginPanel.className = 'login-panel';
+loginPanel.style.display = 'none';
 
 // 表单元素
 let newServiceForm = document.getElementById('new-service-form');
@@ -70,6 +73,10 @@ let runtimeIntervalId = null;
 const servicesRuntime = {};
 let previousView = null;
 
+// 认证状态
+let isAuthenticated = false;
+let authToken = localStorage.getItem('natter_auth_token');
+
 // API 端点
 const API = {
     listServices: '/api/services',
@@ -85,7 +92,9 @@ const API = {
     saveTemplate: '/api/templates/save',
     deleteTemplate: '/api/templates/delete',
     installTool: '/api/tools/install',
-    checkTool: '/api/tools/check'
+    checkTool: '/api/tools/check',
+    authCheck: '/api/auth/check',
+    authLogin: '/api/auth/login'
 };
 
 // 工具状态信息
@@ -106,7 +115,7 @@ function checkToolInstalled(tool) {
 
     toolsStatus[tool].checking = true;
 
-    fetch(`${API.checkTool}?tool=${tool}`)
+    fetchWithAuth(`${API.checkTool}?tool=${tool}`)
         .then(response => response.json())
         .then(data => {
             toolsStatus[tool].installed = data.installed;
@@ -474,11 +483,22 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     }
+
+    // 添加登出按钮事件监听
+    const logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', function () {
+            logout();
+        });
+    }
+
+    // 检查认证状态
+    checkAuthRequired();
 });
 
 // 加载服务列表
 function loadServices() {
-    fetch(API.listServices)
+    fetchWithAuth(API.listServices)
         .then(response => response.json())
         .then(data => {
             renderServicesList(data.services);
@@ -708,7 +728,7 @@ function startNewService() {
     }
 
     // 发送请求启动服务
-    fetch(API.startService, {
+    fetchWithAuth(API.startService, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -742,7 +762,7 @@ function stopService(id) {
         return;
     }
 
-    fetch(API.stopService, {
+    fetchWithAuth(API.stopService, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -779,7 +799,7 @@ function restartService(id) {
         return;
     }
 
-    fetch(API.restartService, {
+    fetchWithAuth(API.restartService, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -809,7 +829,7 @@ function stopAllServices() {
         return;
     }
 
-    fetch(API.stopAllServices, {
+    fetchWithAuth(API.stopAllServices, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -839,7 +859,7 @@ function stopAllServices() {
 
 // 设置自动重启
 function setAutoRestart(id, enabled) {
-    fetch(API.setAutoRestart, {
+    fetchWithAuth(API.setAutoRestart, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -862,7 +882,7 @@ function setAutoRestart(id, enabled) {
 
 // 清空服务日志
 function clearServiceLogs(id) {
-    fetch(API.clearLogs, {
+    fetchWithAuth(API.clearLogs, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -928,7 +948,11 @@ function updateDetailRuntime() {
 
 // 加载服务详情
 function loadServiceDetails(id) {
-    fetch(`${API.getService}?id=${id}`)
+    if (refreshIntervalId) {
+        clearInterval(refreshIntervalId);
+    }
+
+    fetchWithAuth(`${API.getService}?id=${id}`)
         .then(response => response.json())
         .then(data => {
             if (!data.service) {
@@ -1110,7 +1134,7 @@ function hideTemplatesPanel() {
 
 // 加载模板列表
 function loadTemplates() {
-    fetch(API.listTemplates)
+    fetchWithAuth(API.listTemplates)
         .then(response => response.json())
         .then(data => {
             renderTemplatesList(data.templates);
@@ -1179,7 +1203,7 @@ function deleteTemplate(id) {
         return;
     }
 
-    fetch(API.deleteTemplate, {
+    fetchWithAuth(API.deleteTemplate, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -1234,7 +1258,7 @@ function saveTemplateFromDialog() {
 
     if (serviceId) {
         // 从服务详情保存
-        fetch(`${API.getService}?id=${serviceId}`)
+        fetchWithAuth(`${API.getService}?id=${serviceId}`)
             .then(response => response.json())
             .then(data => {
                 if (!data.service) {
@@ -1268,7 +1292,7 @@ function saveTemplateFromDialog() {
 
 // 保存模板到服务器
 function saveTemplateToServer(name, description, cmd_args) {
-    fetch(API.saveTemplate, {
+    fetchWithAuth(API.saveTemplate, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -1367,7 +1391,7 @@ function showCopyFeedback(button) {
  * @param {string} id - 服务ID
  */
 function deleteService(id) {
-    fetch(API.deleteService, {
+    fetchWithAuth(API.deleteService, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -1428,7 +1452,7 @@ function showNotification(message, type = 'info') {
 function installTool(tool) {
     showNotification(`正在安装 ${tool}，请稍候...`, 'info');
 
-    fetch(API.installTool, {
+    fetchWithAuth(API.installTool, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -1491,4 +1515,184 @@ function formatAddressShort(address) {
         console.error('格式化地址出错:', e);
         return address;
     }
+}
+
+// 添加登录表单HTML
+function createLoginForm() {
+    if (document.getElementById('login-form')) {
+        return; // 已存在，不重复创建
+    }
+
+    const loginHtml = `
+    <div class="card">
+        <h2>Natter管理界面登录</h2>
+        <form id="login-form">
+            <div class="form-group">
+                <label for="password">请输入密码:</label>
+                <input type="password" id="password" required>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn-primary">登录</button>
+            </div>
+            <div id="login-error" class="login-error" style="display:none; color: #dc3545; margin-top: 10px;"></div>
+        </form>
+    </div>
+    `;
+
+    loginPanel.innerHTML = loginHtml;
+    document.querySelector('.container').appendChild(loginPanel);
+
+    // 添加登录表单事件监听
+    const loginForm = document.getElementById('login-form');
+    loginForm.addEventListener('submit', function (e) {
+        e.preventDefault();
+        const password = document.getElementById('password').value;
+        login(password);
+    });
+}
+
+// 检查是否需要认证
+function checkAuthRequired() {
+    return fetchWithAuth(API.authCheck)
+        .then(response => response.json())
+        .then(data => {
+            const authRequired = data.auth_required;
+            if (authRequired) {
+                // 如果需要认证但未认证，则显示登录表单
+                if (!isAuthenticated && !authToken) {
+                    createLoginForm();
+                    hideAllPanels();
+                    loginPanel.style.display = 'block';
+
+                    // 隐藏登出按钮
+                    const logoutBtn = document.getElementById('logout-btn');
+                    if (logoutBtn) {
+                        logoutBtn.style.display = 'none';
+                    }
+                } else if (authToken) {
+                    // 已有token，尝试使用
+                    isAuthenticated = true;
+
+                    // 显示登出按钮
+                    const logoutBtn = document.getElementById('logout-btn');
+                    if (logoutBtn) {
+                        logoutBtn.style.display = 'block';
+                    }
+
+                    showServicesList();
+                }
+            } else {
+                // 不需要认证
+                isAuthenticated = true;
+
+                // 隐藏登出按钮，因为不需要认证
+                const logoutBtn = document.getElementById('logout-btn');
+                if (logoutBtn) {
+                    logoutBtn.style.display = 'none';
+                }
+
+                showServicesList();
+            }
+            return authRequired;
+        })
+        .catch(error => {
+            console.error('检查认证状态时出错:', error);
+            return false;
+        });
+}
+
+// 登录功能
+function login(password) {
+    const loginError = document.getElementById('login-error');
+    loginError.style.display = 'none';
+
+    fetchWithAuth(API.authLogin, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                password: password
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // 保存认证token
+                authToken = data.token;
+                localStorage.setItem('natter_auth_token', authToken);
+                isAuthenticated = true;
+
+                // 显示登出按钮
+                const logoutBtn = document.getElementById('logout-btn');
+                if (logoutBtn) {
+                    logoutBtn.style.display = 'block';
+                }
+
+                // 隐藏登录面板
+                loginPanel.style.display = 'none';
+
+                // 显示服务列表
+                showServicesList();
+            } else {
+                // 显示错误
+                loginError.textContent = data.error || '密码错误';
+                loginError.style.display = 'block';
+            }
+        })
+        .catch(error => {
+            console.error('登录请求出错:', error);
+            loginError.textContent = '登录请求失败，请重试';
+            loginError.style.display = 'block';
+        });
+}
+
+// 登出功能
+function logout() {
+    authToken = null;
+    isAuthenticated = false;
+    localStorage.removeItem('natter_auth_token');
+
+    // 隐藏登出按钮
+    const logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) {
+        logoutBtn.style.display = 'none';
+    }
+
+    createLoginForm();
+    hideAllPanels();
+    loginPanel.style.display = 'block';
+}
+
+// 隐藏所有面板
+function hideAllPanels() {
+    servicesPanel.style.display = 'none';
+    newServicePanel.style.display = 'none';
+    serviceDetailsPanel.style.display = 'none';
+    helpPanel.style.display = 'none';
+    templatesPanel.style.display = 'none';
+}
+
+// 添加Authorization头到fetch请求
+function fetchWithAuth(url, options = {}) {
+    // 深复制选项，避免修改原对象
+    const newOptions = JSON.parse(JSON.stringify(options));
+
+    // 确保headers对象存在
+    newOptions.headers = newOptions.headers || {};
+
+    // 添加认证头（如果有token）
+    if (authToken) {
+        newOptions.headers['Authorization'] = `Basic ${authToken}`;
+    }
+
+    return fetch(url, newOptions)
+        .then(response => {
+            // 处理401未授权响应
+            if (response.status === 401) {
+                logout();
+                throw new Error('认证失败，请重新登录');
+            }
+            return response;
+        });
 }

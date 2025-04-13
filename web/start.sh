@@ -3,7 +3,7 @@
  # @Author: Await
  # @Date: 2025-04-12 15:27:12
  # @LastEditors: Await
- # @LastEditTime: 2025-04-13 15:54:15
+ # @LastEditTime: 2025-04-13 17:26:55
  # @Description: 请填写简介
 ### 
 
@@ -38,9 +38,15 @@ else
   apt-get update && apt-get install -y nftables
 fi
 
-# 设置环境变量，确保Web管理工具能找到natter.py
-export NATTER_PATH=/app/natter/natter.py
-export DATA_DIR=/app/data
+# 设置应用路径变量
+APP_DIR=$(dirname "$0")
+APP_PARENT_DIR=$(dirname "$APP_DIR")
+
+# 获取环境变量或使用默认值
+NATTER_PATH=${NATTER_PATH:-"$APP_PARENT_DIR/natter/natter.py"}
+DATA_DIR=${DATA_DIR:-"$APP_DIR/data"}
+WEB_PORT=${WEB_PORT:-8080}
+WEB_PASSWORD=${WEB_PASSWORD:-""}
 
 # 调试信息
 echo "NATTER_PATH设置为: $NATTER_PATH"
@@ -58,13 +64,13 @@ chmod -R 755 /app/web
 echo "切换到web目录并启动服务..."
 cd /app/web
 
-# 获取Web端口号
-# 如果传入了命令行参数，则使用命令行参数作为端口号
-# 否则使用环境变量WEB_PORT，如果未设置则默认使用8080
-WEB_PORT=${WEB_PORT:-8080}
-if [ $# -gt 0 ]; then
-  WEB_PORT=$1
-fi
-
-echo "Web服务将使用端口: $WEB_PORT"
-python3 -u server.py $WEB_PORT 
+echo "启动Natter Web管理界面"
+echo "使用的Natter路径: $NATTER_PATH"
+echo "数据存储目录: $DATA_DIR"
+echo "Web端口: $WEB_PORT"
+if [ -n "$WEB_PASSWORD" ]; then
+    echo "已配置访问密码，访问界面需要认证"
+    python3 -u "$APP_DIR/server.py" "$WEB_PORT" "$WEB_PASSWORD"
+else
+    echo "未配置访问密码，所有人均可访问"
+    python3 -u "$APP_DIR/server.py" "$WEB_PORT" 
