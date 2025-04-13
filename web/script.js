@@ -500,6 +500,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // 检查认证状态
     checkAuthRequired();
+
+    // 检查Docker环境并显示nftables警告
+    checkDockerEnvironment();
 });
 
 // 加载服务列表
@@ -533,6 +536,15 @@ function renderServicesList(services) {
 
         // 设置服务ID
         card.setAttribute('data-id', service.id);
+
+        // 根据服务状态设置data-status属性
+        if (service.status === 'OPEN' || service.running) {
+            card.setAttribute('data-status', 'running');
+        } else if (service.status === 'CLOSED' || !service.running) {
+            card.setAttribute('data-status', 'stopped');
+        } else {
+            card.setAttribute('data-status', 'waiting');
+        }
 
         // 格式化地址显示
         const addressDisplay = service.mapped_address || '等待映射...';
@@ -1428,7 +1440,7 @@ function deleteService(id) {
  * @param {string} message - 通知消息，可包含HTML
  * @param {string} type - 通知类型 ('success', 'error', 'warning', 'info')
  */
-function showNotification(message, type = 'info') {
+function showNotification(message, type = 'info', duration = 5000) {
     // 创建通知元素
     const notification = document.createElement('div');
     notification.className = `notification ${type}`;
@@ -1446,9 +1458,11 @@ function showNotification(message, type = 'info') {
     setTimeout(() => {
         notification.classList.remove('show');
         setTimeout(() => {
-            document.body.removeChild(notification);
+            if (document.body.contains(notification)) {
+                document.body.removeChild(notification);
+            }
         }, 300);
-    }, 5000); // 增加显示时间到5秒，因为可能有更多内容需要阅读
+    }, duration); // 使用传入的持续时间
 }
 
 /**
@@ -1719,4 +1733,22 @@ function fetchWithAuth(url, options = {}) {
             }
             return response;
         });
+}
+
+// 添加新函数，用于检查Docker环境
+function checkDockerEnvironment() {
+    // 由于前端无法直接检测Docker环境，我们假设在Docker中运行
+    // 因为这个应用主要设计为在Docker中使用
+
+    // 获取nftables选项
+    const nftablesOption = document.querySelector('option[value="nftables"]');
+
+    if (nftablesOption && nftablesOption.disabled) {
+        // 如果已禁用，显示全局通知
+        showNotification(`
+            <strong>注意：</strong> 检测到Docker容器环境，已禁用nftables转发方法。<br>
+            Docker容器缺少运行nftables所需的内核权限。<br>
+            请使用<strong>socket</strong>或<strong>iptables</strong>转发方法。
+        `, 'warning', 10000); // 显示10秒
+    }
 }

@@ -104,7 +104,8 @@
                                 <select id="forward-method">
                                     <option value="socket">socket (内置)</option>
                                     <option value="iptables">iptables (需要root权限)</option>
-                                    <option value="nftables">nftables (需要root权限)</option>
+                                    <option value="nftables" disabled title="Docker环境中不支持">nftables (Docker中不可用)
+                                    </option>
                                     <option value="socat">socat (需要安装)</option>
                                     <option value="gost">gost (需要安装)</option>
                                 </select>
@@ -280,7 +281,8 @@
                     <ul>
                         <li><strong>socket</strong>: 内置方法，纯Python实现，无需额外依赖</li>
                         <li><strong>iptables</strong>: 使用Linux的iptables进行转发，需要root权限</li>
-                        <li><strong>nftables</strong>: 使用Linux的nftables进行转发，需要root权限</li>
+                        <li><strong>nftables</strong>: 使用Linux的nftables进行转发，需要root权限 <span
+                                style="color:#ff6b6b;font-size:0.9em;">(在Docker容器中不可用)</span></li>
                         <li><strong>socat</strong>: 使用socat工具转发，需要安装socat</li>
                         <li><strong>gost</strong>: 使用gost工具转发，需要安装gost</li>
                     </ul>

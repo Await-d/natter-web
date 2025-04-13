@@ -58,6 +58,15 @@ class NatterService:
         if self.process and self.process.poll() is None:
             return False
         
+        # 检查Docker环境下是否尝试使用nftables
+        if os.path.exists('/.dockerenv') and any(arg == '-m' and i+1 < len(self.cmd_args) and self.cmd_args[i+1] == 'nftables' for i, arg in enumerate(self.cmd_args)):
+            print("错误: 在Docker环境中尝试使用nftables转发方法，此方法在Docker中不可用")
+            self.output_lines.append("❌ 错误: nftables在Docker容器中不可用")
+            self.output_lines.append("💡 请使用socket或iptables转发方法")
+            self.output_lines.append("➡️ 请停止此服务，然后使用其他转发方法重新创建服务")
+            self.status = "已停止"
+            return False
+        
         cmd = [sys.executable, NATTER_PATH] + self.cmd_args
 
         # 如果没有指定keepalive间隔，添加默认值
