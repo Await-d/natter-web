@@ -427,6 +427,14 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                     self._error(500, "Failed to start service")
             else:
                 self._error(400, "Missing args")
+        elif path == "/api/tools/install":
+            if "tool" in data:
+                tool = data["tool"]
+                result = self._install_tool(tool)
+                self._set_headers()
+                self.wfile.write(json.dumps(result).encode())
+            else:
+                self._error(400, "Missing tool parameter")
         elif path == "/api/services/stop":
             if "id" in data:
                 service_id = data["id"]
@@ -523,6 +531,34 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
         self.send_header("Content-type", "application/json")
         self.end_headers()
         self.wfile.write(json.dumps({"error": message}).encode())
+
+    def _install_tool(self, tool):
+        """安装指定的工具"""
+        try:
+            if tool == "socat":
+                # 安装socat
+                subprocess.run(["apt-get", "update"], check=True)
+                result = subprocess.run(["apt-get", "install", "-y", "socat"], capture_output=True, text=True)
+                success = result.returncode == 0
+                return {
+                    "success": success, 
+                    "message": "socat安装成功" if success else f"安装失败: {result.stderr}"
+                }
+            elif tool == "gost":
+                # 安装gost
+                result = subprocess.run([
+                    "bash", "-c", 
+                    "wget -qO- https://github.com/ginuerzh/gost/releases/download/v2.11.2/gost-linux-amd64-2.11.2.gz | gunzip > /usr/local/bin/gost && chmod +x /usr/local/bin/gost"
+                ], capture_output=True, text=True)
+                success = result.returncode == 0
+                return {
+                    "success": success, 
+                    "message": "gost安装成功" if success else f"安装失败: {result.stderr}"
+                }
+            else:
+                return {"success": False, "message": f"未知工具: {tool}"}
+        except Exception as e:
+            return {"success": False, "message": f"安装过程出错: {str(e)}"}
 
 def get_free_port():
     """获取可用端口"""

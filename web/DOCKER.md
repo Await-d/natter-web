@@ -93,11 +93,51 @@ RUN git clone -b v2.1.1 https://github.com/MikeWang000000/Natter.git /app/natter
 
 ### 自定义端口
 
-修改docker-compose.yml文件中的端口映射：
+有三种方式可以自定义Web管理界面的端口：
+
+1. 使用环境变量（推荐）：
 
 ```yaml
+# 在docker-compose.yml中
+environment:
+  - WEB_PORT=9090  # 将8080修改为任意端口
+```
+
+或者在命令行中：
+
+```bash
+WEB_PORT=9090 docker-compose up -d
+```
+
+2. 在docker run命令中指定环境变量：
+
+```bash
+docker run -d --name natter-web \
+  --network host \
+  --cap-add NET_ADMIN \
+  -e WEB_PORT=9090 \
+  -v $(pwd)/data:/app/data \
+  natter-web
+```
+
+3. 通过命令行参数直接传递给容器：
+
+```bash
+docker run -d --name natter-web \
+  --network host \
+  --cap-add NET_ADMIN \
+  -v $(pwd)/data:/app/data \
+  natter-web 9090
+```
+
+4. 对于使用端口映射（非host网络模式）的配置，需要同时修改端口映射：
+
+```yaml
+# 在docker-compose.yml中
 ports:
-  - "自定义端口:8080"
+  - "9090:9090"  # 修改为相同的自定义端口
+environment:
+  - WEB_PORT=9090
 ```
 
 ### 使用已有的Natter安装

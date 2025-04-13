@@ -47,7 +47,24 @@ http://localhost:8080
 我们提供了Docker支持，方便在容器中运行Natter Web管理工具：
 
 ```bash
+# 使用默认配置运行
 docker-compose up -d
+
+# 或指定自定义Web端口
+WEB_PORT=9090 docker-compose up -d
+```
+
+您也可以通过直接运行Docker容器来指定Web端口：
+
+```bash
+# 使用默认8080端口
+docker run -d --name natter-web --network host -v ./data:/app/data nattertool/natter-web
+
+# 或指定自定义Web端口
+docker run -d --name natter-web --network host -e WEB_PORT=9090 -v ./data:/app/data nattertool/natter-web
+
+# 或通过命令行参数指定Web端口
+docker run -d --name natter-web --network host -v ./data:/app/data nattertool/natter-web 9090
 ```
 
 详细的Docker使用说明请参阅[Docker文档](DOCKER.md)。

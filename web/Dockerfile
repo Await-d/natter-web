@@ -7,11 +7,22 @@ RUN apt-get update && apt-get install -y \
     git \
     procps \
     iptables \
+    nftables \
+    socat \
     iproute2 \
     net-tools \
     iputils-ping \
     curl \
+    wget \
     && rm -rf /var/lib/apt/lists/*
+
+# 设置iptables-legacy为默认
+RUN update-alternatives --set iptables /usr/sbin/iptables-legacy && \
+    update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy
+
+# 安装gost工具 
+RUN wget -qO- https://github.com/ginuerzh/gost/releases/download/v2.11.2/gost-linux-amd64-2.11.2.gz | gunzip > /usr/local/bin/gost && \
+    chmod +x /usr/local/bin/gost
 
 # 安装Python依赖
 RUN pip install --no-cache-dir psutil
@@ -46,6 +57,7 @@ EXPOSE 8080
 ENV PYTHONUNBUFFERED=1
 ENV NATTER_PATH=/app/natter/natter.py
 ENV DATA_DIR=/app/data
+ENV WEB_PORT=8080
 
 # 显示文件结构调试信息
 RUN echo "文件结构:" && \

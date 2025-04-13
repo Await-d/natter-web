@@ -13,7 +13,7 @@ services:
     # 2. 使用端口映射（Windows/macOS建议）
     # 如果使用端口映射，请注释掉上面的network_mode行，取消下面ports的注释
     # ports:
-    #   - "8080:8080"
+    #   - "8080:${WEB_PORT:-8080}"
     volumes:
       - ./data:/app/data
     cap_add:
@@ -23,9 +23,10 @@ services:
       - PYTHONUNBUFFERED=1 # 确保Python输出不被缓冲
       - NATTER_PATH=/app/natter/natter.py
       - DATA_DIR=/app/data
+      - WEB_PORT=8080 # Web服务端口，可自定义
     # 添加健康检查
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      test: ["CMD", "curl", "-f", "http://localhost:${WEB_PORT:-8080}"]
       interval: 30s
       timeout: 10s
       retries: 3

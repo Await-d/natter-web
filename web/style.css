@@ -590,3 +590,15 @@ footer {
 .notification.info {
     background-color: #17a2b8;
 }
+
+/* 工具安装按钮 */
+.tool-install-buttons {
+    margin-top: 10px;
+    display: flex;
+    gap: 10px;
+}
+
+.tool-install-buttons button {
+    padding: 6px 10px;
+    font-size: 0.85rem;
+}

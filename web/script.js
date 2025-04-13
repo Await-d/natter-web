@@ -83,7 +83,8 @@ const API = {
     clearLogs: '/api/services/clear-logs',
     listTemplates: '/api/templates',
     saveTemplate: '/api/templates/save',
-    deleteTemplate: '/api/templates/delete'
+    deleteTemplate: '/api/templates/delete',
+    installTool: '/api/tools/install'
 };
 
 // 事件监听器设置
@@ -93,6 +94,21 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // 设置页面刷新定时器 (每10秒刷新一次列表)
     setInterval(loadServices, 10000);
+
+    // 安装工具按钮事件
+    const installSocatBtn = document.getElementById('install-socat-btn');
+    if (installSocatBtn) {
+        installSocatBtn.addEventListener('click', function () {
+            installTool('socat');
+        });
+    }
+
+    const installGostBtn = document.getElementById('install-gost-btn');
+    if (installGostBtn) {
+        installGostBtn.addEventListener('click', function () {
+            installTool('gost');
+        });
+    }
 
     // 模式切换事件
     serviceMode.addEventListener('change', function () {
@@ -1077,4 +1093,34 @@ function showNotification(message, type = 'info') {
             document.body.removeChild(notification);
         }, 300);
     }, 3000);
+}
+
+/**
+ * 安装指定工具
+ * @param {string} tool - 工具名称
+ */
+function installTool(tool) {
+    showNotification(`正在安装 ${tool}，请稍候...`, 'info');
+
+    fetch(API.installTool, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                tool: tool
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification(data.message, 'success');
+            } else {
+                showNotification(data.message, 'error');
+            }
+        })
+        .catch(error => {
+            console.error(`安装 ${tool} 出错:`, error);
+            showNotification(`安装 ${tool} 时发生错误`, 'error');
+        });
 }

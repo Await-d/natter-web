@@ -22,6 +22,7 @@ steps:
         -e PYTHONUNBUFFERED=1
         -e NATTER_PATH=/app/natter/natter.py
         -e DATA_DIR=/app/data
+        -e WEB_PORT=7111
         natter-web:latest
 
 volumes:
