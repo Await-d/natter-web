@@ -15,7 +15,7 @@ steps:
       - >
         docker run -d --name natter-web-container 
         --network host
-        -v /data/natter-web/data:/app/data
+        -v /volume1/docker/1panel/apps/www/natter-web/data:/app/data
         --cap-add NET_ADMIN
         --restart always
         -e TZ=Asia/Shanghai
@@ -28,9 +28,6 @@ volumes:
   - name: docker-socket
     host:
       path: /var/run/docker.sock
-  - name: app-data
-    host:
-      path: /data/natter-web
 
 trigger:
   branch:
