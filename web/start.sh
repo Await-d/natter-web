@@ -26,16 +26,33 @@ fi
 # 确保nftables正常工作
 echo "检查nftables..."
 if command -v nft &> /dev/null; then
-  # 尝试一个简单的nftables命令，检查是否能正常工作
-  if ! nft list tables &> /dev/null; then
-    echo "尝试修复nftables..."
-    apt-get update && apt-get install -y nftables
-    systemctl restart nftables || true
+  # 尝试加载nftables模块
+  modprobe nf_tables || echo "无法加载nf_tables模块，可能是容器限制"
+  
+  # 尝试启动nftables服务
+  systemctl start nftables 2>/dev/null || echo "无法通过systemctl启动nftables服务"
+  
+  # 创建一个测试表，然后删除，以检查nftables是否真正工作
+  echo "测试nftables功能..."
+  if nft add table inet test_table 2>/dev/null && nft delete table inet test_table 2>/dev/null; then
+    echo "nftables功能正常"
+  else
+    echo "nftables功能测试失败，可能需要特权或模块支持"
   fi
-  echo "nftables检查完成"
 else
   echo "未找到nftables命令，尝试安装..."
   apt-get update && apt-get install -y nftables
+  # 安装后再次尝试
+  if command -v nft &> /dev/null; then
+    echo "nftables已安装，尝试测试功能..."
+    if nft add table inet test_table 2>/dev/null && nft delete table inet test_table 2>/dev/null; then
+      echo "nftables功能正常"
+    else
+      echo "nftables功能测试失败，可能需要特权或模块支持"
+    fi
+  else
+    echo "nftables安装失败"
+  fi
 fi
 
 # 设置应用路径变量

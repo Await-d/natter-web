@@ -7,6 +7,7 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     procps \
     nftables \
+    iptables \
     net-tools \
     iproute2 \
     wget \
