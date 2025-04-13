@@ -39,14 +39,47 @@ docker build -t natter-web .
 docker run -d --name natter-web \
   --network host \
   --cap-add NET_ADMIN \
-  -v $(pwd)/data:/app/data \
+  -v "$(pwd)/data:/app/data" \
   -p 8080:8080 \
   natter-web
 ```
 
 ## 持久化数据
 
-Docker镜像会将数据（如配置模板）存储在`/app/data`目录中。为了保持数据持久化，您应该将此目录挂载到主机上的目录。使用docker-compose时，数据会自动存储在当前目录的`data`文件夹中。
+**重要提示：一定要正确映射数据目录，否则每次重启容器数据将丢失**
+
+Docker镜像会将数据（如服务配置和模板）存储在`/app/data`目录中。为了保持数据持久化，您必须将此目录挂载到主机上的目录。
+
+### 使用docker-compose（推荐）
+
+在docker-compose.yml文件中已配置数据映射：
+```yaml
+volumes:
+  - ./data:/app/data  # 数据持久化：将容器内的/app/data目录映射到宿主机的./data目录
+```
+
+这会将数据存储在当前目录下的`data`文件夹中。确保该目录在宿主机上具有适当的权限。
+
+### 使用docker run命令
+
+如果直接使用docker run，确保添加卷映射参数：
+```bash
+docker run -d --name natter-web \
+  --network host \
+  --cap-add NET_ADMIN \
+  -v "$(pwd)/data:/app/data" \
+  -p 8080:8080 \
+  natter-web
+```
+
+### 验证数据持久化
+
+1. 首次启动容器后，会在数据目录中创建一个`.data_test`文件
+2. 重启容器后，如果该文件仍然存在，说明数据目录映射正确
+3. 如果服务配置和模板在重启后丢失，检查：
+   - 数据目录映射是否正确
+   - 宿主机目录权限是否正确
+   - 启动命令中是否包含了卷映射参数
 
 ## 网络配置说明
 

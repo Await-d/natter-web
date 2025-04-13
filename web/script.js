@@ -516,6 +516,9 @@ document.addEventListener('DOMContentLoaded', function () {
             const enabled = this.checked;
             toggleAutoRestart(currentServiceId, enabled);
             autoRestartStatus.textContent = enabled ? '已启用' : '已禁用';
+
+            // 添加状态样式类
+            autoRestartStatus.className = enabled ? 'status-enabled' : 'status-disabled';
         });
     }
 });
@@ -1028,17 +1031,37 @@ function showServiceDetailsPanel(service) {
         updateDetailPanelRuntime(service);
     }, 1000);
 
-    // 设置LAN/WAN状态
+    // 更新详情标签中的LAN/WAN状态和NAT类型
     lanStatus.textContent = service.lan_status || '未知';
     wanStatus.textContent = service.wan_status || '未知';
-
-    // 设置NAT类型
     natType.textContent = service.nat_type || '未知';
+
+    // 更新状态面板中的可用性信息
+    const statusPanelLanStatus = document.querySelector('.status-panel #lan-status');
+    const statusPanelWanStatus = document.querySelector('.status-panel #wan-status');
+    const statusPanelNatType = document.querySelector('.status-panel #nat-type');
+
+    if (statusPanelLanStatus) {
+        statusPanelLanStatus.textContent = service.lan_status || '未知';
+        setStatusColor(statusPanelLanStatus, service.lan_status);
+    }
+
+    if (statusPanelWanStatus) {
+        statusPanelWanStatus.textContent = service.wan_status || '未知';
+        setStatusColor(statusPanelWanStatus, service.wan_status);
+    }
+
+    if (statusPanelNatType) {
+        statusPanelNatType.textContent = service.nat_type || '未知';
+    }
 
     // 设置自动重启状态
     if (autoRestartToggle) {
         autoRestartToggle.checked = service.auto_restart;
         autoRestartStatus.textContent = service.auto_restart ? '已启用' : '已禁用';
+
+        // 添加状态样式类
+        autoRestartStatus.className = service.auto_restart ? 'status-enabled' : 'status-disabled';
     }
 
     // 显示输出日志
@@ -1840,19 +1863,33 @@ function toggleAutoRestart(serviceId, enabled) {
         .then(data => {
             if (data.success) {
                 showNotification(`服务自动重启已${enabled ? '启用' : '禁用'}`, 'success');
+                // 更新状态样式类
+                if (autoRestartStatus) {
+                    autoRestartStatus.className = enabled ? 'status-enabled' : 'status-disabled';
+                }
             } else {
                 showNotification('设置自动重启失败', 'error');
                 // 回滚UI状态
-                autoRestartToggle.checked = !enabled;
-                autoRestartStatus.textContent = !enabled ? '已启用' : '已禁用';
+                if (autoRestartToggle) {
+                    autoRestartToggle.checked = !enabled;
+                }
+                if (autoRestartStatus) {
+                    autoRestartStatus.textContent = !enabled ? '已启用' : '已禁用';
+                    autoRestartStatus.className = !enabled ? 'status-enabled' : 'status-disabled';
+                }
             }
         })
         .catch(error => {
             console.error('设置自动重启出错:', error);
             showNotification('设置自动重启时发生错误', 'error');
             // 回滚UI状态
-            autoRestartToggle.checked = !enabled;
-            autoRestartStatus.textContent = !enabled ? '已启用' : '已禁用';
+            if (autoRestartToggle) {
+                autoRestartToggle.checked = !enabled;
+            }
+            if (autoRestartStatus) {
+                autoRestartStatus.textContent = !enabled ? '已启用' : '已禁用';
+                autoRestartStatus.className = !enabled ? 'status-enabled' : 'status-disabled';
+            }
         });
 }
 

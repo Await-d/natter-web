@@ -15,7 +15,7 @@ services:
     # ports:
     #   - "8080:${WEB_PORT:-8080}"
     volumes:
-      - ./data:/app/data
+      - ./data:/app/data  # 数据持久化：将容器内的/app/data目录映射到宿主机的./data目录
     cap_add:
       - NET_ADMIN # 允许使用iptables等网络管理工具
     environment:
@@ -24,6 +24,7 @@ services:
       - NATTER_PATH=/app/natter/natter.py
       - DATA_DIR=/app/data
       - WEB_PORT=8080 # Web服务端口，可自定义
+      - WEB_PASSWORD=zd2580
     # 添加健康检查
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:${WEB_PORT:-8080}"]

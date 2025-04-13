@@ -3,15 +3,25 @@
  # @Author: Await
  # @Date: 2025-04-12 15:27:12
  # @LastEditors: Await
- # @LastEditTime: 2025-04-13 17:46:20
+ # @LastEditTime: 2025-04-13 19:07:25
  # @Description: 请填写简介
 ### 
 
 # 确保目录结构正确
 mkdir -p /app/data
+chmod -R 777 /app/data
 
 echo "开始启动Natter Web管理工具..."
-echo "如果需要持久化数据，请确保挂载了/app/data目录"
+echo "数据目录: ${DATA_DIR:-/app/data}"
+echo "确保此目录已正确映射到宿主机以实现数据持久化"
+
+# 检查数据目录映射是否正确
+if [ -f "${DATA_DIR:-/app/data}/.data_test" ]; then
+  echo "✅ 数据目录映射正常，数据将被持久化"
+else
+  touch "${DATA_DIR:-/app/data}/.data_test"
+  echo "⚠️ 首次运行：创建了数据目录测试文件，重启后检查此文件是否存在以确认持久化正常"
+fi
 
 # 确保使用iptables-legacy
 echo "配置iptables-legacy为默认..."
@@ -98,11 +108,13 @@ echo "DATA_DIR设置为: $DATA_DIR"
 echo "当前目录: $(pwd)"
 echo "文件权限:"
 ls -la /app/web/server.py
+ls -la ${DATA_DIR}
 
 # 修复文件权限问题
 echo "修复文件权限..."
 chmod +x /app/web/server.py
 chmod -R 755 /app/web
+chmod -R 777 ${DATA_DIR}
 
 # 启动Web管理服务
 echo "切换到web目录并启动服务..."
