@@ -79,22 +79,24 @@ let authToken = localStorage.getItem('natter_auth_token');
 
 // API 端点
 const API = {
-    listServices: '/api/services',
-    getService: '/api/service',
+    services: '/api/services',
+    service: '/api/service',
     startService: '/api/services/start',
     stopService: '/api/services/stop',
     deleteService: '/api/services/delete',
     restartService: '/api/services/restart',
     stopAllServices: '/api/services/stop-all',
-    setAutoRestart: '/api/services/auto-restart',
+    autoRestart: '/api/services/auto-restart',
     clearLogs: '/api/services/clear-logs',
-    listTemplates: '/api/templates',
+    templates: '/api/templates',
     saveTemplate: '/api/templates/save',
     deleteTemplate: '/api/templates/delete',
-    installTool: '/api/tools/install',
-    checkTool: '/api/tools/check',
+    toolsCheck: '/api/tools/check',
+    toolsInstall: '/api/tools/install',
     authCheck: '/api/auth/check',
-    authLogin: '/api/auth/login'
+    authLogin: '/api/auth/login',
+    setRemark: '/api/services/set-remark',
+    version: '/api/version'
 };
 
 // 工具状态信息
@@ -556,7 +558,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 // 加载服务列表
 function loadServices() {
-    fetchWithAuth(API.listServices)
+    fetchWithAuth(API.services)
         .then(response => response.json())
         .then(data => {
             renderServicesList(data.services);
@@ -569,81 +571,64 @@ function loadServices() {
 
 // 渲染服务列表
 function renderServicesList(services) {
-    const container = document.getElementById('services-list');
-    container.innerHTML = '';
+    const servicesList = document.getElementById('services-list');
+    servicesList.innerHTML = '';
 
-    if (services.length === 0) {
-        const emptyMessage = document.createElement('div');
-        emptyMessage.className = 'empty-services-message';
-        emptyMessage.textContent = '没有正在运行的服务';
-        container.appendChild(emptyMessage);
+    if (!services || services.length === 0) {
+        servicesList.innerHTML = '<div class="empty-services-message">没有运行中的服务</div>';
         return;
     }
 
+    // 获取模板
     const template = document.getElementById('service-card-template');
 
     services.forEach(service => {
-        const clone = document.importNode(template.content, true);
-        const card = clone.querySelector('.service-card');
+        // 克隆模板
+        const card = document.importNode(template.content, true);
+        const serviceCard = card.querySelector('.service-card');
 
-        card.setAttribute('data-id', service.id);
+        // 设置服务ID
+        serviceCard.dataset.id = service.id;
+        serviceCard.dataset.status = service.status === '运行中' ? 'running' : 'stopped';
 
-        // 设置映射地址和状态
-        const mappedAddressHeader = card.querySelector('.service-mapped-address');
-        if (mappedAddressHeader) {
-            mappedAddressHeader.textContent = service.mapped_address || '未映射';
-        }
+        // 填充数据
+        card.querySelector('.service-mapped-address').textContent = formatAddressShort(service.mapped_address || '未映射');
+        card.querySelector('.service-status').textContent = service.status;
+        card.querySelector('.service-status').className = `service-status service-status-${service.status === '运行中' ? 'running' : 'stopped'}`;
+        card.querySelector('.service-address').textContent = service.mapped_address || '未映射';
+        card.querySelector('.service-cmd-text').textContent = service.cmd_args.join(' ');
 
-        const addressSpan = card.querySelector('.service-address');
-        if (addressSpan) {
-            addressSpan.textContent = service.mapped_address || '未映射';
-        }
+        // 设置备注
+        const remarkText = card.querySelector('.service-remark-text');
+        remarkText.textContent = service.remark || '无';
 
-        const statusElem = card.querySelector('.service-status');
-        statusElem.textContent = service.status;
-        setStatusColor(statusElem, service.status);
+        // 如果有备注，显示备注行，否则隐藏
+        const remarkRow = card.querySelector('.service-remark');
+        remarkRow.style.display = service.remark ? 'block' : 'none';
 
-        // 设置命令文本
-        const cmdText = card.querySelector('.service-cmd-text');
-        if (cmdText) {
-            cmdText.textContent = service.cmd_args.join(' ');
-        }
+        // 添加事件监听器
+        card.querySelector('.btn-details').addEventListener('click', () => {
+            showServiceDetails(service.id);
+        });
 
-        // 绑定详情按钮事件
-        const detailsBtn = card.querySelector('.btn-details');
-        if (detailsBtn) {
-            detailsBtn.addEventListener('click', () => {
-                showServiceDetails(service.id);
-            });
-        }
+        card.querySelector('.btn-stop').addEventListener('click', (e) => {
+            e.stopPropagation();
+            stopService(service.id);
+        });
 
-        // 绑定停止按钮事件
-        const stopBtn = card.querySelector('.btn-stop');
-        if (stopBtn) {
-            stopBtn.addEventListener('click', () => {
-                stopService(service.id);
-            });
-        }
+        card.querySelector('.btn-delete').addEventListener('click', (e) => {
+            e.stopPropagation();
+            deleteService(service.id);
+        });
 
-        // 绑定删除按钮事件
-        const deleteBtn = card.querySelector('.btn-delete');
-        if (deleteBtn) {
-            deleteBtn.addEventListener('click', () => {
-                deleteService(service.id);
-            });
-        }
+        card.querySelector('.copy-address-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            const button = e.currentTarget;
+            copyToClipboard(service.mapped_address, button);
+        });
 
-        // 绑定复制地址按钮事件
-        const copyBtn = card.querySelector('.copy-address-btn');
-        if (copyBtn) {
-            copyBtn.addEventListener('click', (event) => {
-                event.stopPropagation(); // 防止冒泡触发其他事件
-                const address = service.mapped_address;
-                copyToClipboard(address);
-            });
-        }
-
-        container.appendChild(clone);
+        // 添加到列表
+        servicesList.appendChild(card);
     });
 }
 
@@ -750,6 +735,7 @@ function buildArgsFromBasicMode() {
 function startNewService() {
     let args = [];
     let auto_restart = autoRestart.checked;
+    let remark = document.getElementById('service-remark')?.value || "";
 
     if (serviceMode.value === 'basic') {
         // 基础模式，构建参数列表
@@ -773,7 +759,8 @@ function startNewService() {
             },
             body: JSON.stringify({
                 args: args,
-                auto_restart: auto_restart
+                auto_restart: auto_restart,
+                remark: remark
             })
         })
         .then(response => response.json())
@@ -897,7 +884,7 @@ function stopAllServices() {
 
 // 设置自动重启
 function setAutoRestart(id, enabled) {
-    fetchWithAuth(API.setAutoRestart, {
+    fetchWithAuth(API.autoRestart, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -990,7 +977,7 @@ function loadServiceDetails(id) {
         clearInterval(refreshIntervalId);
     }
 
-    fetchWithAuth(`${API.getService}?id=${id}`)
+    fetchWithAuth(`${API.service}?id=${id}`)
         .then(response => response.json())
         .then(data => {
             if (data.service) {
@@ -1007,12 +994,25 @@ function loadServiceDetails(id) {
 
 // 显示服务详情面板
 function showServiceDetailsPanel(service) {
-    currentServiceId = service.id;
     hideAllPanels();
-    serviceDetailsPanel.style.display = 'block';
 
-    // 更新服务详情
-    serviceId.textContent = service.id;
+    // 显示面板
+    const detailsPanel = document.getElementById('service-details-panel');
+    detailsPanel.style.display = 'block';
+
+    // 填充数据
+    document.querySelectorAll('#service-id').forEach(el => el.textContent = service.id);
+    document.getElementById('service-status').textContent = service.status;
+    document.getElementById('service-mapped-address').textContent = service.mapped_address || '未映射';
+    document.getElementById('service-cmd-args').textContent = service.cmd_args.join(' ');
+
+    // 设置备注
+    const remarkInput = document.getElementById('service-remark');
+    remarkInput.value = service.remark || '';
+
+    // 添加保存备注按钮事件
+    const saveRemarkBtn = document.getElementById('save-remark-btn');
+    saveRemarkBtn.onclick = () => saveServiceRemark(service.id, remarkInput.value);
 
     // 设置状态文本和样式
     serviceStatus.textContent = service.status;
@@ -1203,7 +1203,7 @@ function hideTemplatesPanel() {
 
 // 加载模板列表
 function loadTemplates() {
-    fetchWithAuth(API.listTemplates)
+    fetchWithAuth(API.templates)
         .then(response => response.json())
         .then(data => {
             renderTemplatesList(data.templates);
@@ -1327,7 +1327,7 @@ function saveTemplateFromDialog() {
 
     if (serviceId) {
         // 从服务详情保存
-        fetchWithAuth(`${API.getService}?id=${serviceId}`)
+        fetchWithAuth(`${API.service}?id=${serviceId}`)
             .then(response => response.json())
             .then(data => {
                 if (!data.service) {
@@ -1388,7 +1388,7 @@ function saveTemplateToServer(name, description, cmd_args) {
 }
 
 // 复制文本到剪贴板
-function copyToClipboard(text) {
+function copyToClipboard(text, button) {
     if (!text || text === '等待映射...' || text === '未知') {
         showNotification('暂无可复制的地址', 'warning');
         return;
@@ -1525,7 +1525,7 @@ function showNotification(message, type = 'info', duration = 5000) {
 function installTool(tool) {
     showNotification(`正在安装 ${tool}，请稍候...`, 'info');
 
-    fetchWithAuth(API.installTool, {
+    fetchWithAuth(API.toolsInstall, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -1855,7 +1855,7 @@ function checkDockerEnvironment() {
 
 // 切换服务的自动重启功能
 function toggleAutoRestart(serviceId, enabled) {
-    fetchWithAuth(API.setAutoRestart, {
+    fetchWithAuth(API.autoRestart, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -1948,7 +1948,7 @@ function startDetailRefresh() {
 
 // 获取版本号
 function fetchVersion() {
-    fetch('/api/version')
+    fetch(API.version)
         .then(response => response.json())
         .then(data => {
             document.getElementById('version').textContent = data.version;
@@ -1956,5 +1956,39 @@ function fetchVersion() {
         .catch(error => {
             console.error('获取版本号失败:', error);
             document.getElementById('version').textContent = '未知';
+        });
+}
+
+// 保存服务备注
+function saveServiceRemark(serviceId, remark) {
+    fetchWithAuth(API.setRemark, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                id: serviceId,
+                remark: remark
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification('备注已保存', 'success');
+
+                // 刷新服务详情
+                loadServiceDetails(serviceId);
+
+                // 如果在服务列表中，也需要刷新
+                if (document.getElementById('services-panel').style.display !== 'none') {
+                    loadServices();
+                }
+            } else {
+                showNotification('保存备注失败：' + (data.error || '未知错误'), 'error');
+            }
+        })
+        .catch(error => {
+            console.error('保存备注出错:', error);
+            showNotification('保存备注时发生错误', 'error');
         });
 }

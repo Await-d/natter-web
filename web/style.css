@@ -1287,3 +1287,35 @@ input:checked + .slider:before {
     color: #8c8c8c;
     font-size: 16px;
 }
+
+.service-remark {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.service-remark-text {
+    font-style: italic;
+    color: #888;
+}
+
+.service-remark-edit {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.service-remark-edit input {
+    flex: 1;
+    padding: 6px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.service-remark-edit button {
+    white-space: nowrap;
+}

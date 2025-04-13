@@ -42,7 +42,7 @@ WAN_STATUS_PATTERN = re.compile(r"WAN > ([^\[]+)\[ ([^\]]+) \]")
 PASSWORD = None
 
 class NatterService:
-    def __init__(self, service_id, cmd_args):
+    def __init__(self, service_id, cmd_args, remark=""):
         self.service_id = service_id
         self.cmd_args = cmd_args
         self.process = None
@@ -57,6 +57,7 @@ class NatterService:
         self.restart_thread = None
         self.local_port = None   # 添加本地端口属性
         self.remote_port = None  # 添加远程端口属性
+        self.remark = remark     # 添加备注属性
         
         # 尝试从命令参数中解析端口信息
         self._parse_ports_from_args()
@@ -256,7 +257,8 @@ class NatterService:
             "lan_status": self.lan_status,
             "wan_status": self.wan_status,
             "nat_type": self.nat_type,
-            "auto_restart": self.auto_restart
+            "auto_restart": self.auto_restart,
+            "remark": self.remark
         }
     
     def to_dict(self):
@@ -265,7 +267,8 @@ class NatterService:
             "id": self.service_id,
             "cmd_args": self.cmd_args,
             "auto_restart": self.auto_restart,
-            "created_at": self.start_time or time.time()
+            "created_at": self.start_time or time.time(),
+            "remark": self.remark
         }
 
 def generate_service_id():
@@ -338,12 +341,12 @@ class TemplateManager:
 
 class NatterManager:
     @staticmethod
-    def start_service(args, auto_restart=False):
+    def start_service(args, auto_restart=False, remark=""):
         """启动一个新的Natter服务"""
         service_id = generate_service_id()
         
         with service_lock:
-            service = NatterService(service_id, args)
+            service = NatterService(service_id, args, remark)
             service.set_auto_restart(auto_restart)
             if service.start():
                 running_services[service_id] = service
@@ -460,7 +463,8 @@ class NatterManager:
                         'args': service.cmd_args,
                         'status': service.status,
                         'auto_restart': service.auto_restart,
-                        'start_time': service.start_time
+                        'start_time': service.start_time,
+                        'remark': service.remark if hasattr(service, 'remark') else ""
                     }
                     
                     # 添加可能不存在的属性
@@ -497,10 +501,11 @@ class NatterManager:
                     
                     args = config.get('args')
                     auto_restart = config.get('auto_restart', False)
+                    remark = config.get('remark', "")
                     
                     if args:
                         # 创建并启动服务
-                        service = NatterService(service_id, args)
+                        service = NatterService(service_id, args, remark)
                         service.auto_restart = auto_restart
                         
                         # 设置可能存在的端口信息
@@ -663,7 +668,8 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
             if "args" in data:
                 args = data["args"]
                 auto_restart = data.get("auto_restart", False)
-                service_id = NatterManager.start_service(args, auto_restart)
+                remark = data.get("remark", "")
+                service_id = NatterManager.start_service(args, auto_restart, remark)
                 if service_id:
                     self._set_headers()
                     self.wfile.write(json.dumps({"service_id": service_id}).encode())
@@ -757,6 +763,21 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                     self._error(500, "Failed to delete template")
             else:
                 self._error(400, "Missing template id")
+        elif path == "/api/services/set-remark":
+            if "id" in data and "remark" in data:
+                service_id = data["id"]
+                remark = data["remark"]
+                with service_lock:
+                    if service_id in running_services:
+                        service = running_services[service_id]
+                        service.remark = remark
+                        NatterManager.save_services()
+                        self._set_headers()
+                        self.wfile.write(json.dumps({"success": True}).encode())
+                    else:
+                        self._error(404, "Service not found")
+            else:
+                self._error(400, "Missing id or remark parameter")
         else:
             self._error(404, "Not found")
     
