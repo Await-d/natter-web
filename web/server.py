@@ -405,6 +405,14 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
             self._set_headers()
             templates = TemplateManager.load_templates()
             self.wfile.write(json.dumps({"templates": templates}).encode())
+        elif path == "/api/tools/check":
+            if "tool" in query:
+                tool = query["tool"][0]
+                result = self._check_tool_installed(tool)
+                self._set_headers()
+                self.wfile.write(json.dumps(result).encode())
+            else:
+                self._error(400, "Missing tool parameter")
         else:
             self._error(404, "Not found")
     
@@ -565,6 +573,24 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                 return {"success": False, "message": f"未知工具: {tool}"}
         except Exception as e:
             return {"success": False, "message": f"安装过程出错: {str(e)}"}
+
+    def _check_tool_installed(self, tool):
+        """检查指定的工具是否已安装"""
+        try:
+            if tool == "socat":
+                # 检查socat是否已安装
+                result = subprocess.run(["which", "socat"], capture_output=True, text=True)
+                installed = result.returncode == 0
+                return {"installed": installed}
+            elif tool == "gost":
+                # 检查gost是否已安装
+                result = subprocess.run(["which", "gost"], capture_output=True, text=True)
+                installed = result.returncode == 0
+                return {"installed": installed}
+            else:
+                return {"installed": False, "error": f"未知工具: {tool}"}
+        except Exception as e:
+            return {"installed": False, "error": f"检查过程出错: {str(e)}"}
 
 def get_free_port():
     """获取可用端口"""

@@ -800,3 +800,28 @@ footer {
     border-style: solid;
     border-color: white transparent transparent transparent;
 }
+
+/* 工具安装提示样式 */
+.tool-install-prompt {
+    max-width: 400px;
+}
+
+.tool-install-prompt .install-now-btn {
+    display: inline-block;
+    padding: 8px 15px;
+    margin-top: 5px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    text-align: center;
+}
+
+/* 按钮成功状态 */
+.btn-success {
+    background-color: var(--success-color);
+    color: white;
+}
+
+.btn-success:hover {
+    background-color: #218838;
+}

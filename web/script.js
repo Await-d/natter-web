@@ -84,8 +84,124 @@ const API = {
     listTemplates: '/api/templates',
     saveTemplate: '/api/templates/save',
     deleteTemplate: '/api/templates/delete',
-    installTool: '/api/tools/install'
+    installTool: '/api/tools/install',
+    checkTool: '/api/tools/check'
 };
+
+// 工具状态信息
+const toolsStatus = {
+    'socat': {
+        installed: false,
+        checking: false
+    },
+    'gost': {
+        installed: false,
+        checking: false
+    }
+};
+
+// 检查工具是否已安装
+function checkToolInstalled(tool) {
+    if (toolsStatus[tool].checking) return;
+
+    toolsStatus[tool].checking = true;
+
+    fetch(`${API.checkTool}?tool=${tool}`)
+        .then(response => response.json())
+        .then(data => {
+            toolsStatus[tool].installed = data.installed;
+            toolsStatus[tool].checking = false;
+
+            // 更新安装按钮状态
+            updateToolInstallButtons();
+
+            // 如果在转发方法中选择了该工具但未安装，显示提示
+            if (forwardMethod && forwardMethod.value === tool && !data.installed) {
+                showToolInstallPrompt(tool);
+            }
+        })
+        .catch(error => {
+            console.error(`检查工具 ${tool} 安装状态出错:`, error);
+            toolsStatus[tool].checking = false;
+        });
+}
+
+// 更新工具安装按钮状态
+function updateToolInstallButtons() {
+    const socatBtn = document.getElementById('install-socat-btn');
+    const gostBtn = document.getElementById('install-gost-btn');
+
+    if (socatBtn) {
+        if (toolsStatus['socat'].installed) {
+            socatBtn.textContent = '已安装socat';
+            socatBtn.classList.add('btn-success');
+            socatBtn.classList.remove('btn-secondary');
+            socatBtn.disabled = true;
+        } else {
+            socatBtn.textContent = '安装socat';
+            socatBtn.classList.remove('btn-success');
+            socatBtn.classList.add('btn-secondary');
+            socatBtn.disabled = false;
+        }
+    }
+
+    if (gostBtn) {
+        if (toolsStatus['gost'].installed) {
+            gostBtn.textContent = '已安装gost';
+            gostBtn.classList.add('btn-success');
+            gostBtn.classList.remove('btn-secondary');
+            gostBtn.disabled = true;
+        } else {
+            gostBtn.textContent = '安装gost';
+            gostBtn.classList.remove('btn-success');
+            gostBtn.classList.add('btn-secondary');
+            gostBtn.disabled = false;
+        }
+    }
+}
+
+// 显示工具安装提示
+function showToolInstallPrompt(tool) {
+    const toolName = tool.charAt(0).toUpperCase() + tool.slice(1);
+
+    const notification = document.createElement('div');
+    notification.className = 'notification warning tool-install-prompt';
+    notification.innerHTML = `
+        <div style="margin-bottom:10px;">检测到您选择了 <strong>${toolName}</strong> 作为转发方法，但系统中未安装该工具。</div>
+        <button class="btn-primary install-now-btn" data-tool="${tool}">现在安装 ${toolName}</button>
+    `;
+
+    // 添加到页面
+    document.body.appendChild(notification);
+
+    // 显示通知
+    setTimeout(() => {
+        notification.classList.add('show');
+    }, 10);
+
+    // 添加安装按钮事件
+    const installBtn = notification.querySelector('.install-now-btn');
+    if (installBtn) {
+        installBtn.addEventListener('click', function () {
+            const toolToInstall = this.getAttribute('data-tool');
+            installTool(toolToInstall);
+            notification.classList.remove('show');
+            setTimeout(() => {
+                document.body.removeChild(notification);
+            }, 300);
+        });
+    }
+
+    // 自动关闭
+    setTimeout(() => {
+        notification.classList.remove('show');
+        setTimeout(() => {
+            if (document.body.contains(notification)) {
+                document.body.removeChild(notification);
+            }
+        }, 300);
+    }, 15000);
+}
 
 // 事件监听器设置
 document.addEventListener('DOMContentLoaded', function () {
@@ -153,6 +269,10 @@ document.addEventListener('DOMContentLoaded', function () {
     // 设置页面刷新定时器 (每10秒刷新一次列表)
     setInterval(loadServices, 10000);
 
+    // 检查工具安装状态
+    checkToolInstalled('socat');
+    checkToolInstalled('gost');
+
     // 安装工具按钮事件
     const installSocatBtn = document.getElementById('install-socat-btn');
     if (installSocatBtn) {
@@ -215,6 +335,11 @@ document.addEventListener('DOMContentLoaded', function () {
             if (methodDescriptions[method]) {
                 const info = methodDescriptions[method];
                 showNotification(`${info.name}: ${info.desc}<br>适用于: ${info.bestFor}`, 'info');
+
+                // 检查是否需要安装工具
+                if (method === 'socat' || method === 'gost') {
+                    checkToolInstalled(method);
+                }
             }
         });
     }
@@ -1316,6 +1441,9 @@ function installTool(tool) {
         .then(data => {
             if (data.success) {
                 showNotification(data.message, 'success');
+                // 更新工具状态
+                toolsStatus[tool].installed = true;
+                updateToolInstallButtons();
             } else {
                 showNotification(data.message, 'error');
             }
