@@ -1009,55 +1009,32 @@ function showServiceDetailsPanel(service) {
     document.getElementById('service-mapped-address').textContent = service.mapped_address || '未映射';
     document.getElementById('service-cmd-args').textContent = service.cmd_args.join(' ');
 
-    // 设置备注
+    // 设置常规备注输入框
     const remarkInput = document.getElementById('service-remark');
-
-    // 清除之前的事件监听器
-    if (remarkInput._valueTracker) {
-        remarkInput._valueTracker = null;
-    }
-
-    // 设置输入框的值并存储服务ID
     remarkInput.value = service.remark || '';
     remarkInput.dataset.serviceId = service.id;
 
-    // 存储初始值，用于比较是否有变化
-    remarkInput.dataset.originalValue = service.remark || '';
+    // 设置备用备注区域
+    const debugRemarkArea = document.getElementById('remark-debug-area');
+    if (debugRemarkArea) {
+        debugRemarkArea.value = service.remark || '';
+    }
 
-    // 使用全局变量跟踪当前输入值
-    window.currentRemarkValue = service.remark || '';
-
-    // 添加输入事件监听器，实时跟踪值的变化
-    remarkInput.addEventListener('input', function (e) {
-        window.currentRemarkValue = e.target.value;
-        console.log('备注输入更新为:', window.currentRemarkValue);
+    // 完全替换保存按钮，以避免事件绑定问题
+    replaceButtonAndAddListener('save-remark-btn', function (event) {
+        event.preventDefault();
+        const currentValue = remarkInput.value;
+        saveServiceRemark(service.id, currentValue);
     });
 
-    // 添加保存备注按钮事件 - 完全重写事件处理逻辑
-    const saveRemarkBtn = document.getElementById('save-remark-btn');
-
-    // 移除所有现有事件监听器
-    const newSaveBtn = saveRemarkBtn.cloneNode(true);
-    saveRemarkBtn.parentNode.replaceChild(newSaveBtn, saveRemarkBtn);
-
-    // 添加新的事件监听器
-    newSaveBtn.addEventListener('click', function (event) {
-        // 阻止默认行为和事件冒泡
+    // 添加备用保存按钮事件监听
+    replaceButtonAndAddListener('save-debug-remark-btn', function (event) {
         event.preventDefault();
-        event.stopPropagation();
-
-        // 从全局变量获取最新值
-        const latestValue = window.currentRemarkValue;
-        // 获取服务ID
-        const serviceId = remarkInput.dataset.serviceId;
-
-        // 记录调试信息
-        console.log('点击保存按钮时获取的原始值:', remarkInput.dataset.originalValue);
-        console.log('点击保存按钮时获取的输入框当前值:', remarkInput.value);
-        console.log('点击保存按钮时获取的全局变量跟踪值:', latestValue);
-
-        // 确保使用最新输入的值
-        saveServiceRemark(serviceId, latestValue || remarkInput.value);
+        if (debugRemarkArea) {
+            const debugValue = debugRemarkArea.value;
+            console.log('从备用输入区域获取值:', debugValue);
+            saveServiceRemark(service.id, debugValue);
+        }
     });
 
     // 设置状态文本和样式
@@ -1134,6 +1111,84 @@ function showServiceDetailsPanel(service) {
 
     // 启动自动刷新
     startDetailRefresh();
+}
+
+// 辅助函数：替换按钮并添加新的事件监听器
+function replaceButtonAndAddListener(buttonId, clickHandler) {
+    const button = document.getElementById(buttonId);
+    if (!button) return;
+
+    // 创建新按钮并复制属性
+    const newButton = document.createElement('button');
+    newButton.id = buttonId;
+    newButton.className = button.className;
+    newButton.textContent = button.textContent;
+
+    // 添加事件监听器
+    newButton.addEventListener('click', clickHandler);
+
+    // 替换原按钮
+    button.parentNode.replaceChild(newButton, button);
+}
+
+// 保存服务备注 - 简化并完全重构
+function saveServiceRemark(serviceId, remark) {
+    // 强制转换为字符串并进行简单清理
+    const remarkValue = String(remark || '').trim();
+
+    console.log('准备保存备注 - 服务ID:', serviceId);
+    console.log('准备保存备注 - 最终值:', remarkValue);
+
+    fetchWithAuth(API.setRemark, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                id: serviceId,
+                remark: remarkValue
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification('备注已保存: ' + remarkValue, 'success');
+
+                // 更新所有显示和跟踪的值
+                updateAllRemarkDisplays(serviceId, remarkValue);
+
+                // 刷新服务列表
+                loadServices();
+            } else {
+                showNotification('保存备注失败：' + (data.error || '未知错误'), 'error');
+            }
+        })
+        .catch(error => {
+            console.error('保存备注出错:', error);
+            showNotification('保存备注时发生错误', 'error');
+        });
+}
+
+// 更新所有备注显示
+function updateAllRemarkDisplays(serviceId, remarkValue) {
+    // 更新输入框
+    const remarkInput = document.getElementById('service-remark');
+    if (remarkInput) {
+        remarkInput.value = remarkValue;
+    }
+
+    // 更新备用输入区域
+    const debugRemarkArea = document.getElementById('remark-debug-area');
+    if (debugRemarkArea) {
+        debugRemarkArea.value = remarkValue;
+    }
+
+    // 更新当前服务数据
+    if (window.currentServiceData && currentServiceId === serviceId) {
+        window.currentServiceData.remark = remarkValue;
+    }
+
+    console.log('所有备注显示已更新为:', remarkValue);
 }
 
 // 设置状态显示的颜色
@@ -2004,67 +2059,5 @@ function fetchVersion() {
         .catch(error => {
             console.error('获取版本号失败:', error);
             document.getElementById('version').textContent = '未知';
-        });
-}
-
-// 保存服务备注
-function saveServiceRemark(serviceId, remark) {
-    // 更详细的调试日志
-    console.log('发送备注请求 - 服务ID:', serviceId);
-    console.log('发送备注请求 - 备注值:', remark);
-    console.log('原始请求参数类型检查 - serviceId类型:', typeof serviceId);
-    console.log('原始请求参数类型检查 - remark类型:', typeof remark);
-
-    // 确保remark是字符串类型
-    const remarkString = String(remark);
-
-    const requestBody = {
-        id: serviceId,
-        remark: remarkString
-    };
-
-    console.log('请求体:', JSON.stringify(requestBody));
-
-    fetchWithAuth(API.setRemark, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(requestBody)
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showNotification('备注已保存: ' + remarkString, 'success');
-
-                // 更新内存中的跟踪值
-                window.currentRemarkValue = remarkString;
-
-                // 更新输入框的值，确保显示最新的备注
-                const remarkInput = document.getElementById('service-remark');
-                if (remarkInput) {
-                    remarkInput.value = remarkString;
-                    remarkInput.dataset.originalValue = remarkString;
-                    console.log('成功后更新输入框值为:', remarkString);
-                }
-
-                // 更新内存中的服务对象
-                if (currentServiceId === serviceId) {
-                    // 如果有缓存的服务数据，也更新它
-                    if (window.currentServiceData) {
-                        window.currentServiceData.remark = remarkString;
-                        console.log('更新内存中服务数据的备注为:', remarkString);
-                    }
-                }
-
-                // 刷新服务列表但不刷新详情页
-                loadServices();
-            } else {
-                showNotification('保存备注失败：' + (data.error || '未知错误'), 'error');
-            }
-        })
-        .catch(error => {
-            console.error('保存备注出错:', error);
-            showNotification('保存备注时发生错误', 'error');
         });
 }
