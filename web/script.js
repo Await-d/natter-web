@@ -46,6 +46,7 @@ const autoScroll = document.getElementById('auto-scroll');
 const refreshServiceBtn = document.getElementById('refresh-service-btn');
 const restartServiceBtn = document.getElementById('restart-service-btn');
 const stopServiceBtn = document.getElementById('stop-service-btn');
+const deleteServiceBtn = document.getElementById('delete-service-btn');
 const saveAsTemplateBtn = document.getElementById('save-as-template-btn');
 const backToListBtn = document.getElementById('back-to-list-btn');
 const refreshAllBtn = document.getElementById('refresh-all-btn');
@@ -75,6 +76,7 @@ const API = {
     getService: '/api/service',
     startService: '/api/services/start',
     stopService: '/api/services/stop',
+    deleteService: '/api/services/delete',
     restartService: '/api/services/restart',
     stopAllServices: '/api/services/stop-all',
     setAutoRestart: '/api/services/auto-restart',
@@ -224,6 +226,15 @@ document.addEventListener('DOMContentLoaded', function () {
             hideSaveTemplateDialog();
         });
     }
+
+    // 添加删除服务按钮的事件监听
+    if (deleteServiceBtn) {
+        deleteServiceBtn.addEventListener('click', function () {
+            if (confirm('确定要删除此服务吗？此操作不可恢复。')) {
+                deleteService(currentServiceId);
+            }
+        });
+    }
 });
 
 // 加载服务列表
@@ -241,46 +252,68 @@ function loadServices() {
 
 // 渲染服务列表
 function renderServicesList(services) {
-    if (!services || services.length === 0) {
-        servicesList.innerHTML = '<div class="no-services">当前没有运行中的服务。</div>';
+    // 清空列表
+    servicesList.innerHTML = '';
+
+    if (services.length === 0) {
+        servicesList.innerHTML = '<div class="no-services">没有运行中的服务</div>';
         return;
     }
 
-    servicesList.innerHTML = '';
-    const template = document.getElementById('service-card-template');
-
+    // 为每个服务创建卡片
     services.forEach(service => {
-        const card = template.content.cloneNode(true);
-        const serviceCard = card.querySelector('.service-card');
+        const template = document.getElementById('service-card-template');
+        const clone = document.importNode(template.content, true);
+        const card = clone.querySelector('.service-card');
 
-        // 更新服务卡片数据
-        serviceCard.dataset.id = service.id;
-        card.querySelector('.service-mapped-address').textContent = service.mapped_address || '映射地址加载中...';
+        // 设置服务ID
+        card.setAttribute('data-id', service.id);
 
-        const statusBadge = card.querySelector('.service-status');
-        if (service.running) {
-            statusBadge.textContent = '运行中';
-            statusBadge.classList.add('badge-success');
-        } else {
-            statusBadge.textContent = '已停止';
-            statusBadge.classList.add('badge-danger');
-        }
+        // 填充服务信息
+        const mappedAddress = card.querySelector('.service-mapped-address');
+        mappedAddress.textContent = service.mapped_address || '等待映射...';
 
-        card.querySelector('.service-cmd-args').textContent = `命令: python natter.py ${service.cmd_args.join(' ')}`;
+        const status = card.querySelector('.service-status');
+        status.textContent = service.status;
+        setStatusColor(status, service.status);
 
-        // 更新运行时间
-        updateServiceRuntime(service, card.querySelector('.service-runtime'));
+        const cmdArgs = card.querySelector('.service-cmd-args');
+        cmdArgs.textContent = '命令: ' + service.cmd_args.join(' ');
 
-        // 为卡片按钮添加事件
-        card.querySelector('.view-details-btn').addEventListener('click', function () {
+        const runtime = card.querySelector('.service-runtime');
+        // 记录服务的启动时间
+        servicesRuntime[service.id] = service.start_time;
+        updateServiceRuntime(service, runtime);
+
+        // 添加查看详情按钮事件
+        const viewDetailsBtn = card.querySelector('.view-details-btn');
+        viewDetailsBtn.addEventListener('click', function () {
             showServiceDetails(service.id);
         });
 
-        card.querySelector('.stop-service-btn').addEventListener('click', function (e) {
-            e.stopPropagation();
+        // 添加停止服务按钮事件
+        const stopBtn = card.querySelector('.stop-service-btn');
+        stopBtn.addEventListener('click', function (e) {
+            e.stopPropagation(); // 阻止事件冒泡
             stopService(service.id);
         });
 
+        // 添加删除服务按钮
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'btn-danger delete-service-btn';
+        deleteBtn.textContent = '删除';
+        deleteBtn.addEventListener('click', function (e) {
+            e.stopPropagation(); // 阻止事件冒泡
+            if (confirm('确定要删除此服务吗？此操作不可恢复。')) {
+                deleteService(service.id);
+            }
+        });
+
+        // 将删除按钮添加到卡片底部
+        const cardFooter = card.querySelector('.service-card-footer');
+        cardFooter.appendChild(deleteBtn);
+
+        // 添加卡片到列表
         servicesList.appendChild(card);
     });
 }
@@ -985,4 +1018,63 @@ function copyToClipboard(text) {
 
     // 提示用户
     alert('已复制到剪贴板: ' + text);
+}
+
+/**
+ * 删除指定的服务
+ * @param {string} id - 服务ID
+ */
+function deleteService(id) {
+    fetch(API.deleteService, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                id: id
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // 删除成功，返回服务列表
+                showNotification('服务已成功删除', 'success');
+                showServicesList();
+                loadServices(); // 刷新服务列表
+            } else {
+                showNotification('删除服务失败', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('删除服务出错:', error);
+            showNotification('删除服务时发生错误', 'error');
+        });
+}
+
+/**
+ * 显示通知消息
+ * @param {string} message - 通知消息
+ * @param {string} type - 通知类型 ('success', 'error', 'warning', 'info')
+ */
+function showNotification(message, type = 'info') {
+    // 创建通知元素
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.textContent = message;
+
+    // 添加到页面
+    document.body.appendChild(notification);
+
+    // 显示通知
+    setTimeout(() => {
+        notification.classList.add('show');
+    }, 10);
+
+    // 自动删除通知
+    setTimeout(() => {
+        notification.classList.remove('show');
+        setTimeout(() => {
+            document.body.removeChild(notification);
+        }, 300);
+    }, 3000);
 }

@@ -280,6 +280,19 @@ class NatterManager:
         return False
     
     @staticmethod
+    def delete_service(service_id):
+        """删除指定的Natter服务"""
+        with service_lock:
+            if service_id in running_services:
+                service = running_services[service_id]
+                # 确保服务已停止
+                service.stop()
+                # 从字典中删除服务
+                del running_services[service_id]
+                return True
+        return False
+    
+    @staticmethod
     def restart_service(service_id):
         """重启指定的Natter服务"""
         with service_lock:
@@ -422,6 +435,16 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                     self.wfile.write(json.dumps({"success": True}).encode())
                 else:
                     self._error(500, "Failed to stop service")
+            else:
+                self._error(400, "Missing service id")
+        elif path == "/api/services/delete":
+            if "id" in data:
+                service_id = data["id"]
+                if NatterManager.delete_service(service_id):
+                    self._set_headers()
+                    self.wfile.write(json.dumps({"success": True}).encode())
+                else:
+                    self._error(500, "Failed to delete service")
             else:
                 self._error(400, "Missing service id")
         elif path == "/api/services/restart":
