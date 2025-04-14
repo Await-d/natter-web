@@ -48,9 +48,11 @@ iyuu_config = {
 }
 
 # 消息队列用于事件整合推送
-message_queue = deque(maxlen=20)  # 最多保存20条待发送消息
+message_queue = deque(maxlen=50)  # 增大队列容量到50条
 message_lock = threading.RLock()
 message_batch_timer = None  # 批量发送定时器
+last_send_time = 0  # 上次发送时间
+MIN_SEND_INTERVAL = 300  # 最小发送间隔(秒)，5分钟
 
 # NAT类型和端口状态的正则表达式
 NAT_TYPE_PATTERN = re.compile(r"NAT type: ([^\n]+)")
@@ -60,9 +62,16 @@ WAN_STATUS_PATTERN = re.compile(r"WAN > ([^\[]+)\[ ([^\]]+) \]")
 # 默认密码为None，表示不启用验证
 PASSWORD = None
 
-# 添加消息到推送队列
-def queue_message(category, title, content):
-    """添加消息到队列，等待批量推送"""
+# 修改添加消息到推送队列函数
+def queue_message(category, title, content, important=False):
+    """添加消息到队列，等待批量推送
+    
+    Args:
+        category: 消息类别
+        title: 消息标题
+        content: 消息内容
+        important: 是否为重要消息，影响发送策略
+    """
     if not iyuu_config.get("enabled", True) or not iyuu_config.get("tokens"):
         return
 
@@ -71,26 +80,50 @@ def queue_message(category, title, content):
             "category": category,  # 消息类别: 启动, 停止, 地址变更, 错误等
             "title": title,        # 消息标题
             "content": content,    # 消息内容
-            "time": time.time()    # 消息生成时间
+            "time": time.time(),   # 消息生成时间
+            "important": important # 是否为重要消息
         })
         
-        # 如果定时器不存在，创建一个新的
-        global message_batch_timer
-        if message_batch_timer is None or not message_batch_timer.is_alive():
-            message_batch_timer = threading.Timer(10.0, send_batch_messages)  # 10秒后发送批量消息
-            message_batch_timer.daemon = True
-            message_batch_timer.start()
-            print(f"消息整合推送定时器已启动，将在10秒后发送批量消息")
+        # 如果消息标记为重要，或满足特定条件，考虑立即发送
+        should_send_now = important or len(message_queue) >= 10
+        
+        # 检查距离上次发送是否已超过最小间隔
+        global last_send_time
+        current_time = time.time()
+        time_since_last_send = current_time - last_send_time
+        
+        if should_send_now and time_since_last_send >= MIN_SEND_INTERVAL:
+            # 立即发送
+            print(f"触发立即发送: {'重要消息' if important else '消息队列已满'}, 距上次发送已过{time_since_last_send:.1f}秒")
+            send_batch_messages()
+        else:
+            # 否则，设置或重置定时器
+            global message_batch_timer
+            if message_batch_timer is None or not message_batch_timer.is_alive():
+                # 计算下次发送时间：确保至少间隔MIN_SEND_INTERVAL
+                next_send_delay = max(MIN_SEND_INTERVAL - time_since_last_send, 60)  # 至少等待60秒
+                
+                # 如果消息是重要的但未达到发送间隔，使用较短的延迟
+                if important and next_send_delay > 60:
+                    next_send_delay = 60
+                
+                message_batch_timer = threading.Timer(next_send_delay, send_batch_messages)
+                message_batch_timer.daemon = True
+                message_batch_timer.start()
+                print(f"消息整合推送定时器已启动，将在{next_send_delay:.1f}秒后发送批量消息")
 
-# 批量发送消息队列中的所有消息
+# 修改批量发送消息队列中的所有消息函数
 def send_batch_messages():
     """批量发送队列中的所有消息"""
-    global message_batch_timer
+    global message_batch_timer, last_send_time
     message_batch_timer = None
     
     with message_lock:
         if not message_queue:
             return
+        
+        # 更新上次发送时间
+        last_send_time = time.time()
         
         # 按类别整理消息
         categories = {}
@@ -105,23 +138,264 @@ def send_batch_messages():
         message_content = f"【服务状态整合通知】\n"
         message_content += f"时间: {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
         
-        # 按类别添加消息
+        # 服务状态汇总部分 - 新增服务整体状态小结
+        running_services = []
+        services_with_mappings = {}
+        
+        # 收集所有服务信息和映射地址
         for cat, messages in categories.items():
-            message_content += f"## {cat} ({len(messages)}条)\n"
             for msg in messages:
-                # 提取消息标题中服务名称部分
+                # 尝试从消息内容中提取服务ID和映射地址
+                content = msg["content"]
                 service_name = msg["title"].split(']')[-1].strip() if ']' in msg["title"] else msg["title"]
-                # 提取消息内容中的第一行作为简要信息
-                brief = msg["content"].split('\n', 1)[0] if '\n' in msg["content"] else msg["content"]
-                message_content += f"- {service_name}: {brief}\n"
+                
+                # 提取服务的运行状态
+                if cat == "启动":
+                    running_services.append(service_name)
+                
+                # 提取映射地址
+                mapping_match = re.search(r"映射地址[：:]\s*([^\n]+)", content)
+                if mapping_match:
+                    mapping = mapping_match.group(1).strip()
+                    if mapping and mapping != "无" and mapping != "无映射":
+                        services_with_mappings[service_name] = mapping
+                
+                # 也从消息标题中提取服务名称（针对地址变更消息）
+                if cat == "地址变更" or cat == "地址分配":
+                    # 提取新地址
+                    new_addr_match = re.search(r"新地址[：:]\s*([^\n]+)", content)
+                    if new_addr_match:
+                        new_addr = new_addr_match.group(1).strip()
+                        if new_addr and new_addr != "无" and new_addr != "无映射":
+                            services_with_mappings[service_name] = new_addr
+        
+        # 添加服务映射地址汇总部分（如果有）
+        if services_with_mappings:
+            message_content += "## 服务映射地址汇总\n"
+            for service_name, mapping in services_with_mappings.items():
+                running_status = "🟢" if service_name in running_services else "⚪"
+                message_content += f"{running_status} {service_name}: `{mapping}`\n"
             message_content += "\n"
         
-        # 发送整合后的消息
-        send_iyuu_message(message_title, message_content, force_send=True)
+        # 优先处理错误和重要类别
+        priority_cats = ["错误", "服务状态", "定时报告"]
+        sorted_cats = sorted(categories.keys(), 
+                           key=lambda x: (0 if x in priority_cats else 1, x))
+        
+        # 按类别添加消息
+        for cat in sorted_cats:
+            messages = categories[cat]
+            message_content += f"## {cat} ({len(messages)}条)\n"
+            
+            # 对错误和重要消息，提供更详细的信息
+            if cat in ["错误", "服务状态"]:
+                for msg in messages:
+                    # 提取消息标题中服务名称部分
+                    service_name = msg["title"].split(']')[-1].strip() if ']' in msg["title"] else msg["title"]
+                    # 使用完整内容
+                    message_content += f"- {service_name}:\n{msg['content']}\n"
+            # 定时报告特殊处理，提取并高亮显示服务状态
+            elif cat == "定时报告":
+                for msg in messages:
+                    service_name = msg["title"].split(']')[-1].strip() if ']' in msg["title"] else msg["title"]
+                    content = msg["content"]
+                    
+                    # 提取服务总数等信息
+                    summary_match = re.search(r"- 总服务数.*?- 已停止.*?\n\n", content, re.DOTALL)
+                    if summary_match:
+                        summary = summary_match.group(0)
+                        message_content += f"- {service_name}:\n{summary}\n"
+                        
+                        # 提取并美化每个服务信息，高亮映射地址
+                        services_section = content[summary_match.end():]
+                        for line in services_section.split('\n'):
+                            if line.strip() and '[' in line and ']' in line:
+                                # 格式化服务行，突出显示映射地址
+                                parts = line.split('-', 1)
+                                if len(parts) > 1:
+                                    status_part = parts[0].strip()
+                                    addr_part = parts[1].strip()
+                                    message_content += f"  {status_part}- {addr_part}\n"
+                    else:
+                        # 如果无法解析，显示原始内容
+                        message_content += f"- {service_name}:\n{content}\n"
+            # 普通消息类别
+            else:
+                for msg in messages:
+                    service_name = msg["title"].split(']')[-1].strip() if ']' in msg["title"] else msg["title"]
+                    content = msg["content"]
+                    
+                    # 尝试提取并突出显示映射地址（如果有）
+                    mapping_info = ""
+                    mapping_match = re.search(r"映射地址[：:]\s*([^\n]+)", content)
+                    if mapping_match:
+                        mapping = mapping_match.group(1).strip()
+                        if mapping and mapping != "无" and mapping != "无映射":
+                            mapping_info = f" | 映射: `{mapping}`"
+                    
+                    # 提取服务ID和本地端口（如果有）
+                    service_id_match = re.search(r"服务ID[：:]\s*([^\n]+)", content)
+                    local_port_match = re.search(r"本地端口[：:]\s*([^\n]+)", content)
+                    
+                    service_info = ""
+                    if service_id_match:
+                        service_id = service_id_match.group(1).strip()
+                        service_info += f"ID: {service_id}"
+                    
+                    if local_port_match:
+                        local_port = local_port_match.group(1).strip()
+                        if service_info:
+                            service_info += f" | "
+                        service_info += f"端口: {local_port}"
+                    
+                    if service_info:
+                        service_info = f" ({service_info})"
+                    
+                    # 提取消息内容中的第一行作为简要信息
+                    brief = content.split('\n', 1)[0] if '\n' in content else content
+                    message_content += f"- {service_name}{service_info}: {brief}{mapping_info}\n"
+            
+            message_content += "\n"
+        
+        # 直接发送整合后的消息
+        _send_iyuu_message_direct(message_title, message_content)
         
         # 清空消息队列
+        queue_len = len(message_queue)
         message_queue.clear()
-        print(f"已整合发送 {len(message_queue)} 条服务状态消息")
+        print(f"已整合发送 {queue_len} 条服务状态消息")
+
+# 修改直接发送IYUU消息的内部函数
+def _send_iyuu_message_direct(text, desp):
+    """直接发送IYUU消息，不经过队列
+    
+    内部使用，不应该被外部直接调用
+    """
+    if not iyuu_config.get("enabled", True) or not iyuu_config.get("tokens"):
+        return False, ["IYUU推送已禁用或未配置令牌"]
+    
+    success = False
+    errors = []
+    
+    for token in iyuu_config.get("tokens", []):
+        if not token.strip():
+            continue
+            
+        try:
+            url = f"https://iyuu.cn/{token}.send"
+            payload = {
+                "text": text,
+                "desp": desp
+            }
+            headers = {
+                "Content-Type": "application/json; charset=UTF-8"
+            }
+            
+            response = requests.post(url, json=payload, headers=headers, timeout=10)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if result.get("errcode") == 0:
+                    success = True
+                else:
+                    errors.append(f"令牌 {token[:5]}...: {result.get('errmsg', '未知错误')}")
+            else:
+                errors.append(f"令牌 {token[:5]}...: HTTP错误 {response.status_code}")
+        except Exception as e:
+            errors.append(f"令牌 {token[:5]}...: {str(e)}")
+    
+    if success:
+        return True, errors
+    else:
+        return False, errors
+
+# 修改公开的IYUU消息发送函数
+def send_iyuu_message(text, desp, force_send=False):
+    """发送IYUU消息推送
+    
+    Args:
+        text: 消息标题
+        desp: 消息内容
+        force_send: 废弃参数，保留为兼容性，实际使用important参数
+    
+    Returns:
+        (success, errors) 元组，表示是否成功发送和错误信息列表
+    """
+    # 判断消息类型和重要性
+    is_important = False
+    category = "通知"
+    
+    # 根据消息标题识别类别
+    if "[错误]" in text or "错误" in text:
+        category = "错误"
+        is_important = True
+    elif "[启动]" in text:
+        category = "启动"
+    elif "[停止]" in text or "[手动停止]" in text:
+        category = "停止"
+    elif "[地址变更]" in text or "[地址分配]" in text:
+        category = "地址变更"
+    elif "日报" in text or "服务状态" in text:
+        category = "定时报告"
+        is_important = True
+    elif "管理服务已启动" in text:
+        category = "服务状态"
+        is_important = True
+    elif "管理服务已关闭" in text:
+        category = "服务状态"
+        is_important = True
+    
+    # 将消息加入队列
+    queue_message(category, text, desp, important=is_important)
+    return True, []
+
+# 修改定时推送函数
+def schedule_daily_notification():
+    """设置每日定时推送任务"""
+    if not iyuu_config.get("schedule", {}).get("enabled", False):
+        return
+    
+    def check_and_send_notification():
+        while True:
+            now = time.localtime()
+            current_time = f"{now.tm_hour:02d}:{now.tm_min:02d}"
+            schedule_times = iyuu_config.get("schedule", {}).get("times", ["08:00"])
+            
+            if current_time in schedule_times:
+                # 获取所有服务状态用于日报
+                services_info = NatterManager.list_services()
+                running_count = sum(1 for s in services_info if s.get("status") == "运行中")
+                stopped_count = sum(1 for s in services_info if s.get("status") == "已停止")
+                
+                message = iyuu_config.get("schedule", {}).get("message", "Natter服务状态日报")
+                detail = f"【Natter服务状态日报】\n\n"
+                detail += f"- 总服务数: {len(services_info)}\n"
+                detail += f"- 运行中: {running_count}\n"
+                detail += f"- 已停止: {stopped_count}\n\n"
+                
+                for service in services_info:
+                    service_id = service.get("id", "未知")
+                    remark = service.get("remark") or f"服务 {service_id}"
+                    status = service.get("status", "未知")
+                    mapped_address = service.get("mapped_address", "无映射")
+                    lan_status = service.get("lan_status", "未知")
+                    wan_status = service.get("wan_status", "未知")
+                    nat_type = service.get("nat_type", "未知")
+                    
+                    detail += f"[{status}] {remark} - {mapped_address}\n"
+                    detail += f"  LAN: {lan_status} | WAN: {wan_status} | NAT: {nat_type}\n"
+                
+                # 使用消息队列处理定时推送，标记为重要消息
+                send_iyuu_message(message, detail)
+                
+                # 日志记录推送时间
+                print(f"已在 {current_time} 将定时推送加入消息队列")
+            
+            # 休眠60秒再检查
+            time.sleep(60)
+    
+    notification_thread = threading.Thread(target=check_and_send_notification, daemon=True)
+    notification_thread.start()
 
 class NatterService:
     def __init__(self, service_id, cmd_args, remark=""):
@@ -1274,7 +1548,7 @@ def run_server(port=8080, password=None):
         # 加载已保存的服务配置
         NatterManager.load_services()
         
-        # 发送服务器启动通知
+        # 发送服务器启动通知，使用常规队列处理
         if iyuu_config.get("enabled", True) and iyuu_config.get("tokens"):
             services_count = len(NatterManager.list_services())
             send_iyuu_message(
@@ -1284,10 +1558,9 @@ def run_server(port=8080, password=None):
                 f"服务地址: http://0.0.0.0:{port}\n"
                 f"加载服务数: {services_count}\n"
                 f"IYUU推送: {'已启用' if iyuu_config.get('enabled', True) else '已禁用'}\n"
-                f"定时推送: {'已启用' if iyuu_config.get('schedule', {}).get('enabled', False) else '已禁用'}",
-                force_send=True  # 强制立即发送，不进入队列
+                f"定时推送: {'已启用' if iyuu_config.get('schedule', {}).get('enabled', False) else '已禁用'}"
             )
-            print("已发送IYUU启动通知")
+            print("已将启动通知加入消息队列")
         
         httpd.serve_forever()
     except OSError as e:
@@ -1308,19 +1581,17 @@ def cleanup():
     stopped_count = NatterManager.stop_all_services()
     
     # 确保所有待发消息都已发送
-    if len(message_queue) > 0:
-        send_batch_messages()
-    
-    # 发送服务器关闭通知
-    if iyuu_config.get("enabled", True) and iyuu_config.get("tokens"):
-        send_iyuu_message(
-            "Natter管理服务已关闭",
-            f"Natter管理服务已关闭\n\n"
-            f"关闭时间: {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
-            f"已停止服务数: {stopped_count}",
-            force_send=True  # 强制立即发送，不进入队列
-        )
-        print("已发送IYUU关闭通知")
+    with message_lock:
+        if len(message_queue) > 0:
+            # 强制直接发送所有剩余消息，不进队列
+            _send_iyuu_message_direct(
+                "Natter服务状态更新 [关闭前最后通知]",
+                f"【服务关闭前最后通知】\n\n"
+                f"- 停止时间: {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
+                f"- 已停止服务数: {stopped_count}\n\n"
+                f"服务器即将关闭，所有运行中的服务已停止。"
+            )
+            message_queue.clear()
     
     print(f"已停止 {stopped_count} 个服务")
 
@@ -1347,107 +1618,6 @@ def save_iyuu_config():
     except Exception as e:
         print(f"保存IYUU配置失败: {e}")
         return False
-
-def send_iyuu_message(text, desp, force_send=False):
-    """发送IYUU消息推送
-    
-    Args:
-        text: 消息标题
-        desp: 消息内容
-        force_send: 是否强制立即发送，不进入队列
-    
-    Returns:
-        (success, errors) 元组，表示是否成功发送和错误信息列表
-    """
-    if not iyuu_config.get("enabled", True) or not iyuu_config.get("tokens"):
-        return False, ["IYUU推送已禁用或未配置令牌"]
-    
-    # 如果不是强制发送且定时推送队列已启动，则加入队列
-    if not force_send and message_batch_timer is not None:
-        queue_message("通知", text, desp)
-        return True, []
-    
-    success = False
-    errors = []
-    
-    for token in iyuu_config.get("tokens", []):
-        if not token.strip():
-            continue
-            
-        try:
-            url = f"https://iyuu.cn/{token}.send"
-            payload = {
-                "text": text,
-                "desp": desp
-            }
-            headers = {
-                "Content-Type": "application/json; charset=UTF-8"
-            }
-            
-            response = requests.post(url, json=payload, headers=headers, timeout=10)
-            
-            if response.status_code == 200:
-                result = response.json()
-                if result.get("errcode") == 0:
-                    success = True
-                else:
-                    errors.append(f"令牌 {token[:5]}...: {result.get('errmsg', '未知错误')}")
-            else:
-                errors.append(f"令牌 {token[:5]}...: HTTP错误 {response.status_code}")
-        except Exception as e:
-            errors.append(f"令牌 {token[:5]}...: {str(e)}")
-    
-    if success:
-        return True, errors
-    else:
-        return False, errors
-
-def schedule_daily_notification():
-    """设置每日定时推送任务"""
-    if not iyuu_config.get("schedule", {}).get("enabled", False):
-        return
-    
-    def check_and_send_notification():
-        while True:
-            now = time.localtime()
-            current_time = f"{now.tm_hour:02d}:{now.tm_min:02d}"
-            schedule_times = iyuu_config.get("schedule", {}).get("times", ["08:00"])
-            
-            if current_time in schedule_times:
-                # 获取所有服务状态用于日报
-                services_info = NatterManager.list_services()
-                running_count = sum(1 for s in services_info if s.get("status") == "运行中")
-                stopped_count = sum(1 for s in services_info if s.get("status") == "已停止")
-                
-                message = iyuu_config.get("schedule", {}).get("message", "Natter服务状态日报")
-                detail = f"【Natter服务状态日报】\n\n"
-                detail += f"- 总服务数: {len(services_info)}\n"
-                detail += f"- 运行中: {running_count}\n"
-                detail += f"- 已停止: {stopped_count}\n\n"
-                
-                for service in services_info:
-                    service_id = service.get("id", "未知")
-                    remark = service.get("remark") or f"服务 {service_id}"
-                    status = service.get("status", "未知")
-                    mapped_address = service.get("mapped_address", "无映射")
-                    lan_status = service.get("lan_status", "未知")
-                    wan_status = service.get("wan_status", "未知")
-                    nat_type = service.get("nat_type", "未知")
-                    
-                    detail += f"[{status}] {remark} - {mapped_address}\n"
-                    detail += f"  LAN: {lan_status} | WAN: {wan_status} | NAT: {nat_type}\n"
-                
-                # 定时推送使用force_send=True强制直接发送，不进队列
-                send_iyuu_message(message, detail, force_send=True)
-                
-                # 日志记录推送时间
-                print(f"已在 {current_time} 发送IYUU定时推送")
-            
-            # 休眠60秒再检查
-            time.sleep(60)
-    
-    notification_thread = threading.Thread(target=check_and_send_notification, daemon=True)
-    notification_thread.start()
 
 if __name__ == "__main__":
     # 注册清理函数
