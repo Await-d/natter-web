@@ -3,7 +3,7 @@
  # @Author: Await
  # @Date: 2025-04-12 15:27:12
  # @LastEditors: Await
- # @LastEditTime: 2025-04-13 19:07:25
+ # @LastEditTime: 2025-04-14 09:46:10
  # @Description: 请填写简介
 ### 
 
@@ -115,6 +115,16 @@ echo "修复文件权限..."
 chmod +x /app/web/server.py
 chmod -R 755 /app/web
 chmod -R 777 ${DATA_DIR}
+
+# 检查并安装Python依赖
+echo "检查Python依赖..."
+if ! python3 -c "import requests" 2>/dev/null; then
+  echo "安装requests模块..."
+  pip install requests --no-cache-dir || apt-get update && apt-get install -y python3-requests
+  echo "requests模块安装完成"
+else
+  echo "✅ requests模块已安装"
+fi
 
 # 启动Web管理服务
 echo "切换到web目录并启动服务..."

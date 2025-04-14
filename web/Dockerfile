@@ -18,7 +18,7 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/*
 
 # 安装psutil等Python依赖
-RUN pip install psutil --no-cache-dir
+RUN pip install psutil requests --no-cache-dir
 
 # 拷贝web目录内容
 COPY . /app/web/
