@@ -2248,40 +2248,6 @@ function saveIyuuConfig() {
         });
 }
 
-// 添加IYUU令牌
-function addIyuuToken() {
-    const token = newIyuuToken.value.trim();
-
-    if (!token) {
-        showNotification('请输入有效的IYUU令牌', 'warning');
-        return;
-    }
-
-    fetchWithAuth(API.iyuuAddToken, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                token: token
-            })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showNotification(data.message || '令牌已添加', 'success');
-                newIyuuToken.value = ''; // 清空输入框
-                loadIyuuConfig(); // 重新加载令牌列表
-            } else {
-                showNotification(data.message || '添加令牌失败', 'error');
-            }
-        })
-        .catch(error => {
-            console.error('添加IYUU令牌出错:', error);
-            showNotification('添加令牌时发生错误', 'error');
-        });
-}
-
 // 删除IYUU令牌
 function deleteIyuuToken(token) {
     if (!confirm('确定要删除此令牌吗？')) {
