@@ -153,8 +153,9 @@ def send_batch_messages():
         # 构建整合后的消息内容
         total_unique_messages = sum(len(msgs) for msgs in categories.values())
         message_title = f"Natter服务状态更新 [{total_unique_messages}条]"
-        message_content = f"【服务状态整合通知】\n"
-        message_content += f"时间: {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+        message_content = f"## 📣 服务状态整合通知 ##\n\n"
+        message_content += f"⏰ 时间: {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
+        message_content += f"━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
         
         # 服务状态汇总部分 - 新增服务整体状态小结
         running_services = []
@@ -189,10 +190,10 @@ def send_batch_messages():
         
         # 添加服务映射地址汇总部分（如果有）
         if services_with_mappings:
-            message_content += "## 服务映射地址汇总\n"
+            message_content += "📌 **服务映射地址汇总**\n"
             for service_name, mapping in services_with_mappings.items():
                 running_status = "🟢" if service_name in running_services else "⚪"
-                message_content += f"{running_status} {service_name}: `{mapping}`\n"
+                message_content += f"{running_status} **{service_name}**: `{mapping}`\n"
             message_content += "\n"
         
         # 优先处理错误和重要类别
@@ -203,40 +204,42 @@ def send_batch_messages():
         # 按类别添加消息
         for cat in sorted_cats:
             messages = categories[cat]
-            message_content += f"## {cat} ({len(messages)}条)\n"
+            # 添加类别图标
+            cat_icon = "⚠️" if cat == "错误" else "📊" if cat == "定时报告" else "🔄" if cat == "地址变更" else "▶️" if cat == "启动" else "⏹️" if cat == "停止" else "📋"
+            message_content += f"📌 **{cat_icon} {cat} ({len(messages)}条)**\n"
+            message_content += f"┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n"
             
             # 对错误和重要消息，提供更详细的信息
             if cat in ["错误", "服务状态"]:
                 for msg in messages:
                     # 提取消息标题中服务名称部分
                     service_name = msg["title"].split(']')[-1].strip() if ']' in msg["title"] else msg["title"]
-                    # 使用完整内容
-                    message_content += f"- {service_name}:\n{msg['content']}\n"
+                    # 使用完整内容，但进行格式优化
+                    formatted_content = msg['content'].replace('\n', '\n  ')
+                    message_content += f"➤ **{service_name}**:\n  {formatted_content}\n\n"
             # 定时报告特殊处理，提取并高亮显示服务状态
             elif cat == "定时报告":
-                for msg in messages:
-                    service_name = msg["title"].split(']')[-1].strip() if ']' in msg["title"] else msg["title"]
+                # 只显示一次定时报告的整体摘要，避免冗余
+                if messages:
+                    # 使用第一条消息作为代表
+                    msg = messages[0]
                     content = msg["content"]
                     
-                    # 提取服务总数等信息
-                    summary_match = re.search(r"- 总服务数.*?- 已停止.*?\n\n", content, re.DOTALL)
-                    if summary_match:
-                        summary = summary_match.group(0)
-                        message_content += f"- {service_name}:\n{summary}\n"
-                        
-                        # 提取并美化每个服务信息，高亮映射地址
-                        services_section = content[summary_match.end():]
-                        for line in services_section.split('\n'):
-                            if line.strip() and '[' in line and ']' in line:
-                                # 格式化服务行，突出显示映射地址
-                                parts = line.split('-', 1)
-                                if len(parts) > 1:
-                                    status_part = parts[0].strip()
-                                    addr_part = parts[1].strip()
-                                    message_content += f"  {status_part}- {addr_part}\n"
-                    else:
-                        # 如果无法解析，显示原始内容
-                        message_content += f"- {service_name}:\n{content}\n"
+                    # 提取服务总数等信息的更好方法
+                    summary_sections = re.findall(r"总服务数.*?运行中.*?已停止.*?", content, re.DOTALL)
+                    if summary_sections:
+                        summary = summary_sections[0].strip()
+                        # 美化格式
+                        summary = summary.replace("总服务数", "总服务数").replace("运行中", "🟢 运行中").replace("已停止", "⚪ 已停止")
+                        message_content += f"➤ **服务概况**:\n  {summary}\n\n"
+                    
+                    # 提取服务列表并美化展示
+                    message_content += f"➤ **服务详情**:\n"
+                    services_details = re.findall(r"\[(\w+)\](.*?)-(.*?)(?=\n\[|\n\n|\Z)", content, re.DOTALL)
+                    for status, name, address in services_details:
+                        status_emoji = "🟢" if "运行中" in status else "⚪"
+                        message_content += f"  {status_emoji} **{name.strip()}**: `{address.strip()}`\n"
+                    message_content += "\n"
             # 普通消息类别
             else:
                 for msg in messages:
@@ -269,11 +272,40 @@ def send_batch_messages():
                     if service_info:
                         service_info = f" ({service_info})"
                     
-                    # 提取消息内容中的第一行作为简要信息
-                    brief = content.split('\n', 1)[0] if '\n' in content else content
-                    message_content += f"- {service_name}{service_info}: {brief}{mapping_info}\n"
+                    # 美化消息显示
+                    message_content += f"➤ **{service_name}**{service_info}:\n"
+                    
+                    # 提取重要信息并格式化展示
+                    important_items = []
+                    if "服务已成功启动" in content:
+                        important_items.append("✅ 服务已成功启动")
+                    elif "服务已停止" in content:
+                        important_items.append("⏹️ 服务已停止运行")
+                    elif "服务已被手动停止" in content:
+                        important_items.append("⏹️ 服务已被手动停止")
+                    elif "映射地址已变更" in content:
+                        old_addr_match = re.search(r"旧地址[：:]\s*([^\n]+)", content)
+                        new_addr_match = re.search(r"新地址[：:]\s*([^\n]+)", content)
+                        if old_addr_match and new_addr_match:
+                            old_addr = old_addr_match.group(1).strip()
+                            new_addr = new_addr_match.group(1).strip()
+                            important_items.append(f"🔄 映射地址变更: `{old_addr}` → `{new_addr}`")
+                    elif "服务获取到映射地址" in content:
+                        important_items.append(f"🆕 获取新映射地址{mapping_info}")
+                    
+                    # 如果没有提取到特定信息，展示第一行
+                    if not important_items:
+                        first_line = content.split('\n', 1)[0] if '\n' in content else content
+                        important_items.append(first_line)
+                    
+                    # 显示提取的重要信息
+                    for item in important_items:
+                        message_content += f"  {item}\n"
+                    
+                    message_content += "\n"
             
-            message_content += "\n"
+        message_content += f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        message_content += f"💡 通过Natter管理界面可以管理服务"
         
         # 直接发送整合后的消息
         _send_iyuu_message_direct(message_title, message_content)
@@ -405,22 +437,39 @@ def schedule_daily_notification():
                 stopped_count = sum(1 for s in services_info if s.get("status") == "已停止")
                 
                 message = iyuu_config.get("schedule", {}).get("message", "Natter服务状态日报")
-                detail = f"【Natter服务状态日报】\n\n"
-                detail += f"- 总服务数: {len(services_info)}\n"
-                detail += f"- 运行中: {running_count}\n"
-                detail += f"- 已停止: {stopped_count}\n\n"
+                detail = f"## 📊 Natter服务状态日报 ##\n\n"
+                detail += f"⏰ 报告时间: {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
+                detail += f"━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                detail += f"📌 **服务概况**\n"
+                detail += f"➤ 总服务数: {len(services_info)}\n"
+                detail += f"➤ 🟢 运行中: {running_count}\n"
+                detail += f"➤ ⚪ 已停止: {stopped_count}\n\n"
                 
-                for service in services_info:
-                    service_id = service.get("id", "未知")
-                    remark = service.get("remark") or f"服务 {service_id}"
-                    status = service.get("status", "未知")
-                    mapped_address = service.get("mapped_address", "无映射")
-                    lan_status = service.get("lan_status", "未知")
-                    wan_status = service.get("wan_status", "未知")
-                    nat_type = service.get("nat_type", "未知")
-                    
-                    detail += f"[{status}] {remark} - {mapped_address}\n"
-                    detail += f"  LAN: {lan_status} | WAN: {wan_status} | NAT: {nat_type}\n"
+                if services_info:
+                    detail += f"📌 **服务详情**\n"
+                    for service in services_info:
+                        service_id = service.get("id", "未知")
+                        remark = service.get("remark") or f"服务 {service_id}"
+                        status = service.get("status", "未知")
+                        mapped_address = service.get("mapped_address", "无映射")
+                        lan_status = service.get("lan_status", "未知")
+                        wan_status = service.get("wan_status", "未知")
+                        nat_type = service.get("nat_type", "未知")
+                        
+                        # 根据状态添加emoji
+                        status_emoji = "🟢" if status == "运行中" else "⚪"
+                        
+                        detail += f"{status_emoji} **{remark}**\n"
+                        detail += f"  ├─ 状态: {status}\n"
+                        detail += f"  ├─ 映射: `{mapped_address}`\n"
+                        detail += f"  ├─ LAN状态: {lan_status}\n"
+                        detail += f"  ├─ WAN状态: {wan_status}\n"
+                        detail += f"  └─ NAT类型: {nat_type}\n\n"
+                else:
+                    detail += "❗ 当前无服务运行\n\n"
+                
+                detail += f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                detail += f"💡 通过Natter管理界面可以管理服务"
                 
                 # 使用消息队列处理定时推送，标记为重要消息
                 send_iyuu_message(message, detail)
@@ -1137,9 +1186,31 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
             elif path == "/api/iyuu/test":
                 # 测试IYUU推送
                 # 直接使用_send_iyuu_message_direct函数，跳过消息队列，立即发送
+                test_message = f"## 🔔 Natter测试消息 ##\n\n"
+                test_message += f"⏰ 发送时间: {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
+                test_message += f"━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                test_message += f"✅ 通知测试成功\n\n"
+                test_message += f"📌 **系统信息**\n"
+                test_message += f"➤ 运行环境: {'Docker容器内' if os.path.exists('/.dockerenv') else '主机系统'}\n"
+                test_message += f"➤ Python版本: {sys.version.split()[0]}\n"
+                test_message += f"➤ 操作系统: {sys.platform}\n\n"
+                
+                # 获取所有服务数量
+                services_info = NatterManager.list_services()
+                running_count = sum(1 for s in services_info if s.get("status") == "运行中")
+                stopped_count = sum(1 for s in services_info if s.get("status") == "已停止")
+                
+                test_message += f"📌 **服务概况**\n"
+                test_message += f"➤ 总服务数: {len(services_info)}\n"
+                test_message += f"➤ 🟢 运行中: {running_count}\n"
+                test_message += f"➤ ⚪ 已停止: {stopped_count}\n\n"
+                
+                test_message += f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                test_message += f"💡 IYUU推送功能正常"
+                
                 success, errors = _send_iyuu_message_direct(
                     "Natter测试消息", 
-                    f"这是一条测试消息，发送时间: {time.strftime('%Y-%m-%d %H:%M:%S')}"
+                    test_message
                 )
                 self._set_headers()
                 self.wfile.write(json.dumps({
