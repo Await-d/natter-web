@@ -13,6 +13,7 @@ import time
 import requests  # 添加requests模块用于HTTP请求
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
+from collections import deque  # 添加队列用于消息批量发送
 
 import psutil
 
@@ -46,6 +47,11 @@ iyuu_config = {
     }
 }
 
+# 消息队列用于事件整合推送
+message_queue = deque(maxlen=20)  # 最多保存20条待发送消息
+message_lock = threading.RLock()
+message_batch_timer = None  # 批量发送定时器
+
 # NAT类型和端口状态的正则表达式
 NAT_TYPE_PATTERN = re.compile(r"NAT type: ([^\n]+)")
 LAN_STATUS_PATTERN = re.compile(r"LAN > ([^\[]+)\[ ([^\]]+) \]")
@@ -53,6 +59,69 @@ WAN_STATUS_PATTERN = re.compile(r"WAN > ([^\[]+)\[ ([^\]]+) \]")
 
 # 默认密码为None，表示不启用验证
 PASSWORD = None
+
+# 添加消息到推送队列
+def queue_message(category, title, content):
+    """添加消息到队列，等待批量推送"""
+    if not iyuu_config.get("enabled", True) or not iyuu_config.get("tokens"):
+        return
+
+    with message_lock:
+        message_queue.append({
+            "category": category,  # 消息类别: 启动, 停止, 地址变更, 错误等
+            "title": title,        # 消息标题
+            "content": content,    # 消息内容
+            "time": time.time()    # 消息生成时间
+        })
+        
+        # 如果定时器不存在，创建一个新的
+        global message_batch_timer
+        if message_batch_timer is None or not message_batch_timer.is_alive():
+            message_batch_timer = threading.Timer(10.0, send_batch_messages)  # 10秒后发送批量消息
+            message_batch_timer.daemon = True
+            message_batch_timer.start()
+            print(f"消息整合推送定时器已启动，将在10秒后发送批量消息")
+
+# 批量发送消息队列中的所有消息
+def send_batch_messages():
+    """批量发送队列中的所有消息"""
+    global message_batch_timer
+    message_batch_timer = None
+    
+    with message_lock:
+        if not message_queue:
+            return
+        
+        # 按类别整理消息
+        categories = {}
+        for msg in message_queue:
+            cat = msg["category"]
+            if cat not in categories:
+                categories[cat] = []
+            categories[cat].append(msg)
+        
+        # 构建整合后的消息内容
+        message_title = f"Natter服务状态更新 [{len(message_queue)}条]"
+        message_content = f"【服务状态整合通知】\n"
+        message_content += f"时间: {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+        
+        # 按类别添加消息
+        for cat, messages in categories.items():
+            message_content += f"## {cat} ({len(messages)}条)\n"
+            for msg in messages:
+                # 提取消息标题中服务名称部分
+                service_name = msg["title"].split(']')[-1].strip() if ']' in msg["title"] else msg["title"]
+                # 提取消息内容中的第一行作为简要信息
+                brief = msg["content"].split('\n', 1)[0] if '\n' in msg["content"] else msg["content"]
+                message_content += f"- {service_name}: {brief}\n"
+            message_content += "\n"
+        
+        # 发送整合后的消息
+        send_iyuu_message(message_title, message_content, force_send=True)
+        
+        # 清空消息队列
+        message_queue.clear()
+        print(f"已整合发送 {len(message_queue)} 条服务状态消息")
 
 class NatterService:
     def __init__(self, service_id, cmd_args, remark=""):
@@ -109,14 +178,14 @@ class NatterService:
             self.output_lines.append("➡️ 请停止此服务，然后使用其他转发方法重新创建服务")
             self.status = "已停止"
             
-            # 发送错误推送
-            if iyuu_config.get("enabled", True):
-                service_name = self.remark or f"服务 {self.service_id}"
-                error_msg = "nftables在Docker容器中不可用，请使用socket或iptables转发方法"
-                send_iyuu_message(
-                    f"[错误] {service_name}启动失败", 
-                    f"服务启动失败\n\n错误原因: {error_msg}\n\n请停止此服务，然后使用其他转发方法重新创建服务"
-                )
+            # 发送错误推送 - 使用消息队列
+            service_name = self.remark or f"服务 {self.service_id}"
+            error_msg = "nftables在Docker容器中不可用，请使用socket或iptables转发方法"
+            queue_message(
+                "错误", 
+                f"[错误] {service_name}", 
+                f"服务启动失败\n错误原因: {error_msg}\n\n请停止此服务，然后使用其他转发方法重新创建服务"
+            )
             
             return False
         
@@ -143,14 +212,14 @@ class NatterService:
         t.daemon = True
         t.start()
         
-        # 发送启动推送
-        if iyuu_config.get("enabled", True):
-            service_name = self.remark or f"服务 {self.service_id}"
-            local_port = self.local_port or "未知"
-            send_iyuu_message(
-                f"[启动] {service_name}已启动", 
-                f"服务已成功启动\n\n服务ID: {self.service_id}\n本地端口: {local_port}\n启动时间: {time.strftime('%Y-%m-%d %H:%M:%S')}"
-            )
+        # 发送启动推送 - 使用消息队列
+        service_name = self.remark or f"服务 {self.service_id}"
+        local_port = self.local_port or "未知"
+        queue_message(
+            "启动", 
+            f"[启动] {service_name}", 
+            f"服务已成功启动\n服务ID: {self.service_id}\n本地端口: {local_port}\n启动时间: {time.strftime('%Y-%m-%d %H:%M:%S')}"
+        )
         
         return True
     
@@ -187,23 +256,24 @@ class NatterService:
                         except Exception as e:
                             print(f"解析远程端口出错: {e}")
                         
-                        # 发送映射地址变更推送
-                        if iyuu_config.get("enabled", True):
-                            service_name = self.remark or f"服务 {self.service_id}"
-                            local_port = self.local_port or "未知"
-                            
-                            # 仅在非首次获取地址时发送变更消息
-                            if old_address != "无":
-                                send_iyuu_message(
-                                    f"[地址变更] {service_name}映射地址已变更", 
-                                    f"服务映射地址已变更\n\n服务ID: {self.service_id}\n服务备注: {self.remark or '无'}\n本地端口: {local_port}\n\n旧地址: {old_address}\n新地址: {self.mapped_address}\n\n变更时间: {time.strftime('%Y-%m-%d %H:%M:%S')}"
-                                )
-                            else:
-                                # 首次获取地址时发送通知
-                                send_iyuu_message(
-                                    f"[地址分配] {service_name}获取到映射地址", 
-                                    f"服务获取到映射地址\n\n服务ID: {self.service_id}\n服务备注: {self.remark or '无'}\n本地端口: {local_port}\n映射地址: {self.mapped_address}\n\n获取时间: {time.strftime('%Y-%m-%d %H:%M:%S')}"
-                                )
+                        # 发送映射地址变更推送 - 使用消息队列
+                        service_name = self.remark or f"服务 {self.service_id}"
+                        local_port = self.local_port or "未知"
+                        
+                        # 仅在非首次获取地址时发送变更消息
+                        if old_address != "无":
+                            queue_message(
+                                "地址变更", 
+                                f"[地址变更] {service_name}", 
+                                f"服务映射地址已变更\n服务ID: {self.service_id}\n服务备注: {self.remark or '无'}\n本地端口: {local_port}\n\n旧地址: {old_address}\n新地址: {self.mapped_address}\n变更时间: {time.strftime('%Y-%m-%d %H:%M:%S')}"
+                            )
+                        else:
+                            # 首次获取地址时发送通知
+                            queue_message(
+                                "地址分配", 
+                                f"[地址分配] {service_name}", 
+                                f"服务获取到映射地址\n服务ID: {self.service_id}\n服务备注: {self.remark or '无'}\n本地端口: {local_port}\n映射地址: {self.mapped_address}\n获取时间: {time.strftime('%Y-%m-%d %H:%M:%S')}"
+                            )
             
             # 检测nftables错误
             if "nftables" in line and "not available" in line:
@@ -212,26 +282,26 @@ class NatterService:
                 self.output_lines.append("💡 建议：尝试使用其他转发方法，如'socket'（内置）或'iptables'。")
                 self.output_lines.append("📋 步骤：停止此服务，重新创建服务并在'转发方法'中选择'socket'或'iptables'。")
                 
-                # 发送错误推送
-                if iyuu_config.get("enabled", True):
-                    service_name = self.remark or f"服务 {self.service_id}"
-                    send_iyuu_message(
-                        f"[错误] {service_name}出现nftables错误", 
-                        f"服务出现错误\n\n错误类型: nftables不可用\n服务ID: {self.service_id}\n\n建议：尝试使用其他转发方法，如'socket'（内置）或'iptables'。\n步骤：停止此服务，重新创建服务并在'转发方法'中选择'socket'或'iptables'。"
-                    )
+                # 发送错误推送 - 使用消息队列
+                service_name = self.remark or f"服务 {self.service_id}"
+                queue_message(
+                    "错误", 
+                    f"[错误] {service_name}", 
+                    f"服务出现错误\n错误类型: nftables不可用\n服务ID: {self.service_id}\n\n建议：尝试使用其他转发方法，如'socket'（内置）或'iptables'。\n步骤：停止此服务，重新创建服务并在'转发方法'中选择'socket'或'iptables'。"
+                )
             
             # 检测pcap初始化错误
             if "pcap initialization failed" in line:
                 self.output_lines.append("⚠️ 检测到pcap初始化错误！这通常与nftables功能有关。")
                 self.output_lines.append("💡 建议：尝试使用其他转发方法，如'socket'（内置）或'iptables'。")
                 
-                # 发送错误推送
-                if iyuu_config.get("enabled", True):
-                    service_name = self.remark or f"服务 {self.service_id}"
-                    send_iyuu_message(
-                        f"[错误] {service_name}出现pcap初始化错误", 
-                        f"服务出现错误\n\n错误类型: pcap初始化失败\n服务ID: {self.service_id}\n\n建议：尝试使用其他转发方法，如'socket'（内置）或'iptables'。"
-                    )
+                # 发送错误推送 - 使用消息队列
+                service_name = self.remark or f"服务 {self.service_id}"
+                queue_message(
+                    "错误", 
+                    f"[错误] {service_name}", 
+                    f"服务出现错误\n错误类型: pcap初始化失败\n服务ID: {self.service_id}\n\n建议：尝试使用其他转发方法，如'socket'（内置）或'iptables'。"
+                )
             
             # 提取NAT类型
             nat_match = NAT_TYPE_PATTERN.search(line)
@@ -251,17 +321,17 @@ class NatterService:
         # 进程结束后更新状态
         self.status = "已停止"
         
-        # 发送服务停止推送
-        if iyuu_config.get("enabled", True):
-            service_name = self.remark or f"服务 {self.service_id}"
-            local_port = self.local_port or "未知"
-            mapped_address = self.mapped_address or "无"
-            
-            # 发送服务停止通知
-            send_iyuu_message(
-                f"[停止] {service_name}已停止", 
-                f"服务已停止运行\n\n服务ID: {self.service_id}\n服务备注: {self.remark or '无'}\n本地端口: {local_port}\n映射地址: {mapped_address}\n\n停止时间: {time.strftime('%Y-%m-%d %H:%M:%S')}"
-            )
+        # 发送服务停止推送 - 使用消息队列
+        service_name = self.remark or f"服务 {self.service_id}"
+        local_port = self.local_port or "未知"
+        mapped_address = self.mapped_address or "无"
+        
+        # 发送服务停止通知
+        queue_message(
+            "停止", 
+            f"[停止] {service_name}", 
+            f"服务已停止运行\n服务ID: {self.service_id}\n服务备注: {self.remark or '无'}\n本地端口: {local_port}\n映射地址: {mapped_address}\n停止时间: {time.strftime('%Y-%m-%d %H:%M:%S')}"
+        )
         
         # 如果启用了自动重启，且不是由于nftables错误导致的退出，则重新启动服务
         if self.auto_restart and not nftables_error_detected:
@@ -315,16 +385,16 @@ class NatterService:
             
             self.status = "已停止"
             
-            # 发送手动停止推送
-            if iyuu_config.get("enabled", True):
-                service_name = self.remark or f"服务 {self.service_id}"
-                local_port = self.local_port or "未知"
-                mapped_address = self.mapped_address or "无"
-                
-                send_iyuu_message(
-                    f"[手动停止] {service_name}已手动停止", 
-                    f"服务已被手动停止\n\n服务ID: {self.service_id}\n服务备注: {self.remark or '无'}\n本地端口: {local_port}\n映射地址: {mapped_address}\n\n停止时间: {time.strftime('%Y-%m-%d %H:%M:%S')}"
-                )
+            # 发送手动停止推送 - 使用消息队列
+            service_name = self.remark or f"服务 {self.service_id}"
+            local_port = self.local_port or "未知"
+            mapped_address = self.mapped_address or "无"
+            
+            queue_message(
+                "手动停止", 
+                f"[手动停止] {service_name}", 
+                f"服务已被手动停止\n服务ID: {self.service_id}\n服务备注: {self.remark or '无'}\n本地端口: {local_port}\n映射地址: {mapped_address}\n停止时间: {time.strftime('%Y-%m-%d %H:%M:%S')}"
+            )
             
             return True
         return False
@@ -1214,7 +1284,8 @@ def run_server(port=8080, password=None):
                 f"服务地址: http://0.0.0.0:{port}\n"
                 f"加载服务数: {services_count}\n"
                 f"IYUU推送: {'已启用' if iyuu_config.get('enabled', True) else '已禁用'}\n"
-                f"定时推送: {'已启用' if iyuu_config.get('schedule', {}).get('enabled', False) else '已禁用'}"
+                f"定时推送: {'已启用' if iyuu_config.get('schedule', {}).get('enabled', False) else '已禁用'}",
+                force_send=True  # 强制立即发送，不进入队列
             )
             print("已发送IYUU启动通知")
         
@@ -1236,13 +1307,18 @@ def cleanup():
     print("正在停止所有Natter服务...")
     stopped_count = NatterManager.stop_all_services()
     
+    # 确保所有待发消息都已发送
+    if len(message_queue) > 0:
+        send_batch_messages()
+    
     # 发送服务器关闭通知
     if iyuu_config.get("enabled", True) and iyuu_config.get("tokens"):
         send_iyuu_message(
             "Natter管理服务已关闭",
             f"Natter管理服务已关闭\n\n"
             f"关闭时间: {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
-            f"已停止服务数: {stopped_count}"
+            f"已停止服务数: {stopped_count}",
+            force_send=True  # 强制立即发送，不进入队列
         )
         print("已发送IYUU关闭通知")
     
@@ -1272,10 +1348,24 @@ def save_iyuu_config():
         print(f"保存IYUU配置失败: {e}")
         return False
 
-def send_iyuu_message(text, desp):
-    """发送IYUU消息推送"""
+def send_iyuu_message(text, desp, force_send=False):
+    """发送IYUU消息推送
+    
+    Args:
+        text: 消息标题
+        desp: 消息内容
+        force_send: 是否强制立即发送，不进入队列
+    
+    Returns:
+        (success, errors) 元组，表示是否成功发送和错误信息列表
+    """
     if not iyuu_config.get("enabled", True) or not iyuu_config.get("tokens"):
-        return False
+        return False, ["IYUU推送已禁用或未配置令牌"]
+    
+    # 如果不是强制发送且定时推送队列已启动，则加入队列
+    if not force_send and message_batch_timer is not None:
+        queue_message("通知", text, desp)
+        return True, []
     
     success = False
     errors = []
@@ -1347,7 +1437,8 @@ def schedule_daily_notification():
                     detail += f"[{status}] {remark} - {mapped_address}\n"
                     detail += f"  LAN: {lan_status} | WAN: {wan_status} | NAT: {nat_type}\n"
                 
-                send_iyuu_message(message, detail)
+                # 定时推送使用force_send=True强制直接发送，不进队列
+                send_iyuu_message(message, detail, force_send=True)
                 
                 # 日志记录推送时间
                 print(f"已在 {current_time} 发送IYUU定时推送")
