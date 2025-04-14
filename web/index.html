@@ -386,19 +386,33 @@
                             <input type="checkbox" id="iyuu-schedule-enabled">
                             启用每日定时推送
                         </label>
-                        <small>每天定时发送服务状态摘要</small>
+                        <small>按设定时间发送服务状态摘要，支持多个时间段</small>
                     </div>
 
                     <div class="form-group" id="iyuu-schedule-options">
-                        <label for="iyuu-schedule-time">推送时间:</label>
-                        <input type="time" id="iyuu-schedule-time" value="08:00">
-                        <small>每天的这个时间将发送服务状态摘要</small>
+                        <label>推送时间:</label>
+                        <div id="schedule-times-list" class="schedule-times-list">
+                            <!-- 时间段列表将通过JS动态添加 -->
+                        </div>
+                        <div class="time-actions">
+                            <input type="time" id="new-schedule-time" value="08:00">
+                            <button id="add-schedule-time" class="btn-primary">添加时间</button>
+                        </div>
+                        <small>每天的这些时间将发送服务状态摘要</small>
                     </div>
 
                     <div class="form-group">
                         <label for="iyuu-schedule-message">推送标题:</label>
                         <input type="text" id="iyuu-schedule-message" placeholder="每日服务状态摘要标题">
                         <small>定时推送的消息标题</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>立即推送:</label>
+                        <div class="push-now-actions">
+                            <button id="push-all-services" class="btn-primary">推送所有服务状态</button>
+                        </div>
+                        <small>立即发送一次当前所有服务的状态报告</small>
                     </div>
 
                     <div class="iyuu-actions">

@@ -41,7 +41,7 @@ iyuu_config = {
     "enabled": True,  # 是否启用IYUU推送
     "schedule": {
         "enabled": False,  # 是否启用定时推送
-        "time": "08:00",   # 定时推送时间
+        "times": ["08:00"],   # 定时推送时间数组，支持多个时间段
         "message": "Natter服务状态日报"  # 定时推送消息
     }
 }
@@ -939,8 +939,8 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                     schedule = data["schedule"]
                     if "enabled" in schedule:
                         iyuu_config["schedule"]["enabled"] = bool(schedule["enabled"])
-                    if "time" in schedule:
-                        iyuu_config["schedule"]["time"] = schedule["time"]
+                    if "times" in schedule:
+                        iyuu_config["schedule"]["times"] = schedule["times"]
                     if "message" in schedule:
                         iyuu_config["schedule"]["message"] = schedule["message"]
                 
@@ -1034,6 +1034,59 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                         self._error(404, "未找到指定令牌")
             else:
                 self._error(400, "缺少token参数")
+        elif path == "/api/iyuu/push_now":
+            # 立即推送当前服务状态
+            try:
+                service_id = None
+                if "service_id" in data:
+                    service_id = data["service_id"]
+                    
+                # 获取服务状态
+                services_info = []
+                if service_id:
+                    # 只推送指定服务
+                    service = NatterManager.get_service(service_id)
+                    if service:
+                        services_info = [service]
+                    else:
+                        self._error(404, "未找到指定服务")
+                        return
+                else:
+                    # 推送所有服务
+                    services_info = NatterManager.list_services()
+                
+                # 生成推送内容
+                running_count = sum(1 for s in services_info if s.get("status") == "运行中")
+                stopped_count = sum(1 for s in services_info if s.get("status") == "已停止")
+                
+                message = "Natter服务状态即时报告"
+                detail = f"【Natter服务状态报告】\n\n"
+                detail += f"- 总服务数: {len(services_info)}\n"
+                detail += f"- 运行中: {running_count}\n"
+                detail += f"- 已停止: {stopped_count}\n\n"
+                
+                for service in services_info:
+                    service_id = service.get("id", "未知")
+                    remark = service.get("remark") or f"服务 {service_id}"
+                    status = service.get("status", "未知")
+                    mapped_address = service.get("mapped_address", "无映射")
+                    lan_status = service.get("lan_status", "未知")
+                    wan_status = service.get("wan_status", "未知")
+                    nat_type = service.get("nat_type", "未知")
+                    
+                    detail += f"[{status}] {remark} - {mapped_address}\n"
+                    detail += f"  LAN: {lan_status} | WAN: {wan_status} | NAT: {nat_type}\n"
+                
+                # 发送推送
+                success, errors = send_iyuu_message(message, detail)
+                
+                self._set_headers()
+                self.wfile.write(json.dumps({
+                    "success": success,
+                    "errors": errors
+                }).encode())
+            except Exception as e:
+                self._error(500, f"推送服务状态失败: {e}")
         else:
             self._error(404, "Not found")
     
@@ -1134,7 +1187,7 @@ def run_server(port=8080, password=None):
         
         # 如果启用了定时推送，启动定时任务
         if iyuu_config.get("schedule", {}).get("enabled", False):
-            print(f"启用IYUU定时推送，每天 {iyuu_config.get('schedule', {}).get('time', '08:00')} 发送服务状态摘要")
+            print(f"启用IYUU定时推送，每天 {iyuu_config.get('schedule', {}).get('times', ['08:00'])} 发送服务状态摘要")
             schedule_daily_notification()
         
         server_address = ('0.0.0.0', port)  # 修改为明确绑定0.0.0.0，确保监听所有网络接口
@@ -1268,9 +1321,9 @@ def schedule_daily_notification():
         while True:
             now = time.localtime()
             current_time = f"{now.tm_hour:02d}:{now.tm_min:02d}"
-            schedule_time = iyuu_config.get("schedule", {}).get("time", "08:00")
+            schedule_times = iyuu_config.get("schedule", {}).get("times", ["08:00"])
             
-            if current_time == schedule_time:
+            if current_time in schedule_times:
                 # 获取所有服务状态用于日报
                 services_info = NatterManager.list_services()
                 running_count = sum(1 for s in services_info if s.get("status") == "运行中")
@@ -1287,10 +1340,17 @@ def schedule_daily_notification():
                     remark = service.get("remark") or f"服务 {service_id}"
                     status = service.get("status", "未知")
                     mapped_address = service.get("mapped_address", "无映射")
+                    lan_status = service.get("lan_status", "未知")
+                    wan_status = service.get("wan_status", "未知")
+                    nat_type = service.get("nat_type", "未知")
                     
                     detail += f"[{status}] {remark} - {mapped_address}\n"
+                    detail += f"  LAN: {lan_status} | WAN: {wan_status} | NAT: {nat_type}\n"
                 
                 send_iyuu_message(message, detail)
+                
+                # 日志记录推送时间
+                print(f"已在 {current_time} 发送IYUU定时推送")
             
             # 休眠60秒再检查
             time.sleep(60)

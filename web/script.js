@@ -74,7 +74,7 @@ let iyuuTokensList = document.getElementById('iyuu-tokens-list'); // 令牌列�
 let newIyuuToken = document.getElementById('new-iyuu-token'); // 新令牌输入框
 let addIyuuToken = document.getElementById('add-iyuu-token'); // 添加令牌按钮
 let iyuuScheduleEnabled = document.getElementById('iyuu-schedule-enabled'); // 定时推送开关
-let iyuuScheduleTime = document.getElementById('iyuu-schedule-time'); // 定时推送时间
+let iyuuScheduleTime = document.getElementById('new-schedule-time'); // 调整为新的时间输入框ID
 let iyuuScheduleMessage = document.getElementById('iyuu-schedule-message'); // 定时推送消息
 let testIyuuPush = document.getElementById('test-iyuu-push'); // 测试推送按钮
 let saveIyuuSettings = document.getElementById('save-iyuu-settings'); // 保存设置按钮
@@ -111,12 +111,12 @@ const API = {
     authLogin: '/api/auth/login',
     setRemark: '/api/services/set-remark',
     version: '/api/version',
-    // IYUU推送相关API
     iyuuConfig: '/api/iyuu/config',
     iyuuUpdate: '/api/iyuu/update',
     iyuuTest: '/api/iyuu/test',
     iyuuAddToken: '/api/iyuu/add_token',
-    iyuuDeleteToken: '/api/iyuu/delete_token'
+    iyuuDeleteToken: '/api/iyuu/delete_token',
+    iyuuPushNow: '/api/iyuu/push_now'
 };
 
 // 工具状态信息
@@ -258,11 +258,15 @@ document.addEventListener('DOMContentLoaded', function () {
     newIyuuToken = document.getElementById('new-iyuu-token');
     addIyuuToken = document.getElementById('add-iyuu-token');
     iyuuScheduleEnabled = document.getElementById('iyuu-schedule-enabled');
-    iyuuScheduleTime = document.getElementById('iyuu-schedule-time');
+    iyuuScheduleTime = document.getElementById('new-schedule-time'); // 调整为新的时间输入框ID
     iyuuScheduleMessage = document.getElementById('iyuu-schedule-message');
     testIyuuPush = document.getElementById('test-iyuu-push');
     saveIyuuSettings = document.getElementById('save-iyuu-settings');
     backFromIyuuBtn = document.getElementById('back-from-iyuu-btn');
+
+    // 新增的IYUU相关元素
+    const addScheduleTimeBtn = document.getElementById('add-schedule-time');
+    const pushAllServicesBtn = document.getElementById('push-all-services');
 
     // 服务详情页面元素
     serviceId = document.getElementById('service-id');
@@ -624,6 +628,20 @@ document.addEventListener('DOMContentLoaded', function () {
         iyuuScheduleEnabled.addEventListener('change', function () {
             document.getElementById('iyuu-schedule-options').style.display =
                 this.checked ? 'block' : 'none';
+        });
+    }
+
+    // 添加时间段按钮事件
+    if (addScheduleTimeBtn) {
+        addScheduleTimeBtn.addEventListener('click', function () {
+            addScheduleTime();
+        });
+    }
+
+    // 立即推送所有服务状态按钮事件
+    if (pushAllServicesBtn) {
+        pushAllServicesBtn.addEventListener('click', function () {
+            pushServicesNow();
         });
     }
 });
@@ -1095,6 +1113,12 @@ function showServiceDetailsPanel(service) {
             console.log('获取备注值:', debugValue);
             saveServiceRemark(service.id, debugValue);
         }
+    });
+
+    // 添加推送单个服务状态按钮事件监听
+    replaceButtonAndAddListener('push-service-now', function (event) {
+        event.preventDefault();
+        pushServiceNow(service.id);
     });
 
     // 设置状态文本和样式
@@ -2169,8 +2193,10 @@ function loadIyuuConfig() {
                 // 设置定时推送配置
                 const schedule = config.schedule || {};
                 iyuuScheduleEnabled.checked = schedule.enabled || false;
-                iyuuScheduleTime.value = schedule.time || "08:00";
                 iyuuScheduleMessage.value = schedule.message || "Natter服务状态日报";
+
+                // 渲染时间段列表
+                renderScheduleTimes(schedule.times || ["08:00"]);
 
                 // 根据定时推送状态显示或隐藏选项
                 document.getElementById('iyuu-schedule-options').style.display =
@@ -2180,6 +2206,230 @@ function loadIyuuConfig() {
         .catch(error => {
             console.error('加载IYUU配置出错:', error);
             showNotification('加载IYUU配置失败', 'error');
+        });
+}
+
+// 渲染定时推送时间段列表
+function renderScheduleTimes(times) {
+    const timesList = document.getElementById('schedule-times-list');
+    timesList.innerHTML = '';
+
+    if (!times || times.length === 0) {
+        timesList.innerHTML = '<div class="empty-tokens">未添加任何时间段</div>';
+        return;
+    }
+
+    times.forEach(time => {
+        const timeItem = document.createElement('div');
+        timeItem.className = 'schedule-time-item';
+
+        const timeText = document.createElement('span');
+        timeText.className = 'time-text';
+        timeText.textContent = time;
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'btn-danger btn-small';
+        deleteBtn.textContent = '删除';
+        deleteBtn.addEventListener('click', function () {
+            removeScheduleTime(time);
+        });
+
+        timeItem.appendChild(timeText);
+        timeItem.appendChild(deleteBtn);
+        timesList.appendChild(timeItem);
+    });
+}
+
+// 添加时间段
+function addScheduleTime() {
+    const newTimeInput = document.getElementById('new-schedule-time');
+    const newTime = newTimeInput.value.trim();
+
+    if (!newTime) {
+        showNotification('请选择有效的时间', 'warning');
+        return;
+    }
+
+    // 获取当前配置中的时间段列表
+    fetchWithAuth(API.iyuuConfig)
+        .then(response => response.json())
+        .then(data => {
+            if (data.config) {
+                const config = data.config;
+                const schedule = config.schedule || {};
+                const times = schedule.times || [];
+
+                // 检查是否已存在相同时间
+                if (times.includes(newTime)) {
+                    showNotification('该时间段已存在', 'warning');
+                    return;
+                }
+
+                // 添加新时间段
+                times.push(newTime);
+
+                // 更新配置
+                const updatedConfig = {
+                    enabled: config.enabled,
+                    schedule: {
+                        enabled: schedule.enabled,
+                        times: times,
+                        message: schedule.message
+                    }
+                };
+
+                // 保存更新后的配置
+                saveIyuuConfigWithData(updatedConfig);
+
+                // 清空输入框
+                newTimeInput.value = '08:00';
+            }
+        })
+        .catch(error => {
+            console.error('获取IYUU配置出错:', error);
+            showNotification('获取IYUU配置失败', 'error');
+        });
+}
+
+// 移除时间段
+function removeScheduleTime(time) {
+    if (!confirm('确定要删除此时间段吗？')) {
+        return;
+    }
+
+    // 获取当前配置
+    fetchWithAuth(API.iyuuConfig)
+        .then(response => response.json())
+        .then(data => {
+            if (data.config) {
+                const config = data.config;
+                const schedule = config.schedule || {};
+                let times = schedule.times || [];
+
+                // 移除指定时间段
+                times = times.filter(t => t !== time);
+
+                // 更新配置
+                const updatedConfig = {
+                    enabled: config.enabled,
+                    schedule: {
+                        enabled: schedule.enabled,
+                        times: times,
+                        message: schedule.message
+                    }
+                };
+
+                // 保存更新后的配置
+                saveIyuuConfigWithData(updatedConfig);
+            }
+        })
+        .catch(error => {
+            console.error('获取IYUU配置出错:', error);
+            showNotification('获取IYUU配置失败', 'error');
+        });
+}
+
+// 使用指定数据保存IYUU配置
+function saveIyuuConfigWithData(config) {
+    fetchWithAuth(API.iyuuUpdate, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(config)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification('IYUU配置已保存', 'success');
+                loadIyuuConfig(); // 重新加载确认配置已更新
+            } else {
+                showNotification('保存IYUU配置失败', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('保存IYUU配置出错:', error);
+            showNotification('保存IYUU配置时发生错误', 'error');
+        });
+}
+
+// 修改保存IYUU配置函数，支持多时间段
+function saveIyuuConfig() {
+    // 收集当前配置
+    const config = {
+        enabled: iyuuEnabled.checked,
+        schedule: {
+            enabled: iyuuScheduleEnabled.checked,
+            message: iyuuScheduleMessage.value
+        }
+    };
+
+    // 获取当前配置中的时间段列表
+    fetchWithAuth(API.iyuuConfig)
+        .then(response => response.json())
+        .then(data => {
+            if (data.config) {
+                const currentConfig = data.config;
+                const schedule = currentConfig.schedule || {};
+
+                // 使用当前的时间段列表
+                config.schedule.times = schedule.times || ["08:00"];
+
+                // 保存更新后的配置
+                saveIyuuConfigWithData(config);
+            }
+        })
+        .catch(error => {
+            console.error('获取IYUU配置出错:', error);
+            showNotification('获取IYUU配置失败', 'error');
+        });
+}
+
+// 立即推送当前服务状态
+function pushServicesNow() {
+    fetchWithAuth(API.iyuuPushNow, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification('服务状态推送成功', 'success');
+            } else {
+                showNotification(`推送失败: ${data.errors ? data.errors.join(', ') : '未知错误'}`, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('推送服务状态出错:', error);
+            showNotification('推送服务状态时发生错误', 'error');
+        });
+}
+
+// 立即推送指定服务状态
+function pushServiceNow(serviceId) {
+    fetchWithAuth(API.iyuuPushNow, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                service_id: serviceId
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification('服务状态推送成功', 'success');
+            } else {
+                showNotification(`推送失败: ${data.errors ? data.errors.join(', ') : '未知错误'}`, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('推送服务状态出错:', error);
+            showNotification('推送服务状态时发生错误', 'error');
         });
 }
 
@@ -2212,40 +2462,6 @@ function renderIyuuTokens(tokens) {
         tokenItem.appendChild(deleteBtn);
         tokensList.appendChild(tokenItem);
     });
-}
-
-// 保存IYUU配置
-function saveIyuuConfig() {
-    // 收集当前配置
-    const config = {
-        enabled: iyuuEnabled.checked,
-        schedule: {
-            enabled: iyuuScheduleEnabled.checked,
-            time: iyuuScheduleTime.value,
-            message: iyuuScheduleMessage.value
-        }
-    };
-
-    fetchWithAuth(API.iyuuUpdate, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(config)
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showNotification('IYUU配置已保存', 'success');
-                loadIyuuConfig(); // 重新加载确认配置已更新
-            } else {
-                showNotification('保存IYUU配置失败', 'error');
-            }
-        })
-        .catch(error => {
-            console.error('保存IYUU配置出错:', error);
-            showNotification('保存IYUU配置时发生错误', 'error');
-        });
 }
 
 // 删除IYUU令牌
