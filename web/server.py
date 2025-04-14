@@ -125,16 +125,34 @@ def send_batch_messages():
         # 更新上次发送时间
         last_send_time = time.time()
         
-        # 按类别整理消息
+        # 按类别整理消息并去重
         categories = {}
         for msg in message_queue:
             cat = msg["category"]
+            
+            # 处理定时报告类别的消息去重
+            if cat == "定时报告":
+                # 如果该类别已存在消息，检查内容是否重复
+                if cat in categories:
+                    # 检查是否有内容相同的消息已存在
+                    is_duplicate = False
+                    for existing_msg in categories[cat]:
+                        if existing_msg["content"] == msg["content"]:
+                            is_duplicate = True
+                            break
+                    
+                    # 如果是重复消息，跳过添加
+                    if is_duplicate:
+                        continue
+            
+            # 添加消息到对应类别
             if cat not in categories:
                 categories[cat] = []
             categories[cat].append(msg)
         
         # 构建整合后的消息内容
-        message_title = f"Natter服务状态更新 [{len(message_queue)}条]"
+        total_unique_messages = sum(len(msgs) for msgs in categories.values())
+        message_title = f"Natter服务状态更新 [{total_unique_messages}条]"
         message_content = f"【服务状态整合通知】\n"
         message_content += f"时间: {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
         
@@ -358,16 +376,28 @@ def schedule_daily_notification():
     def check_and_send_notification():
         # 使用集合记录已处理的时间点，避免重复推送
         processed_times = set()
+        # 记录上次检查的时间，防止短时间内多次触发
+        last_check_time = ""
         
         while True:
             now = time.localtime()
             current_time = f"{now.tm_hour:02d}:{now.tm_min:02d}"
+            
+            # 如果当前分钟已经检查过，则跳过
+            if current_time == last_check_time:
+                time.sleep(1)  # 短暂休眠后再次检查
+                continue
+                
+            # 更新上次检查的时间
+            last_check_time = current_time
+            
             schedule_times = iyuu_config.get("schedule", {}).get("times", ["08:00"])
             
             # 检查当前时间是否在推送时间列表中，且尚未处理过
             if current_time in schedule_times and current_time not in processed_times:
                 # 将当前时间添加到已处理集合中
                 processed_times.add(current_time)
+                print(f"触发定时推送: {current_time}")
                 
                 # 获取所有服务状态用于日报
                 services_info = NatterManager.list_services()
@@ -1106,7 +1136,8 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps({"config": safe_config}).encode())
             elif path == "/api/iyuu/test":
                 # 测试IYUU推送
-                success, errors = send_iyuu_message(
+                # 直接使用_send_iyuu_message_direct函数，跳过消息队列，立即发送
+                success, errors = _send_iyuu_message_direct(
                     "Natter测试消息", 
                     f"这是一条测试消息，发送时间: {time.strftime('%Y-%m-%d %H:%M:%S')}"
                 )
