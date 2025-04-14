@@ -101,11 +101,11 @@ def queue_message(category, title, content, important=False):
             global message_batch_timer
             if message_batch_timer is None or not message_batch_timer.is_alive():
                 # 计算下次发送时间：确保至少间隔MIN_SEND_INTERVAL
-                next_send_delay = max(MIN_SEND_INTERVAL - time_since_last_send, 60)  # 至少等待60秒
+                next_send_delay = max(MIN_SEND_INTERVAL - time_since_last_send, 5)  # 至少等待5秒，原来是60秒
                 
                 # 如果消息是重要的但未达到发送间隔，使用较短的延迟
-                if important and next_send_delay > 60:
-                    next_send_delay = 60
+                if important and next_send_delay > 5:
+                    next_send_delay = 5  # 重要消息使用5秒延迟，原来是60秒
                 
                 message_batch_timer = threading.Timer(next_send_delay, send_batch_messages)
                 message_batch_timer.daemon = True
@@ -391,8 +391,8 @@ def schedule_daily_notification():
                 # 日志记录推送时间
                 print(f"已在 {current_time} 将定时推送加入消息队列")
             
-            # 休眠60秒再检查
-            time.sleep(60)
+            # 休眠5秒再检查
+            time.sleep(5)
     
     notification_thread = threading.Thread(target=check_and_send_notification, daemon=True)
     notification_thread.start()
@@ -1548,19 +1548,49 @@ def run_server(port=8080, password=None):
         # 加载已保存的服务配置
         NatterManager.load_services()
         
-        # 发送服务器启动通知，使用常规队列处理
+        # 整合发送服务器启动通知和服务映射信息
         if iyuu_config.get("enabled", True) and iyuu_config.get("tokens"):
-            services_count = len(NatterManager.list_services())
-            send_iyuu_message(
-                "Natter管理服务已启动",
-                f"Natter管理服务已成功启动\n\n"
-                f"启动时间: {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
-                f"服务地址: http://0.0.0.0:{port}\n"
-                f"加载服务数: {services_count}\n"
-                f"IYUU推送: {'已启用' if iyuu_config.get('enabled', True) else '已禁用'}\n"
-                f"定时推送: {'已启用' if iyuu_config.get('schedule', {}).get('enabled', False) else '已禁用'}"
-            )
-            print("已将启动通知加入消息队列")
+            services = NatterManager.list_services()
+            services_count = len(services)
+            
+            # 构建启动消息
+            message_title = "Natter管理服务已启动"
+            message_content = f"【Natter管理服务启动通知】\n\n"
+            message_content += f"📅 启动时间: {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
+            message_content += f"🔗 服务地址: http://0.0.0.0:{port}\n"
+            message_content += f"📊 服务数量: {services_count}\n"
+            message_content += f"📨 IYUU推送: {'已启用' if iyuu_config.get('enabled', True) else '已禁用'}\n"
+            message_content += f"⏰ 定时推送: {'已启用' if iyuu_config.get('schedule', {}).get('enabled', False) else '已禁用'}\n\n"
+            
+            # 添加服务映射地址部分
+            if services_count > 0:
+                message_content += "## 已加载服务映射地址\n"
+                running_count = 0
+                for service in services:
+                    service_id = service.get("id", "未知")
+                    remark = service.get("remark") or f"服务 {service_id}"
+                    status = service.get("status", "未知")
+                    mapped_address = service.get("mapped_address", "无映射")
+                    running = service.get("running", False)
+                    
+                    # 服务状态图标
+                    status_icon = "🟢" if running else "⚪"
+                    if running:
+                        running_count += 1
+                    
+                    # 添加服务信息
+                    if mapped_address and mapped_address != "无" and mapped_address != "无映射":
+                        message_content += f"{status_icon} {remark}: `{mapped_address}`\n"
+                    else:
+                        message_content += f"{status_icon} {remark}: 等待分配映射地址\n"
+                
+                message_content += f"\n共 {services_count} 个服务，{running_count} 个运行中"
+            else:
+                message_content += "暂无加载的服务\n"
+            
+            # 直接发送整合消息，不经过队列
+            _send_iyuu_message_direct(message_title, message_content)
+            print("已发送启动通知和服务信息")
         
         httpd.serve_forever()
     except OSError as e:
