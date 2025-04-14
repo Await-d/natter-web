@@ -1321,3 +1321,84 @@ input:checked + .slider:before {
     align-self: flex-end;
     padding: 4px 12px;
 }
+
+/* IYUU推送设置面板样式 */
+.iyuu-settings {
+    padding: 10px;
+}
+
+.iyuu-settings .form-group {
+    margin-bottom: 20px;
+}
+
+.tokens-list {
+    max-height: 200px;
+    overflow-y: auto;
+    margin-bottom: 15px;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    padding: 10px;
+    background-color: #f9f9f9;
+}
+
+.empty-tokens {
+    padding: 10px;
+    text-align: center;
+    color: #888;
+    font-style: italic;
+}
+
+.token-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px;
+    margin-bottom: 8px;
+    background-color: #fff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.token-text {
+    font-family: monospace;
+    word-break: break-all;
+    flex: 1;
+}
+
+.token-actions {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.token-actions input {
+    flex: 1;
+}
+
+.iyuu-actions {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 20px;
+}
+
+.settings-btn {
+    display: inline-flex;
+    align-items: center;
+    margin-right: 10px;
+    padding: 5px 10px;
+    background-color: #3498db;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.settings-btn:hover {
+    background-color: #2980b9;
+}
+
+.settings-btn i {
+    margin-right: 5px;
+}

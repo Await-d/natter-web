@@ -6,6 +6,7 @@ let newServicePanel = document.getElementById('new-service-panel');
 let serviceDetailsPanel = document.getElementById('service-details-panel');
 let helpPanel = document.getElementById('help-panel');
 let templatesPanel = document.getElementById('templates-panel');
+let iyuuPanel = document.getElementById('iyuu-panel'); // IYUU推送设置面板
 let saveTemplateDialog = document.getElementById('save-template-dialog');
 let loginPanel = document.createElement('div');
 loginPanel.className = 'login-panel';
@@ -66,6 +67,19 @@ let templateDescription = document.getElementById('template-description');
 let confirmSaveTemplate = document.getElementById('confirm-save-template');
 let cancelSaveTemplate = document.getElementById('cancel-save-template');
 
+// IYUU推送相关DOM元素
+let iyuuSettingsBtn = document.getElementById('iyuu-settings-btn'); // 设置按钮
+let iyuuEnabled = document.getElementById('iyuu-enabled'); // 启用IYUU推送开关
+let iyuuTokensList = document.getElementById('iyuu-tokens-list'); // 令牌列表容器
+let newIyuuToken = document.getElementById('new-iyuu-token'); // 新令牌输入框
+let addIyuuToken = document.getElementById('add-iyuu-token'); // 添加令牌按钮
+let iyuuScheduleEnabled = document.getElementById('iyuu-schedule-enabled'); // 定时推送开关
+let iyuuScheduleTime = document.getElementById('iyuu-schedule-time'); // 定时推送时间
+let iyuuScheduleMessage = document.getElementById('iyuu-schedule-message'); // 定时推送消息
+let testIyuuPush = document.getElementById('test-iyuu-push'); // 测试推送按钮
+let saveIyuuSettings = document.getElementById('save-iyuu-settings'); // 保存设置按钮
+let backFromIyuuBtn = document.getElementById('back-from-iyuu-btn'); // 返回按钮
+
 // 当前视图状态
 let currentServiceId = null;
 let refreshIntervalId = null;
@@ -96,7 +110,13 @@ const API = {
     authCheck: '/api/auth/check',
     authLogin: '/api/auth/login',
     setRemark: '/api/services/set-remark',
-    version: '/api/version'
+    version: '/api/version',
+    // IYUU推送相关API
+    iyuuConfig: '/api/iyuu/config',
+    iyuuUpdate: '/api/iyuu/update',
+    iyuuTest: '/api/iyuu/test',
+    iyuuAddToken: '/api/iyuu/add_token',
+    iyuuDeleteToken: '/api/iyuu/delete_token'
 };
 
 // 工具状态信息
@@ -228,7 +248,21 @@ document.addEventListener('DOMContentLoaded', function () {
     serviceDetailsPanel = document.getElementById('service-details-panel');
     helpPanel = document.getElementById('help-panel');
     templatesPanel = document.getElementById('templates-panel');
+    iyuuPanel = document.getElementById('iyuu-panel'); // 确保获取IYUU面板
     serviceOutput = document.getElementById('service-output');
+
+    // IYUU相关元素
+    iyuuSettingsBtn = document.getElementById('iyuu-settings-btn');
+    iyuuEnabled = document.getElementById('iyuu-enabled');
+    iyuuTokensList = document.getElementById('iyuu-tokens-list');
+    newIyuuToken = document.getElementById('new-iyuu-token');
+    addIyuuToken = document.getElementById('add-iyuu-token');
+    iyuuScheduleEnabled = document.getElementById('iyuu-schedule-enabled');
+    iyuuScheduleTime = document.getElementById('iyuu-schedule-time');
+    iyuuScheduleMessage = document.getElementById('iyuu-schedule-message');
+    testIyuuPush = document.getElementById('test-iyuu-push');
+    saveIyuuSettings = document.getElementById('save-iyuu-settings');
+    backFromIyuuBtn = document.getElementById('back-from-iyuu-btn');
 
     // 服务详情页面元素
     serviceId = document.getElementById('service-id');
@@ -554,6 +588,44 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // 获取版本号
     fetchVersion();
+
+    // IYUU相关
+    if (iyuuSettingsBtn) {
+        iyuuSettingsBtn.addEventListener('click', function () {
+            showIyuuPanel();
+        });
+    }
+
+    if (backFromIyuuBtn) {
+        backFromIyuuBtn.addEventListener('click', function () {
+            hideIyuuPanel();
+        });
+    }
+
+    if (saveIyuuSettings) {
+        saveIyuuSettings.addEventListener('click', function () {
+            saveIyuuConfig();
+        });
+    }
+
+    if (testIyuuPush) {
+        testIyuuPush.addEventListener('click', function () {
+            testIyuuPushMessage(); // 改名以避免与变量冲突
+        });
+    }
+
+    if (addIyuuToken) {
+        addIyuuToken.addEventListener('click', function () {
+            addIyuuTokenAction(); // 改名以避免与变量冲突
+        });
+    }
+
+    if (iyuuScheduleEnabled) {
+        iyuuScheduleEnabled.addEventListener('change', function () {
+            document.getElementById('iyuu-schedule-options').style.display =
+                this.checked ? 'block' : 'none';
+        });
+    }
 });
 
 // 加载服务列表
@@ -1876,6 +1948,7 @@ function hideAllPanels() {
     serviceDetailsPanel.style.display = 'none';
     helpPanel.style.display = 'none';
     templatesPanel.style.display = 'none';
+    iyuuPanel.style.display = 'none';
 }
 
 // 添加Authorization头到fetch请求
@@ -2041,5 +2114,251 @@ function fetchVersion() {
         .catch(error => {
             console.error('获取版本号失败:', error);
             document.getElementById('version').textContent = '未知';
+        });
+}
+
+// 显示IYUU设置面板
+function showIyuuPanel() {
+    previousView = {
+        servicesPanel: servicesPanel.style.display,
+        newServicePanel: newServicePanel.style.display,
+        serviceDetailsPanel: serviceDetailsPanel.style.display,
+        helpPanel: helpPanel.style.display,
+        templatesPanel: templatesPanel.style.display
+    };
+
+    // 隐藏其他面板
+    hideAllPanels();
+
+    // 显示IYUU面板
+    iyuuPanel.style.display = 'block';
+
+    // 加载IYUU配置
+    loadIyuuConfig();
+}
+
+// 隐藏IYUU设置面板
+function hideIyuuPanel() {
+    iyuuPanel.style.display = 'none';
+
+    if (previousView) {
+        servicesPanel.style.display = previousView.servicesPanel;
+        newServicePanel.style.display = previousView.newServicePanel;
+        serviceDetailsPanel.style.display = previousView.serviceDetailsPanel;
+        helpPanel.style.display = previousView.helpPanel;
+        templatesPanel.style.display = previousView.templatesPanel;
+    } else {
+        showServicesList();
+    }
+}
+
+// 加载IYUU配置
+function loadIyuuConfig() {
+    fetchWithAuth(API.iyuuConfig)
+        .then(response => response.json())
+        .then(data => {
+            if (data.config) {
+                const config = data.config;
+
+                // 设置启用状态
+                iyuuEnabled.checked = config.enabled;
+
+                // 加载令牌列表
+                renderIyuuTokens(config.tokens || []);
+
+                // 设置定时推送配置
+                const schedule = config.schedule || {};
+                iyuuScheduleEnabled.checked = schedule.enabled || false;
+                iyuuScheduleTime.value = schedule.time || "08:00";
+                iyuuScheduleMessage.value = schedule.message || "Natter服务状态日报";
+
+                // 根据定时推送状态显示或隐藏选项
+                document.getElementById('iyuu-schedule-options').style.display =
+                    schedule.enabled ? 'block' : 'none';
+            }
+        })
+        .catch(error => {
+            console.error('加载IYUU配置出错:', error);
+            showNotification('加载IYUU配置失败', 'error');
+        });
+}
+
+// 渲染IYUU令牌列表
+function renderIyuuTokens(tokens) {
+    const tokensList = document.getElementById('iyuu-tokens-list');
+    tokensList.innerHTML = '';
+
+    if (!tokens || tokens.length === 0) {
+        tokensList.innerHTML = '<div class="empty-tokens">未添加任何令牌</div>';
+        return;
+    }
+
+    tokens.forEach(token => {
+        const tokenItem = document.createElement('div');
+        tokenItem.className = 'token-item';
+
+        const tokenText = document.createElement('span');
+        tokenText.className = 'token-text';
+        tokenText.textContent = token;
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'btn-danger btn-small';
+        deleteBtn.textContent = '删除';
+        deleteBtn.addEventListener('click', function () {
+            deleteIyuuToken(token);
+        });
+
+        tokenItem.appendChild(tokenText);
+        tokenItem.appendChild(deleteBtn);
+        tokensList.appendChild(tokenItem);
+    });
+}
+
+// 保存IYUU配置
+function saveIyuuConfig() {
+    // 收集当前配置
+    const config = {
+        enabled: iyuuEnabled.checked,
+        schedule: {
+            enabled: iyuuScheduleEnabled.checked,
+            time: iyuuScheduleTime.value,
+            message: iyuuScheduleMessage.value
+        }
+    };
+
+    fetchWithAuth(API.iyuuUpdate, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(config)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification('IYUU配置已保存', 'success');
+                loadIyuuConfig(); // 重新加载确认配置已更新
+            } else {
+                showNotification('保存IYUU配置失败', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('保存IYUU配置出错:', error);
+            showNotification('保存IYUU配置时发生错误', 'error');
+        });
+}
+
+// 添加IYUU令牌
+function addIyuuToken() {
+    const token = newIyuuToken.value.trim();
+
+    if (!token) {
+        showNotification('请输入有效的IYUU令牌', 'warning');
+        return;
+    }
+
+    fetchWithAuth(API.iyuuAddToken, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                token: token
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification(data.message || '令牌已添加', 'success');
+                newIyuuToken.value = ''; // 清空输入框
+                loadIyuuConfig(); // 重新加载令牌列表
+            } else {
+                showNotification(data.message || '添加令牌失败', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('添加IYUU令牌出错:', error);
+            showNotification('添加令牌时发生错误', 'error');
+        });
+}
+
+// 删除IYUU令牌
+function deleteIyuuToken(token) {
+    if (!confirm('确定要删除此令牌吗？')) {
+        return;
+    }
+
+    fetchWithAuth(API.iyuuDeleteToken, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                token: token
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification(data.message || '令牌已删除', 'success');
+                loadIyuuConfig(); // 重新加载令牌列表
+            } else {
+                showNotification(data.message || '删除令牌失败', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('删除IYUU令牌出错:', error);
+            showNotification('删除令牌时发生错误', 'error');
+        });
+}
+
+// 测试IYUU推送（改名避免冲突）
+function testIyuuPushMessage() {
+    fetchWithAuth(API.iyuuTest)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification('测试消息已成功发送', 'success');
+            } else {
+                showNotification(`测试消息发送失败: ${data.errors ? data.errors.join(', ') : '未知错误'}`, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('测试IYUU推送出错:', error);
+            showNotification('测试推送时发生错误', 'error');
+        });
+}
+
+// 添加IYUU令牌（改名避免冲突）
+function addIyuuTokenAction() {
+    const token = newIyuuToken.value.trim();
+
+    if (!token) {
+        showNotification('请输入有效的IYUU令牌', 'warning');
+        return;
+    }
+
+    fetchWithAuth(API.iyuuAddToken, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                token: token
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification(data.message || '令牌已添加', 'success');
+                newIyuuToken.value = ''; // 清空输入框
+                loadIyuuConfig(); // 重新加载令牌列表
+            } else {
+                showNotification(data.message || '添加令牌失败', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('添加IYUU令牌出错:', error);
+            showNotification('添加令牌时发生错误', 'error');
         });
 }

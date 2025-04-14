@@ -14,6 +14,8 @@
             <h1>Natter 管理界面</h1>
             <p>管理您的Natter服务</p>
             <div class="header-actions" style="display: flex; justify-content: flex-end; margin-top: 10px;">
+                <button id="iyuu-settings-btn" class="settings-btn" title="IYUU推送设置"><i class="fas fa-bell"></i>
+                    推送设置</button>
                 <button id="logout-btn" class="logout-btn" style="display: none;">退出登录</button>
             </div>
         </header>
@@ -353,6 +355,57 @@
                 </div>
                 <div class="templates-actions">
                     <button id="back-from-templates-btn" class="btn-secondary">返回</button>
+                </div>
+            </section>
+
+            <section class="card" id="iyuu-panel" style="display:none;">
+                <h2>IYUU推送设置</h2>
+                <div class="iyuu-settings">
+                    <div class="form-group">
+                        <label for="iyuu-enabled">
+                            <input type="checkbox" id="iyuu-enabled">
+                            启用IYUU推送
+                        </label>
+                        <small>开启后服务启动、停止、地址变动等事件将通过IYUU发送通知</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>IYUU令牌:</label>
+                        <div id="iyuu-tokens-list" class="tokens-list">
+                            <div class="loading">加载中...</div>
+                        </div>
+                        <div class="token-actions">
+                            <input type="text" id="new-iyuu-token" placeholder="输入IYUU令牌">
+                            <button id="add-iyuu-token" class="btn-primary">添加令牌</button>
+                        </div>
+                        <small>支持多个令牌，获取令牌请访问 <a href="https://iyuu.cn" target="_blank">https://iyuu.cn</a></small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="iyuu-schedule-enabled">
+                            <input type="checkbox" id="iyuu-schedule-enabled">
+                            启用每日定时推送
+                        </label>
+                        <small>每天定时发送服务状态摘要</small>
+                    </div>
+
+                    <div class="form-group" id="iyuu-schedule-options">
+                        <label for="iyuu-schedule-time">推送时间:</label>
+                        <input type="time" id="iyuu-schedule-time" value="08:00">
+                        <small>每天的这个时间将发送服务状态摘要</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="iyuu-schedule-message">推送标题:</label>
+                        <input type="text" id="iyuu-schedule-message" placeholder="每日服务状态摘要标题">
+                        <small>定时推送的消息标题</small>
+                    </div>
+
+                    <div class="iyuu-actions">
+                        <button id="test-iyuu-push" class="btn-secondary">测试推送</button>
+                        <button id="save-iyuu-settings" class="btn-primary">保存设置</button>
+                        <button id="back-from-iyuu-btn" class="btn-secondary">返回</button>
+                    </div>
                 </div>
             </section>
         </main>

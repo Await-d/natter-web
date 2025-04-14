@@ -10,6 +10,7 @@ import subprocess
 import sys
 import threading
 import time
+import requests  # 添加requests模块用于HTTP请求
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
@@ -25,6 +26,7 @@ NATTER_PATH = os.environ.get('NATTER_PATH') or os.path.join(os.path.dirname(os.p
 DATA_DIR = os.environ.get('DATA_DIR') or os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 TEMPLATES_FILE = os.path.join(DATA_DIR, "templates.json")
 SERVICES_DB_FILE = os.path.join(DATA_DIR, "services.json")
+IYUU_CONFIG_FILE = os.path.join(DATA_DIR, "iyuu_config.json")  # IYUU配置文件
 
 # 确保数据目录存在
 os.makedirs(DATA_DIR, exist_ok=True)
@@ -32,6 +34,17 @@ os.makedirs(DATA_DIR, exist_ok=True)
 # 存储运行中的Natter服务进程
 running_services = {}
 service_lock = threading.RLock()
+
+# IYUU配置
+iyuu_config = {
+    "tokens": [],  # IYUU令牌列表
+    "enabled": True,  # 是否启用IYUU推送
+    "schedule": {
+        "enabled": False,  # 是否启用定时推送
+        "time": "08:00",   # 定时推送时间
+        "message": "Natter服务状态日报"  # 定时推送消息
+    }
+}
 
 # NAT类型和端口状态的正则表达式
 NAT_TYPE_PATTERN = re.compile(r"NAT type: ([^\n]+)")
@@ -58,6 +71,7 @@ class NatterService:
         self.local_port = None   # 添加本地端口属性
         self.remote_port = None  # 添加远程端口属性
         self.remark = remark     # 添加备注属性
+        self.last_mapped_address = None  # 记录上一次的映射地址，用于检测变更
         
         # 尝试从命令参数中解析端口信息
         self._parse_ports_from_args()
@@ -94,6 +108,16 @@ class NatterService:
             self.output_lines.append("💡 请使用socket或iptables转发方法")
             self.output_lines.append("➡️ 请停止此服务，然后使用其他转发方法重新创建服务")
             self.status = "已停止"
+            
+            # 发送错误推送
+            if iyuu_config.get("enabled", True):
+                service_name = self.remark or f"服务 {self.service_id}"
+                error_msg = "nftables在Docker容器中不可用，请使用socket或iptables转发方法"
+                send_iyuu_message(
+                    f"[错误] {service_name}启动失败", 
+                    f"服务启动失败\n\n错误原因: {error_msg}\n\n请停止此服务，然后使用其他转发方法重新创建服务"
+                )
+            
             return False
         
         cmd = [sys.executable, NATTER_PATH] + self.cmd_args
@@ -118,6 +142,16 @@ class NatterService:
         t = threading.Thread(target=self._capture_output)
         t.daemon = True
         t.start()
+        
+        # 发送启动推送
+        if iyuu_config.get("enabled", True):
+            service_name = self.remark or f"服务 {self.service_id}"
+            local_port = self.local_port or "未知"
+            send_iyuu_message(
+                f"[启动] {service_name}已启动", 
+                f"服务已成功启动\n\n服务ID: {self.service_id}\n本地端口: {local_port}\n启动时间: {time.strftime('%Y-%m-%d %H:%M:%S')}"
+            )
+        
         return True
     
     def _capture_output(self):
@@ -134,15 +168,42 @@ class NatterService:
             if '<--Natter-->' in line:
                 parts = line.split('<--Natter-->')
                 if len(parts) == 2:
-                    self.mapped_address = parts[1].strip()
-                    # 解析远程端口
-                    try:
-                        if self.mapped_address and ':' in self.mapped_address:
-                            addr_parts = self.mapped_address.split(':')
-                            if len(addr_parts) >= 2:
-                                self.remote_port = int(addr_parts[-1])
-                    except Exception as e:
-                        print(f"解析远程端口出错: {e}")
+                    new_mapped_address = parts[1].strip()
+                    
+                    # 检查映射地址是否变更
+                    if self.mapped_address != new_mapped_address:
+                        # 记录旧地址用于推送消息
+                        old_address = self.mapped_address or "无"
+                        
+                        # 更新地址
+                        self.mapped_address = new_mapped_address
+                        
+                        # 解析远程端口
+                        try:
+                            if self.mapped_address and ':' in self.mapped_address:
+                                addr_parts = self.mapped_address.split(':')
+                                if len(addr_parts) >= 2:
+                                    self.remote_port = int(addr_parts[-1])
+                        except Exception as e:
+                            print(f"解析远程端口出错: {e}")
+                        
+                        # 发送映射地址变更推送
+                        if iyuu_config.get("enabled", True):
+                            service_name = self.remark or f"服务 {self.service_id}"
+                            local_port = self.local_port or "未知"
+                            
+                            # 仅在非首次获取地址时发送变更消息
+                            if old_address != "无":
+                                send_iyuu_message(
+                                    f"[地址变更] {service_name}映射地址已变更", 
+                                    f"服务映射地址已变更\n\n服务ID: {self.service_id}\n服务备注: {self.remark or '无'}\n本地端口: {local_port}\n\n旧地址: {old_address}\n新地址: {self.mapped_address}\n\n变更时间: {time.strftime('%Y-%m-%d %H:%M:%S')}"
+                                )
+                            else:
+                                # 首次获取地址时发送通知
+                                send_iyuu_message(
+                                    f"[地址分配] {service_name}获取到映射地址", 
+                                    f"服务获取到映射地址\n\n服务ID: {self.service_id}\n服务备注: {self.remark or '无'}\n本地端口: {local_port}\n映射地址: {self.mapped_address}\n\n获取时间: {time.strftime('%Y-%m-%d %H:%M:%S')}"
+                                )
             
             # 检测nftables错误
             if "nftables" in line and "not available" in line:
@@ -150,11 +211,27 @@ class NatterService:
                 self.output_lines.append("⚠️ 检测到nftables不可用错误！Docker容器可能缺少所需权限或内核支持。")
                 self.output_lines.append("💡 建议：尝试使用其他转发方法，如'socket'（内置）或'iptables'。")
                 self.output_lines.append("📋 步骤：停止此服务，重新创建服务并在'转发方法'中选择'socket'或'iptables'。")
+                
+                # 发送错误推送
+                if iyuu_config.get("enabled", True):
+                    service_name = self.remark or f"服务 {self.service_id}"
+                    send_iyuu_message(
+                        f"[错误] {service_name}出现nftables错误", 
+                        f"服务出现错误\n\n错误类型: nftables不可用\n服务ID: {self.service_id}\n\n建议：尝试使用其他转发方法，如'socket'（内置）或'iptables'。\n步骤：停止此服务，重新创建服务并在'转发方法'中选择'socket'或'iptables'。"
+                    )
             
             # 检测pcap初始化错误
             if "pcap initialization failed" in line:
                 self.output_lines.append("⚠️ 检测到pcap初始化错误！这通常与nftables功能有关。")
                 self.output_lines.append("💡 建议：尝试使用其他转发方法，如'socket'（内置）或'iptables'。")
+                
+                # 发送错误推送
+                if iyuu_config.get("enabled", True):
+                    service_name = self.remark or f"服务 {self.service_id}"
+                    send_iyuu_message(
+                        f"[错误] {service_name}出现pcap初始化错误", 
+                        f"服务出现错误\n\n错误类型: pcap初始化失败\n服务ID: {self.service_id}\n\n建议：尝试使用其他转发方法，如'socket'（内置）或'iptables'。"
+                    )
             
             # 提取NAT类型
             nat_match = NAT_TYPE_PATTERN.search(line)
@@ -173,6 +250,18 @@ class NatterService:
         
         # 进程结束后更新状态
         self.status = "已停止"
+        
+        # 发送服务停止推送
+        if iyuu_config.get("enabled", True):
+            service_name = self.remark or f"服务 {self.service_id}"
+            local_port = self.local_port or "未知"
+            mapped_address = self.mapped_address or "无"
+            
+            # 发送服务停止通知
+            send_iyuu_message(
+                f"[停止] {service_name}已停止", 
+                f"服务已停止运行\n\n服务ID: {self.service_id}\n服务备注: {self.remark or '无'}\n本地端口: {local_port}\n映射地址: {mapped_address}\n\n停止时间: {time.strftime('%Y-%m-%d %H:%M:%S')}"
+            )
         
         # 如果启用了自动重启，且不是由于nftables错误导致的退出，则重新启动服务
         if self.auto_restart and not nftables_error_detected:
@@ -225,6 +314,18 @@ class NatterService:
                     self.process.kill()
             
             self.status = "已停止"
+            
+            # 发送手动停止推送
+            if iyuu_config.get("enabled", True):
+                service_name = self.remark or f"服务 {self.service_id}"
+                local_port = self.local_port or "未知"
+                mapped_address = self.mapped_address or "无"
+                
+                send_iyuu_message(
+                    f"[手动停止] {service_name}已手动停止", 
+                    f"服务已被手动停止\n\n服务ID: {self.service_id}\n服务备注: {self.remark or '无'}\n本地端口: {local_port}\n映射地址: {mapped_address}\n\n停止时间: {time.strftime('%Y-%m-%d %H:%M:%S')}"
+                )
+            
             return True
         return False
     
@@ -627,6 +728,37 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                 # 检查密码是否已设置
                 self._set_headers()
                 self.wfile.write(json.dumps({"auth_required": PASSWORD is not None}).encode())
+            elif path == "/api/iyuu/config":
+                # 获取IYUU配置
+                self._set_headers()
+                # 去除令牌中间部分，保留安全性
+                safe_config = dict(iyuu_config)
+                tokens = safe_config.get("tokens", [])
+                safe_tokens = []
+                
+                for token in tokens:
+                    if token and len(token) > 10:
+                        # 只显示令牌的前5位和后5位
+                        masked_token = token[:5] + "*****" + token[-5:]
+                        safe_tokens.append(masked_token)
+                    else:
+                        safe_tokens.append(token)
+                
+                safe_config["tokens"] = safe_tokens
+                safe_config["token_count"] = len(tokens)
+                
+                self.wfile.write(json.dumps({"config": safe_config}).encode())
+            elif path == "/api/iyuu/test":
+                # 测试IYUU推送
+                success, errors = send_iyuu_message(
+                    "Natter测试消息", 
+                    f"这是一条测试消息，发送时间: {time.strftime('%Y-%m-%d %H:%M:%S')}"
+                )
+                self._set_headers()
+                self.wfile.write(json.dumps({
+                    "success": success,
+                    "errors": errors
+                }).encode())
             else:
                 self._error(404, "Not found")
         except Exception as e:
@@ -778,6 +910,130 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                         self._error(404, "Service not found")
             else:
                 self._error(400, "Missing id or remark parameter")
+        elif path == "/api/iyuu/update":
+            # 更新IYUU配置
+            global iyuu_config
+            try:
+                if "enabled" in data:
+                    iyuu_config["enabled"] = bool(data["enabled"])
+                
+                if "tokens" in data and isinstance(data["tokens"], list):
+                    # 检查是否有令牌变更
+                    new_tokens = data["tokens"]
+                    # 检查令牌是否被加了星号掩码
+                    clean_tokens = []
+                    for token in new_tokens:
+                        if token and "*" in token and len(token) > 10:
+                            # 这是一个被掩码的令牌，保留原令牌
+                            matching_tokens = [t for t in iyuu_config.get("tokens", []) 
+                                            if t.startswith(token[:5]) and t.endswith(token[-5:])]
+                            if matching_tokens:
+                                clean_tokens.append(matching_tokens[0])
+                        else:
+                            # 这是一个新令牌
+                            clean_tokens.append(token)
+                    
+                    iyuu_config["tokens"] = clean_tokens
+                
+                if "schedule" in data and isinstance(data["schedule"], dict):
+                    schedule = data["schedule"]
+                    if "enabled" in schedule:
+                        iyuu_config["schedule"]["enabled"] = bool(schedule["enabled"])
+                    if "time" in schedule:
+                        iyuu_config["schedule"]["time"] = schedule["time"]
+                    if "message" in schedule:
+                        iyuu_config["schedule"]["message"] = schedule["message"]
+                
+                # 保存配置到文件
+                save_result = save_iyuu_config()
+                
+                # 如果定时推送设置变更，重新设置定时任务
+                if "schedule" in data:
+                    schedule_daily_notification()
+                
+                self._set_headers()
+                self.wfile.write(json.dumps({
+                    "success": save_result,
+                    "config": iyuu_config
+                }).encode())
+            except Exception as e:
+                self._error(500, f"更新IYUU配置失败: {e}")
+        elif path == "/api/iyuu/add_token":
+            # 添加新的IYUU令牌
+            if "token" in data and isinstance(data["token"], str) and data["token"].strip():
+                token = data["token"].strip()
+                
+                # 验证令牌是否有效
+                test_url = f"https://iyuu.cn/{token}.send"
+                try:
+                    test_payload = {
+                        "text": "Natter令牌验证",
+                        "desp": "这是一条验证IYUU令牌有效性的测试消息"
+                    }
+                    headers = {
+                        "Content-Type": "application/json; charset=UTF-8"
+                    }
+                    
+                    response = requests.post(test_url, json=test_payload, headers=headers, timeout=10)
+                    
+                    if response.status_code == 200:
+                        result = response.json()
+                        if result.get("errcode") == 0:
+                            # 令牌有效，添加到配置
+                            if token not in iyuu_config.get("tokens", []):
+                                iyuu_config.setdefault("tokens", []).append(token)
+                                save_iyuu_config()
+                            
+                            self._set_headers()
+                            self.wfile.write(json.dumps({
+                                "success": True,
+                                "message": "令牌已添加并验证成功"
+                            }).encode())
+                        else:
+                            self._error(400, f"令牌验证失败: {result.get('errmsg', '未知错误')}")
+                    else:
+                        self._error(400, f"令牌验证失败: HTTP错误 {response.status_code}")
+                except Exception as e:
+                    self._error(500, f"令牌验证过程出错: {e}")
+            else:
+                self._error(400, "缺少有效的token参数")
+        elif path == "/api/iyuu/delete_token":
+            # 删除IYUU令牌
+            if "token" in data and isinstance(data["token"], str):
+                token = data["token"]
+                
+                # 如果是加星号的格式，查找匹配的令牌
+                if "*" in token and len(token) > 10:
+                    original_tokens = iyuu_config.get("tokens", [])
+                    matched_tokens = [t for t in original_tokens 
+                                     if t.startswith(token[:5]) and t.endswith(token[-5:])]
+                    
+                    if matched_tokens:
+                        iyuu_config["tokens"] = [t for t in original_tokens if t not in matched_tokens]
+                        save_iyuu_config()
+                        
+                        self._set_headers()
+                        self.wfile.write(json.dumps({
+                            "success": True,
+                            "message": "令牌已删除"
+                        }).encode())
+                    else:
+                        self._error(404, "未找到匹配的令牌")
+                else:
+                    # 直接匹配完整令牌
+                    if token in iyuu_config.get("tokens", []):
+                        iyuu_config["tokens"].remove(token)
+                        save_iyuu_config()
+                        
+                        self._set_headers()
+                        self.wfile.write(json.dumps({
+                            "success": True,
+                            "message": "令牌已删除"
+                        }).encode())
+                    else:
+                        self._error(404, "未找到指定令牌")
+            else:
+                self._error(400, "缺少token参数")
         else:
             self._error(404, "Not found")
     
@@ -872,6 +1128,15 @@ def run_server(port=8080, password=None):
             except Exception as e:
                 print(f"工具安装过程出错: {e}")
         
+        # 加载IYUU配置
+        print("加载IYUU推送配置...")
+        load_iyuu_config()
+        
+        # 如果启用了定时推送，启动定时任务
+        if iyuu_config.get("schedule", {}).get("enabled", False):
+            print(f"启用IYUU定时推送，每天 {iyuu_config.get('schedule', {}).get('time', '08:00')} 发送服务状态摘要")
+            schedule_daily_notification()
+        
         server_address = ('0.0.0.0', port)  # 修改为明确绑定0.0.0.0，确保监听所有网络接口
         httpd = HTTPServer(server_address, NatterHttpHandler)
         print(f"Natter管理界面已启动: http://0.0.0.0:{port}")
@@ -885,6 +1150,20 @@ def run_server(port=8080, password=None):
             
         # 加载已保存的服务配置
         NatterManager.load_services()
+        
+        # 发送服务器启动通知
+        if iyuu_config.get("enabled", True) and iyuu_config.get("tokens"):
+            services_count = len(NatterManager.list_services())
+            send_iyuu_message(
+                "Natter管理服务已启动",
+                f"Natter管理服务已成功启动\n\n"
+                f"启动时间: {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
+                f"服务地址: http://0.0.0.0:{port}\n"
+                f"加载服务数: {services_count}\n"
+                f"IYUU推送: {'已启用' if iyuu_config.get('enabled', True) else '已禁用'}\n"
+                f"定时推送: {'已启用' if iyuu_config.get('schedule', {}).get('enabled', False) else '已禁用'}"
+            )
+            print("已发送IYUU启动通知")
         
         httpd.serve_forever()
     except OSError as e:
@@ -902,7 +1181,122 @@ def run_server(port=8080, password=None):
 def cleanup():
     """清理资源，停止所有运行中的服务"""
     print("正在停止所有Natter服务...")
-    NatterManager.stop_all_services()
+    stopped_count = NatterManager.stop_all_services()
+    
+    # 发送服务器关闭通知
+    if iyuu_config.get("enabled", True) and iyuu_config.get("tokens"):
+        send_iyuu_message(
+            "Natter管理服务已关闭",
+            f"Natter管理服务已关闭\n\n"
+            f"关闭时间: {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
+            f"已停止服务数: {stopped_count}"
+        )
+        print("已发送IYUU关闭通知")
+    
+    print(f"已停止 {stopped_count} 个服务")
+
+# 添加IYUU消息推送相关函数
+def load_iyuu_config():
+    """加载IYUU配置"""
+    global iyuu_config
+    try:
+        if os.path.exists(IYUU_CONFIG_FILE):
+            with open(IYUU_CONFIG_FILE, 'r', encoding='utf-8') as f:
+                loaded_config = json.load(f)
+                iyuu_config.update(loaded_config)
+    except Exception as e:
+        print(f"加载IYUU配置失败: {e}")
+        # 确保写入默认配置
+        save_iyuu_config()
+
+def save_iyuu_config():
+    """保存IYUU配置"""
+    try:
+        with open(IYUU_CONFIG_FILE, 'w', encoding='utf-8') as f:
+            json.dump(iyuu_config, f, ensure_ascii=False, indent=4)
+        return True
+    except Exception as e:
+        print(f"保存IYUU配置失败: {e}")
+        return False
+
+def send_iyuu_message(text, desp):
+    """发送IYUU消息推送"""
+    if not iyuu_config.get("enabled", True) or not iyuu_config.get("tokens"):
+        return False
+    
+    success = False
+    errors = []
+    
+    for token in iyuu_config.get("tokens", []):
+        if not token.strip():
+            continue
+            
+        try:
+            url = f"https://iyuu.cn/{token}.send"
+            payload = {
+                "text": text,
+                "desp": desp
+            }
+            headers = {
+                "Content-Type": "application/json; charset=UTF-8"
+            }
+            
+            response = requests.post(url, json=payload, headers=headers, timeout=10)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if result.get("errcode") == 0:
+                    success = True
+                else:
+                    errors.append(f"令牌 {token[:5]}...: {result.get('errmsg', '未知错误')}")
+            else:
+                errors.append(f"令牌 {token[:5]}...: HTTP错误 {response.status_code}")
+        except Exception as e:
+            errors.append(f"令牌 {token[:5]}...: {str(e)}")
+    
+    if success:
+        return True, errors
+    else:
+        return False, errors
+
+def schedule_daily_notification():
+    """设置每日定时推送任务"""
+    if not iyuu_config.get("schedule", {}).get("enabled", False):
+        return
+    
+    def check_and_send_notification():
+        while True:
+            now = time.localtime()
+            current_time = f"{now.tm_hour:02d}:{now.tm_min:02d}"
+            schedule_time = iyuu_config.get("schedule", {}).get("time", "08:00")
+            
+            if current_time == schedule_time:
+                # 获取所有服务状态用于日报
+                services_info = NatterManager.list_services()
+                running_count = sum(1 for s in services_info if s.get("status") == "运行中")
+                stopped_count = sum(1 for s in services_info if s.get("status") == "已停止")
+                
+                message = iyuu_config.get("schedule", {}).get("message", "Natter服务状态日报")
+                detail = f"【Natter服务状态日报】\n\n"
+                detail += f"- 总服务数: {len(services_info)}\n"
+                detail += f"- 运行中: {running_count}\n"
+                detail += f"- 已停止: {stopped_count}\n\n"
+                
+                for service in services_info:
+                    service_id = service.get("id", "未知")
+                    remark = service.get("remark") or f"服务 {service_id}"
+                    status = service.get("status", "未知")
+                    mapped_address = service.get("mapped_address", "无映射")
+                    
+                    detail += f"[{status}] {remark} - {mapped_address}\n"
+                
+                send_iyuu_message(message, detail)
+            
+            # 休眠60秒再检查
+            time.sleep(60)
+    
+    notification_thread = threading.Thread(target=check_and_send_notification, daemon=True)
+    notification_thread.start()
 
 if __name__ == "__main__":
     # 注册清理函数
