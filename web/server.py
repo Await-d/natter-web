@@ -356,12 +356,19 @@ def schedule_daily_notification():
         return
     
     def check_and_send_notification():
+        # 使用集合记录已处理的时间点，避免重复推送
+        processed_times = set()
+        
         while True:
             now = time.localtime()
             current_time = f"{now.tm_hour:02d}:{now.tm_min:02d}"
             schedule_times = iyuu_config.get("schedule", {}).get("times", ["08:00"])
             
-            if current_time in schedule_times:
+            # 检查当前时间是否在推送时间列表中，且尚未处理过
+            if current_time in schedule_times and current_time not in processed_times:
+                # 将当前时间添加到已处理集合中
+                processed_times.add(current_time)
+                
                 # 获取所有服务状态用于日报
                 services_info = NatterManager.list_services()
                 running_count = sum(1 for s in services_info if s.get("status") == "运行中")
@@ -390,6 +397,11 @@ def schedule_daily_notification():
                 
                 # 日志记录推送时间
                 print(f"已在 {current_time} 将定时推送加入消息队列")
+            
+            # 每天 00:00 重置已处理时间集合，便于第二天重新推送
+            if current_time == "00:00" and "00:00" not in processed_times:
+                processed_times.clear()
+                processed_times.add("00:00")  # 添加00:00防止当天重复处理
             
             # 休眠5秒再检查
             time.sleep(5)
