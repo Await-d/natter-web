@@ -18,7 +18,7 @@ from collections import deque  # 添加队列用于消息批量发送
 import psutil
 
 # 版本号定义
-VERSION = "1.0.4"
+VERSION = "1.0.5"
 
 # 确保能够访问到natter.py，优先使用环境变量定义的路径
 NATTER_PATH = os.environ.get('NATTER_PATH') or os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "natter", "natter.py")

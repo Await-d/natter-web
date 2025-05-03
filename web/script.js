@@ -19,6 +19,7 @@ let basicModeOptions = document.getElementById('basic-mode-options');
 let advancedModeOptions = document.getElementById('advanced-mode-options');
 let commandArgs = document.getElementById('command-args');
 let targetPort = document.getElementById('target-port');
+let targetIp = document.getElementById('target-ip'); // 新增: 获取目标IP输入框
 let udpMode = document.getElementById('udp-mode');
 let forwardMethod = document.getElementById('forward-method');
 let bindInterface = document.getElementById('bind-interface');
@@ -768,6 +769,13 @@ function buildArgsFromBasicMode() {
         return null;
     }
 
+    // 新增: 获取目标IP地址
+    let targetIpValue = targetIp.value.trim();
+    if (targetIpValue) {
+        args.push('-t', targetIpValue); // 假设 -t 是目标地址参数
+    }
+    // 注意: 这里没有添加默认的 127.0.0.1，假设 natter.py 在没有 -t 参数时默认就是本地
+
     args.push('-p', targetPort.value);
 
     // 协议选择
@@ -861,6 +869,8 @@ function startNewService() {
 
                 // 重置表单
                 newServiceForm.reset();
+                // 手动清空 targetIp，因为 reset 可能对后面添加的字段无效
+                if (targetIp) targetIp.value = '';
             } else {
                 alert('服务启动失败：' + (data.error || '未知错误'));
             }
