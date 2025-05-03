@@ -1842,9 +1842,30 @@ function createLoginForm() {
 }
 
 // 检查是否需要认证
+// 检查是否需要认证
 function checkAuthRequired() {
     return fetchWithAuth(API.authCheck)
-        .then(response => response.json())
+        .then(response => {
+            // 检查响应状态
+            if (!response.ok) {
+                // 如果响应不成功（例如500错误），视为配置加载失败
+                console.error('配置加载失败，显示登录界面');
+                createLoginForm();
+                hideAllPanels();
+                loginPanel.style.display = 'block';
+
+                // 在登录面板上显示错误信息
+                const loginErrorDiv = document.querySelector('#login-error');
+                if (loginErrorDiv) {
+                    loginErrorDiv.textContent = '配置加载失败，请联系管理员或检查服务器状态';
+                    loginErrorDiv.style.display = 'block';
+                }
+
+                // 抛出错误终止后续处理
+                throw new Error('配置加载失败');
+            }
+            return response.json();
+        })
         .then(data => {
             const authRequired = data.auth_required;
             if (authRequired) {
@@ -1887,7 +1908,19 @@ function checkAuthRequired() {
         })
         .catch(error => {
             console.error('检查认证状态时出错:', error);
-            return false;
+            // 出错时显示登录界面
+            createLoginForm();
+            hideAllPanels();
+            loginPanel.style.display = 'block';
+
+            // 在登录面板上显示错误信息
+            const loginErrorDiv = document.querySelector('#login-error');
+            if (loginErrorDiv) {
+                loginErrorDiv.textContent = '连接服务器失败，请稍后再试';
+                loginErrorDiv.style.display = 'block';
+            }
+
+            return true; // 默认需要认证
         });
 }
 
