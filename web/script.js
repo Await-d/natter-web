@@ -1194,10 +1194,10 @@ function showServiceDetailsPanel(service) {
     document.querySelector('#service-details-panel h2').textContent =
         `服务详情: ${formatAddressShort(service.mapped_address || '未映射')}`;
 
-    // 如果服务已停止，禁用某些按钮
+    // 如果服务已停止，禁用停止按钮，但启用重启按钮
     if (service.status === '已停止' || !service.running) {
         stopServiceBtn.disabled = true;
-        restartServiceBtn.disabled = true;
+        restartServiceBtn.disabled = false; // 允许重启已停止的服务
     } else {
         stopServiceBtn.disabled = false;
         restartServiceBtn.disabled = false;
