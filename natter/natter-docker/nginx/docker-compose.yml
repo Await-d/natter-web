@@ -1,0 +1,21 @@
+version: "3"
+services:
+  natter-nginx:
+    command: -p 18888
+    environment:
+      - TZ=Asia/Shanghai
+    network_mode: host
+    image: nattertool/natter
+    restart: always
+    depends_on:
+      - nginx
+
+  nginx:
+    volumes:
+      - ./html:/usr/share/nginx/html
+    ports:
+      - "18888:80"
+    environment:
+      - TZ=Asia/Shanghai
+    image: nginx
+    restart: always

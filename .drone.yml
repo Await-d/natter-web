@@ -1,0 +1,36 @@
+kind: pipeline
+type: docker
+name: natter-web
+
+steps:
+  - name: build-and-deploy
+    image: docker:dind
+    volumes:
+      - name: docker-socket
+        path: /var/run/docker.sock
+    commands:
+      - docker build -t natter-web:latest ./web
+      - docker stop natter-web-container || true
+      - docker rm natter-web-container || true
+      - >
+        docker run -d --name natter-web-container 
+        --network host
+        -v /volume1/docker/1panel/apps/www/natter-web/data:/app/data
+        --cap-add NET_ADMIN
+        --restart always
+        -e TZ=Asia/Shanghai
+        -e PYTHONUNBUFFERED=1
+        -e NATTER_PATH=/app/natter/natter.py
+        -e DATA_DIR=/app/data
+        -e WEB_PORT=7111
+        -e WEB_PASSWORD=zd2580
+        natter-web:latest
+
+volumes:
+  - name: docker-socket
+    host:
+      path: /var/run/docker.sock
+
+trigger:
+  branch:
+    - master

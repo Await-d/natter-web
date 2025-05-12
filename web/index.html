@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Natter 管理界面</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <!-- Await科技感LOGO展示区 -->
+    <div style="width:100%;text-align:center;margin:32px 0 8px 0;">
+      <img src="await-logo.svg" alt="Await Logo" style="height:56px;max-width:90vw;filter:drop-shadow(0 2px 8px #00e6c355);">
+    </div>
+    <div class="container">
+        <header>
+            <h1>Natter 管理界面</h1>
+            <p>管理您的Natter服务</p>
+            <div class="header-actions" style="display: flex; justify-content: flex-end; margin-top: 10px;">
+                <button id="iyuu-settings-btn" class="settings-btn" title="IYUU推送设置" style="display: none;"><i class="fas fa-bell"></i>
+                    推送设置</button>
+                <button id="logout-btn" class="logout-btn" style="display: none;">退出登录</button>
+            </div>
+        </header>
+
+        <main>
+            <section class="card" id="services-panel">
+                <h2>运行中的服务</h2>
+                <div class="services-list" id="services-list">
+                    <div class="loading">加载中...</div>
+                </div>
+                <div class="bulk-actions">
+                    <button id="refresh-all-btn" class="btn-secondary">刷新所有</button>
+                    <button id="stop-all-btn" class="btn-danger">停止所有服务</button>
+                </div>
+            </section>
+
+            <section class="card" id="new-service-panel">
+                <h2>新建服务</h2>
+                <form id="new-service-form">
+                    <div class="form-group">
+                        <label for="service-mode">服务模式:</label>
+                        <select id="service-mode">
+                            <option value="basic">基础模式</option>
+                            <option value="advanced">高级模式</option>
+                        </select>
+                    </div>
+
+                    <div id="basic-mode-options">
+                        <div class="form-tabs">
+                            <div class="tab active" data-tab="essential">基本设置</div>
+                            <div class="tab" data-tab="network">网络设置</div>
+                            <div class="tab" data-tab="advanced">高级设置</div>
+                        </div>
+
+                        <div class="tab-content" id="essential-tab">
+                            <div class="form-group">
+                                <label for="target-port">目标端口:</label>
+                                <input type="number" id="target-port" placeholder="例如: 80">
+                                <small>要转发的本地服务端口</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="target-ip">目标IP地址:</label>
+                                <input type="text" id="target-ip" placeholder="可选, 默认为 127.0.0.1">
+                                <small>要转发的本地服务IP地址</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="service-remark">服务备注:</label>
+                                <input type="text" id="service-remark" placeholder="可选，为服务添加备注">
+                                <small>帮助您区分不同的服务</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="udp-mode">
+                                    <input type="checkbox" id="udp-mode">
+                                    使用UDP模式
+                                </label>
+                                <small>选择协议类型，默认为TCP</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="forward-method">转发方法:</label>
+                                <span class="forward-method-info">
+                                    <span class="info-icon">?</span>
+                                    <div class="info-tooltip">
+                                        <h4>转发方法说明</h4>
+                                        <ul>
+                                            <li>
+                                                <span class="method-name">socket (内置)</span>
+                                                <div>纯Python实现，无需额外依赖</div>
+                                                <div class="best-for">适用于: 通用场景，最简单的设置</div>
+                                            </li>
+                                            <li>
+                                                <span class="method-name">iptables</span>
+                                                <div>使用Linux的iptables进行转发，需要root权限</div>
+                                                <div class="best-for">适用于: Linux系统，需要高性能转发</div>
+                                            </li>
+                                            <li>
+                                                <span class="method-name">nftables</span>
+                                                <div>使用Linux的nftables进行转发，需要root权限</div>
+                                                <div class="best-for">适用于: 新版Linux系统，功能更强大</div>
+                                                <div class="compatibility-note"
+                                                    style="color:#ff6b6b;font-size:0.9em;margin-top:4px;">注意:
+                                                    在Docker容器中使用可能不稳定</div>
+                                            </li>
+                                            <li>
+                                                <span class="method-name">socat</span>
+                                                <div>使用socat工具转发，需要安装socat</div>
+                                                <div class="best-for">适用于: 需要高级转发功能但无root权限</div>
+                                            </li>
+                                            <li>
+                                                <span class="method-name">gost</span>
+                                                <div>使用gost工具转发，需要安装gost</div>
+                                                <div class="best-for">适用于: 需要加密转发、代理等高级功能</div>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </span>
+                                <select id="forward-method">
+                                    <option value="socket">socket (内置)</option>
+                                    <option value="iptables">iptables (需要root权限)</option>
+                                    <option value="nftables" disabled title="Docker环境中不支持">nftables (Docker中不可用)
+                                    </option>
+                                    <option value="socat">socat (需要安装)</option>
+                                    <option value="gost">gost (需要安装)</option>
+                                </select>
+                                <small>不同转发方法适用于不同场景，鼠标悬停在问号上查看详情</small>
+                                <div class="tool-install-buttons">
+                                    <button type="button" id="install-socat-btn"
+                                        class="btn-small btn-secondary">安装socat</button>
+                                    <button type="button" id="install-gost-btn"
+                                        class="btn-small btn-secondary">安装gost</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="tab-content" id="network-tab" style="display:none;">
+                            <div class="form-group">
+                                <label for="bind-interface">绑定接口:</label>
+                                <input type="text" id="bind-interface" placeholder="接口名称或IP地址">
+                                <small>网络接口名称或IP地址，默认为所有接口</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="bind-port">绑定端口:</label>
+                                <input type="number" id="bind-port" placeholder="端口号">
+                                <small>可选，指定绑定端口号</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="use-upnp">
+                                    <input type="checkbox" id="use-upnp">
+                                    启用UPnP/IGD发现
+                                </label>
+                                <small>尝试通过UPnP协议配置路由器</small>
+                            </div>
+                        </div>
+
+                        <div class="tab-content" id="advanced-tab" style="display:none;">
+                            <div class="form-group">
+                                <label for="stun-server">STUN服务器:</label>
+                                <input type="text" id="stun-server" placeholder="hostname:port">
+                                <small>用于NAT类型检测和映射的STUN服务器</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="keepalive-server">保活服务器:</label>
+                                <input type="text" id="keepalive-server" placeholder="hostname:port">
+                                <small>用于保持NAT映射的服务器</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="keepalive-interval">保活间隔(秒):</label>
+                                <input type="number" id="keepalive-interval" placeholder="例如: 30">
+                                <small>发送保活包的间隔时间</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="notification-script">通知脚本:</label>
+                                <input type="text" id="notification-script" placeholder="脚本路径">
+                                <small>地址映射变更时执行的脚本</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="retry-mode">
+                                    <input type="checkbox" id="retry-mode">
+                                    持续重试直到目标端口打开
+                                </label>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="quit-on-change">
+                                    <input type="checkbox" id="quit-on-change">
+                                    映射地址变更时退出
+                                </label>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="auto-restart">
+                                    <input type="checkbox" id="auto-restart">
+                                    服务异常时自动重启
+                                </label>
+                                <small>Web管理工具提供的功能，非Natter原生功能</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="advanced-mode-options" style="display:none;">
+                        <div class="form-group">
+                            <label for="command-args">命令参数:</label>
+                            <input type="text" id="command-args" placeholder="例如: -p 80 -m socket">
+                            <small>完整的命令行参数，如同直接运行natter.py</small>
+                        </div>
+                        <div class="config-save-load">
+                            <button type="button" id="save-config-btn" class="btn-secondary">保存配置</button>
+                            <button type="button" id="load-config-btn" class="btn-secondary">加载配置</button>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary">启动服务</button>
+                        <button type="button" id="help-btn" class="btn-info">帮助</button>
+                    </div>
+                </form>
+            </section>
+
+            <section class="card" id="service-details-panel" style="display:none;">
+                <h2>服务详情 <span id="service-id"></span></h2>
+                <div class="service-details">
+                    <div class="detail-row">
+                        <label>服务ID:</label>
+                        <span id="service-id"></span>
+                    </div>
+                    <div class="detail-row">
+                        <label>状态:</label>
+                        <span id="service-status"></span>
+                    </div>
+                    <div class="detail-row">
+                        <label>映射地址:</label>
+                        <div class="service-address-detail">
+                            <span id="service-mapped-address"></span>
+                            <button id="copy-address-btn" class="copy-address-btn"><i class="fas fa-copy"></i>
+                                复制地址</button>
+                        </div>
+                    </div>
+                    <div class="detail-row">
+                        <label>运行时间:</label>
+                        <span id="service-runtime"></span>
+                    </div>
+                    <div class="detail-row">
+                        <label>命令参数:</label>
+                        <span id="service-cmd-args"></span>
+                    </div>
+                    <div class="detail-row">
+                        <label>备注:</label>
+                        <div class="service-remark-edit">
+                            <textarea id="remark-debug-area" placeholder="请输入备注" rows="2"
+                                class="form-control"></textarea>
+                            <button id="save-debug-remark-btn" class="btn btn-sm btn-primary">保存备注</button>
+                        </div>
+                    </div>
+                    <div class="detail-row">
+                        <label>LAN状态:</label>
+                        <span id="lan-status"></span>
+                    </div>
+                    <div class="detail-row">
+                        <label>WAN状态:</label>
+                        <span id="wan-status"></span>
+                    </div>
+                    <div class="detail-row">
+                        <label>NAT类型:</label>
+                        <span id="nat-type"></span>
+                    </div>
+                    <div class="detail-row">
+                        <label>自动重启:</label>
+                        <div class="auto-restart-toggle">
+                            <label class="switch">
+                                <input type="checkbox" id="auto-restart-toggle">
+                                <span class="slider round"></span>
+                            </label>
+                            <span id="auto-restart-status">已禁用</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="status-panel">
+                    <div class="status-item">
+                        <div class="status-label">LAN可用性</div>
+                        <div id="lan-status" class="status-value">检测中</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">WAN可用性</div>
+                        <div id="wan-status" class="status-value">检测中</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">NAT类型</div>
+                        <div id="nat-type" class="status-value">检测中</div>
+                    </div>
+                </div>
+
+                <div class="output-container">
+                    <h3>输出日志</h3>
+                    <pre id="service-output" class="output-log"></pre>
+                    <div class="log-controls">
+                        <button id="clear-log-btn" class="btn-secondary">清空日志</button>
+                        <label for="auto-scroll">
+                            <input type="checkbox" id="auto-scroll" checked>
+                            自动滚动
+                        </label>
+                    </div>
+                </div>
+
+                <div class="action-buttons">
+                    <button id="refresh-service-btn" class="btn-secondary">刷新</button>
+                    <button id="restart-service-btn" class="btn-warning">重启服务</button>
+                    <button id="stop-service-btn" class="btn-danger">停止服务</button>
+                    <button id="delete-service-btn" class="btn-danger">删除服务</button>
+                    <button id="save-as-template-btn" class="btn-info">保存为模板</button>
+                    <button id="back-to-list-btn" class="btn-secondary">返回列表</button>
+                </div>
+            </section>
+
+            <section class="card" id="help-panel" style="display:none;">
+                <h2>帮助信息</h2>
+                <div class="help-content">
+                    <h3>NAT类型说明</h3>
+                    <p>Natter主要用于穿透Full-cone NAT (NAT
+                        1)，在这种NAT类型下，一旦内部地址和端口被映射到外部地址和端口，任何外部主机都可以通过向该外部地址和端口发送数据包与内部主机通信。</p>
+
+                    <h3>转发方法说明</h3>
+                    <ul>
+                        <li><strong>socket</strong>: 内置方法，纯Python实现，无需额外依赖</li>
+                        <li><strong>iptables</strong>: 使用Linux的iptables进行转发，需要root权限</li>
+                        <li><strong>nftables</strong>: 使用Linux的nftables进行转发，需要root权限 <span
+                                style="color:#ff6b6b;font-size:0.9em;">(在Docker容器中不可用)</span></li>
+                        <li><strong>socat</strong>: 使用socat工具转发，需要安装socat</li>
+                        <li><strong>gost</strong>: 使用gost工具转发，需要安装gost</li>
+                    </ul>
+
+                    <h3>常见问题</h3>
+                    <div class="faq-item">
+                        <div class="faq-question">无法获取映射地址？</div>
+                        <div class="faq-answer">可能原因：1) NAT类型不是Full-cone；2) STUN服务器不可用；3) 防火墙阻止了UDP流量。</div>
+                    </div>
+                    <div class="faq-item">
+                        <div class="faq-question">外部无法访问映射端口？</div>
+                        <div class="faq-answer">可能原因：1) NAT类型不支持；2) 防火墙阻止了入站连接；3) ISP可能阻止了特定端口。</div>
+                    </div>
+                    <div class="faq-item">
+                        <div class="faq-question">服务频繁断开？</div>
+                        <div class="faq-answer">尝试减少保活间隔时间，或检查网络连接稳定性。</div>
+                    </div>
+
+                    <button id="close-help-btn" class="btn-secondary">关闭帮助</button>
+                </div>
+            </section>
+
+            <section class="card" id="templates-panel" style="display:none;">
+                <h2>配置模板</h2>
+                <div class="templates-list" id="templates-list">
+                    <div class="loading">加载中...</div>
+                </div>
+                <div class="templates-actions">
+                    <button id="back-from-templates-btn" class="btn-secondary">返回</button>
+                </div>
+            </section>
+
+            <section class="card" id="iyuu-panel" style="display:none;">
+                <h2>IYUU推送设置</h2>
+                <div class="iyuu-settings">
+                    <div class="form-group">
+                        <label for="iyuu-enabled">
+                            <input type="checkbox" id="iyuu-enabled">
+                            启用IYUU推送
+                        </label>
+                        <small>开启后服务启动、停止、地址变动等事件将通过IYUU发送通知</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>IYUU令牌:</label>
+                        <div id="iyuu-tokens-list" class="tokens-list">
+                            <div class="loading">加载中...</div>
+                        </div>
+                        <div class="token-actions">
+                            <input type="text" id="new-iyuu-token" placeholder="输入IYUU令牌">
+                            <button id="add-iyuu-token" class="btn-primary">添加令牌</button>
+                        </div>
+                        <small>支持多个令牌，获取令牌请访问 <a href="https://iyuu.cn" target="_blank">https://iyuu.cn</a></small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="iyuu-schedule-enabled">
+                            <input type="checkbox" id="iyuu-schedule-enabled">
+                            启用每日定时推送
+                        </label>
+                        <small>按设定时间发送服务状态摘要，支持多个时间段</small>
+                    </div>
+
+                    <div class="form-group" id="iyuu-schedule-options">
+                        <label>推送时间:</label>
+                        <div id="schedule-times-list" class="schedule-times-list">
+                            <!-- 时间段列表将通过JS动态添加 -->
+                        </div>
+                        <div class="time-actions">
+                            <input type="time" id="new-schedule-time" value="08:00">
+                            <button id="add-schedule-time" class="btn-primary">添加时间</button>
+                        </div>
+                        <small>每天的这些时间将发送服务状态摘要</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="iyuu-schedule-message">推送标题:</label>
+                        <input type="text" id="iyuu-schedule-message" placeholder="每日服务状态摘要标题">
+                        <small>定时推送的消息标题</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>立即推送:</label>
+                        <div class="push-now-actions">
+                            <button id="push-all-services" class="btn-primary">推送所有服务状态</button>
+                        </div>
+                        <small>立即发送一次当前所有服务的状态报告</small>
+                    </div>
+
+                    <div class="iyuu-actions">
+                        <button id="test-iyuu-push" class="btn-secondary">测试推送</button>
+                        <button id="save-iyuu-settings" class="btn-primary">保存设置</button>
+                        <button id="back-from-iyuu-btn" class="btn-secondary">返回</button>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>Natter Web管理界面 v<span id="version">加载中...</span> &copy; 2025</p>
+            <div style="margin-top:8px;font-size:15px;">
+                项目地址：
+                <a href="https://gitee.com/await29/natter-web" target="_blank" style="margin:0 8px;color:#00b3ff;text-decoration:none;font-weight:bold;">Gitee</a>
+                |
+                <a href="https://github.com/Await-d/natter-web" target="_blank" style="margin:0 8px;color:#222;text-decoration:none;font-weight:bold;">GitHub</a>
+            </div>
+        </footer>
+    </div>
+
+    <!-- 服务卡片模板 -->
+    <template id="service-card-template">
+        <div class="service-card" data-id="">
+            <div class="service-card-header">
+                <h3 class="service-mapped-address">未知地址</h3>
+                <span class="service-status">未知</span>
+            </div>
+            <div class="service-card-body">
+                <div class="service-address-container">
+                    <span class="service-address-label">映射地址：</span>
+                    <span class="service-address">未映射</span>
+                    <button class="copy-address-btn" title="复制地址">
+                        <i class="fas fa-copy"></i> 复制
+                    </button>
+                </div>
+                <p class="service-cmd">命令: <span class="service-cmd-text">未知</span></p>
+                <p class="service-remark">备注: <span class="service-remark-text">无</span></p>
+                <div class="service-card-actions">
+                    <button class="btn-details" title="查看详情">
+                        <i class="fas fa-info-circle"></i> 详情
+                    </button>
+                    <button class="btn-stop" title="停止服务">
+                        <i class="fas fa-stop"></i> 停止
+                    </button>
+                    <button class="btn-delete" title="删除服务">
+                        <i class="fas fa-trash"></i> 删除
+                    </button>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- 模板卡片模板 -->
+    <template id="template-card-template">
+        <div class="template-card" data-id="">
+            <div class="template-card-header">
+                <h3 class="template-name">未命名模板</h3>
+                <span class="template-date">创建时间</span>
+            </div>
+            <div class="template-card-body">
+                <div class="template-description">描述: </div>
+                <div class="template-cmd-args">命令: </div>
+            </div>
+            <div class="template-card-footer">
+                <button class="btn-primary use-template-btn">使用此模板</button>
+                <button class="btn-danger delete-template-btn">删除</button>
+            </div>
+        </div>
+    </template>
+
+    <!-- 保存模板对话框 -->
+    <div id="save-template-dialog" class="dialog">
+        <div class="dialog-content">
+            <h3>保存为模板</h3>
+            <div class="form-group">
+                <label for="template-name">模板名称:</label>
+                <input type="text" id="template-name" placeholder="给模板起个名字">
+            </div>
+            <div class="form-group">
+                <label for="template-description">描述:</label>
+                <textarea id="template-description" placeholder="描述这个模板的用途"></textarea>
+            </div>
+            <div class="dialog-buttons">
+                <button id="confirm-save-template" class="btn-primary">保存</button>
+                <button id="cancel-save-template" class="btn-secondary">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>

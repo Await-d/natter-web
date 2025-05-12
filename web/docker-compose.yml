@@ -1,0 +1,41 @@
+version: '3'
+
+services:
+  natter-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: natter-web
+    restart: unless-stopped
+    # 两种网络模式，请根据实际情况选择其中一种
+    # 1. 使用host网络（Linux建议）
+    network_mode: "host"
+    # 2. 使用端口映射（Windows/macOS建议）
+    # 如果使用端口映射，请注释掉上面的network_mode行，取消下面ports的注释
+    # ports:
+    #   - "8080:${WEB_PORT:-8080}"
+    volumes:
+      - ./data:/app/data  # 数据持久化：将容器内的/app/data目录映射到宿主机的./data目录
+    cap_add:
+      - NET_ADMIN # 允许使用iptables等网络管理工具
+    environment:
+      - TZ=Asia/Shanghai # 设置时区
+      - PYTHONUNBUFFERED=1 # 确保Python输出不被缓冲
+      - NATTER_PATH=/app/natter/natter.py
+      - DATA_DIR=/app/data
+      - WEB_PORT=8080 # Web服务端口，可自定义
+      - WEB_PASSWORD=zd2580
+    # 添加健康检查
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${WEB_PORT:-8080}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    # 增加日志配置
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+ 
