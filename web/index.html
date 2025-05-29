@@ -698,6 +698,111 @@
                 transform: rotate(360deg);
             }
         }
+
+        /* 分组管理样式 */
+        .groups-management {
+            margin-bottom: 1.5rem;
+        }
+
+        .group-input-container {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+        }
+
+        .group-input-container input {
+            flex: 1;
+        }
+
+        .groups-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .group-card {
+            background: var(--light-color);
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .group-card:hover {
+            border-color: var(--primary-color);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        .group-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .group-name {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--dark-color);
+        }
+
+        .group-service-count {
+            background: var(--primary-color);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .group-services-list {
+            margin-bottom: 1rem;
+        }
+
+        .group-service-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .group-service-item:last-child {
+            border-bottom: none;
+        }
+
+        .group-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+
+        .batch-operations {
+            background: var(--light-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .batch-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .batch-controls select {
+            flex: 1;
+            min-width: 150px;
+        }
+
+        .batch-controls span {
+            font-size: 1.5rem;
+            color: var(--primary-color);
+            font-weight: bold;
+        }
     </style>
 </head>
 
@@ -716,7 +821,7 @@
                     onclick="window.open('/guest.html', '_blank')">
                     <span class="icon icon-users"></span> 访客入口
                 </button>
-                <button id="groups-management-btn" class="btn settings-btn" title="服务组管理" style="display: none;">
+                <button id="groups-management-btn" class="btn settings-btn" title="服务组管理">
                     <span class="icon icon-settings"></span> 服务组管理
                 </button>
                 <button id="iyuu-settings-btn" class="btn settings-btn" title="IYUU推送设置" style="display: none;">
@@ -776,6 +881,14 @@
                                 <label for="service-remark">服务备注:</label>
                                 <input type="text" id="service-remark" placeholder="可选，为服务添加备注">
                                 <small>帮助您区分不同的服务</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="service-group">服务分组:</label>
+                                <select id="service-group">
+                                    <option value="">默认分组</option>
+                                </select>
+                                <small>选择服务所属的分组，便于组织管理</small>
                             </div>
 
                             <div class="form-group">
@@ -1063,6 +1176,49 @@
                 </div>
             </section>
 
+            <section class="card" id="groups-panel" style="display:none;">
+                <h2>服务组管理</h2>
+                <div class="groups-management">
+                    <div class="form-group">
+                        <label for="new-group-name">新建分组:</label>
+                        <div class="group-input-container">
+                            <input type="text" id="new-group-name" placeholder="输入分组名称">
+                            <button id="add-group-btn" class="btn btn-primary">添加分组</button>
+                        </div>
+                        <small>为服务创建分组，便于管理和组织</small>
+                    </div>
+
+                    <div class="groups-list-container">
+                        <h3>现有分组</h3>
+                        <div class="groups-list" id="groups-list">
+                            <div class="loading">
+                                <div class="loading-spinner"></div>
+                                加载中...
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="batch-operations">
+                        <h3>批量操作</h3>
+                        <div class="batch-controls">
+                            <select id="batch-source-group">
+                                <option value="">选择源分组...</option>
+                            </select>
+                            <span>→</span>
+                            <select id="batch-target-group">
+                                <option value="">选择目标分组...</option>
+                            </select>
+                            <button id="batch-move-btn" class="btn btn-warning">批量移动</button>
+                        </div>
+                        <small>将服务从一个分组批量移动到另一个分组</small>
+                    </div>
+
+                    <div class="group-actions">
+                        <button id="back-from-groups-btn" class="btn btn-secondary">返回</button>
+                    </div>
+                </div>
+            </section>
+
             <section class="card" id="iyuu-panel" style="display:none;">
                 <h2>IYUU推送设置</h2>
                 <div class="iyuu-settings">
@@ -1192,6 +1348,23 @@
             <div class="template-card-footer">
                 <button class="btn btn-primary use-template-btn">使用此模板</button>
                 <button class="btn btn-danger delete-template-btn">删除</button>
+            </div>
+        </div>
+    </template>
+
+    <!-- 分组卡片模板 -->
+    <template id="group-card-template">
+        <div class="group-card" data-group-id="">
+            <div class="group-card-header">
+                <span class="group-name">分组名称</span>
+                <span class="group-service-count">0 个服务</span>
+            </div>
+            <div class="group-services-list">
+                <!-- 服务列表将通过JavaScript动态添加 -->
+            </div>
+            <div class="group-actions">
+                <button class="btn btn-small btn-warning rename-group-btn">重命名</button>
+                <button class="btn btn-small btn-danger delete-group-btn">删除分组</button>
             </div>
         </div>
     </template>
