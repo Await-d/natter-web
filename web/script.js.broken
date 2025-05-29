@@ -6,12 +6,8 @@ let newServicePanel = document.getElementById('new-service-panel');
 let serviceDetailsPanel = document.getElementById('service-details-panel');
 let helpPanel = document.getElementById('help-panel');
 let templatesPanel = document.getElementById('templates-panel');
-let iyuuPanel = document.getElementById('iyuu-panel'); // IYUU推送设置面板
+let iyuuPanel = document.getElementById('iyuu-panel'); // IYUU推送设置面�?
 let saveTemplateDialog = document.getElementById('save-template-dialog');
-// 以下loginPanel相关代码已不再需要，因为登录功能已移至login.html
-// let loginPanel = document.createElement('div');
-// loginPanel.className = 'login-panel';
-// loginPanel.style.display = 'none';
 
 // 表单元素
 let newServiceForm = document.getElementById('new-service-form');
@@ -20,7 +16,7 @@ let basicModeOptions = document.getElementById('basic-mode-options');
 let advancedModeOptions = document.getElementById('advanced-mode-options');
 let commandArgs = document.getElementById('command-args');
 let targetPort = document.getElementById('target-port');
-let targetIp = document.getElementById('target-ip'); // 新增: 获取目标IP输入框
+let targetIp = document.getElementById('target-ip'); // 新增: 获取目标IP输入�?
 let udpMode = document.getElementById('udp-mode');
 let forwardMethod = document.getElementById('forward-method');
 let bindInterface = document.getElementById('bind-interface');
@@ -34,7 +30,7 @@ let retryMode = document.getElementById('retry-mode');
 let quitOnChange = document.getElementById('quit-on-change');
 let autoRestart = document.getElementById('auto-restart');
 
-// 详情页元素
+// 详情页元�?
 let serviceId = document.getElementById('service-id');
 let serviceStatus = document.getElementById('service-status');
 let serviceRuntime = document.getElementById('service-runtime');
@@ -63,7 +59,7 @@ let backFromTemplatesBtn = document.getElementById('back-from-templates-btn');
 let saveConfigBtn = document.getElementById('save-config-btn');
 let loadConfigBtn = document.getElementById('load-config-btn');
 
-// 模板对话框元素
+// 模板对话框元�?
 let templateName = document.getElementById('template-name');
 let templateDescription = document.getElementById('template-description');
 let confirmSaveTemplate = document.getElementById('confirm-save-template');
@@ -71,25 +67,25 @@ let cancelSaveTemplate = document.getElementById('cancel-save-template');
 
 // IYUU推送相关DOM元素
 let iyuuSettingsBtn = document.getElementById('iyuu-settings-btn'); // 设置按钮
-let iyuuEnabled = document.getElementById('iyuu-enabled'); // 启用IYUU推送开关
+let iyuuEnabled = document.getElementById('iyuu-enabled'); // 启用IYUU推送开�?
 let iyuuTokensList = document.getElementById('iyuu-tokens-list'); // 令牌列表容器
 let newIyuuToken = document.getElementById('new-iyuu-token'); // 新令牌输入框
 let addIyuuToken = document.getElementById('add-iyuu-token'); // 添加令牌按钮
-let iyuuScheduleEnabled = document.getElementById('iyuu-schedule-enabled'); // 定时推送开关
+let iyuuScheduleEnabled = document.getElementById('iyuu-schedule-enabled'); // 定时推送开�?
 let iyuuScheduleTime = document.getElementById('new-schedule-time'); // 调整为新的时间输入框ID
-let iyuuScheduleMessage = document.getElementById('iyuu-schedule-message'); // 定时推送消息
-let testIyuuPush = document.getElementById('test-iyuu-push'); // 测试推送按钮
+let iyuuScheduleMessage = document.getElementById('iyuu-schedule-message'); // 定时推送消�?
+let testIyuuPush = document.getElementById('test-iyuu-push'); // 测试推送按�?
 let saveIyuuSettings = document.getElementById('save-iyuu-settings'); // 保存设置按钮
 let backFromIyuuBtn = document.getElementById('back-from-iyuu-btn'); // 返回按钮
 
-// 当前视图状态
+// 当前视图状�?
 let currentServiceId = null;
 let refreshIntervalId = null;
 let runtimeIntervalId = null;
 const servicesRuntime = {};
 let previousView = null;
 
-// 认证状态
+// 认证状�?
 let isAuthenticated = false;
 let authToken = localStorage.getItem('natter_auth_token');
 
@@ -121,7 +117,7 @@ const API = {
     iyuuPushNow: '/api/iyuu/push_now'
 };
 
-// 工具状态信息
+// 工具状态信�?
 const toolsStatus = {
     'socat': {
         installed: false,
@@ -149,21 +145,21 @@ function checkToolInstalled(tool) {
             toolsStatus[tool].installed = data.installed;
             toolsStatus[tool].checking = false;
 
-            // 更新安装按钮状态
+            // 更新安装按钮状�?
             updateToolInstallButtons();
 
-            // 如果在转发方法中选择了该工具但未安装，显示提示
+            // 如果在转发方法中选择了该工具但未安装，显示提�?
             if (forwardMethod && forwardMethod.value === tool && !data.installed) {
                 showToolInstallPrompt(tool);
             }
         })
         .catch(error => {
-            console.error(`检查工具 ${tool} 安装状态出错:`, error);
+            console.error(`检查工�?${tool} 安装状态出�?`, error);
             toolsStatus[tool].checking = false;
         });
 }
 
-// 更新工具安装按钮状态
+// 更新工具安装按钮状�?
 function updateToolInstallButtons() {
     const socatBtn = document.getElementById('install-socat-btn');
     const gostBtn = document.getElementById('install-gost-btn');
@@ -204,11 +200,11 @@ function showToolInstallPrompt(tool) {
     const notification = document.createElement('div');
     notification.className = 'notification warning tool-install-prompt';
     notification.innerHTML = `
-        <div style="margin-bottom:10px;">检测到您选择了 <strong>${toolName}</strong> 作为转发方法，但系统中未安装该工具。</div>
+        <div style="margin-bottom:10px;">检测到您选择�?<strong>${toolName}</strong> 作为转发方法，但系统中未安装该工具�?/div>
         <button class="btn-primary install-now-btn" data-tool="${tool}">现在安装 ${toolName}</button>
     `;
 
-    // 添加到页面
+    // 添加到页�?
     document.body.appendChild(notification);
 
     // 显示通知
@@ -240,7 +236,7 @@ function showToolInstallPrompt(tool) {
     }, 15000);
 }
 
-// 事件监听器设置
+// 事件监听器设�?
 document.addEventListener('DOMContentLoaded', function () {
     // 获取DOM元素
     servicesList = document.getElementById('services-list');
@@ -318,13 +314,13 @@ document.addEventListener('DOMContentLoaded', function () {
     cancelSaveTemplate = document.getElementById('cancel-save-template');
     deleteServiceBtn = document.getElementById('delete-service-btn');
 
-    // 进行认证检查，只有认证通过才会加载主界面
-    checkAuth();
+    // 加载服务列表
+    loadServices();
 
-    // 设置页面刷新定时器 (每10秒刷新一次列表)
+    // 设置页面刷新定时�?(�?0秒刷新一次列�?
     setInterval(loadServices, 10000);
 
-    // 检查工具安装状态
+    // 检查工具安装状�?
     checkToolInstalled('socat');
     checkToolInstalled('gost');
 
@@ -390,14 +386,14 @@ document.addEventListener('DOMContentLoaded', function () {
             if (methodDescriptions[method]) {
                 const info = methodDescriptions[method];
 
-                // 对于nftables方法，增加特殊警告
+                // 对于nftables方法，增加特殊警�?
                 if (method === 'nftables') {
-                    showNotification(`${info.name}: ${info.desc}<br>适用于: ${info.bestFor}<br><span style="color:#ff6b6b;font-weight:bold">⚠️ 警告：在Docker环境中nftables可能不可用。如出现问题，请改用socket或iptables方法。</span>`, 'warning');
+                    showNotification(`${info.name}: ${info.desc}<br>适用�? ${info.bestFor}<br><span style="color:#ff6b6b;font-weight:bold">⚠️ 警告：在Docker环境中nftables可能不可用。如出现问题，请改用socket或iptables方法�?/span>`, 'warning');
                 } else {
-                    showNotification(`${info.name}: ${info.desc}<br>适用于: ${info.bestFor}`, 'info');
+                    showNotification(`${info.name}: ${info.desc}<br>适用�? ${info.bestFor}`, 'info');
                 }
 
-                // 检查是否需要安装工具
+                // 检查是否需要安装工�?
                 if (method === 'socat' || method === 'gost') {
                     checkToolInstalled(method);
                 }
@@ -405,14 +401,14 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // 选项卡切换
+    // 选项卡切�?
     document.querySelectorAll('.tab').forEach(tab => {
         tab.addEventListener('click', function () {
-            // 移除所有激活状态
+            // 移除所有激活状�?
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(content => content.style.display = 'none');
 
-            // 激活当前选项卡
+            // 激活当前选项�?
             this.classList.add('active');
             const tabId = this.getAttribute('data-tab');
             document.getElementById(tabId + '-tab').style.display = 'block';
@@ -425,7 +421,7 @@ document.addEventListener('DOMContentLoaded', function () {
         startNewService();
     });
 
-    // 配置保存和加载按钮
+    // 配置保存和加载按�?
     if (saveConfigBtn) {
         saveConfigBtn.addEventListener('click', function () {
             showSaveTemplateDialog();
@@ -464,7 +460,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // 服务详情页按钮事件
+    // 服务详情页按钮事�?
     if (refreshServiceBtn) {
         refreshServiceBtn.addEventListener('click', function () {
             loadServiceDetails(currentServiceId);
@@ -505,7 +501,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 navigator.clipboard.writeText(address)
                     .then(() => {
                         showCopyFeedback(copyAddressBtn);
-                        showNotification('地址已复制: ' + address, 'success');
+                        showNotification('地址已复�? ' + address, 'success');
                     })
                     .catch(err => {
                         console.error('复制失败:', err);
@@ -522,7 +518,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     document.body.removeChild(tempInput);
 
                     showCopyFeedback(copyAddressBtn);
-                    showNotification('地址已复制: ' + address, 'success');
+                    showNotification('地址已复�? ' + address, 'success');
                 } catch (err) {
                     console.error('复制失败:', err);
                     showNotification('复制失败，请手动复制', 'error');
@@ -544,7 +540,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // 保存模板对话框按钮
+    // 保存模板对话框按�?
     if (confirmSaveTemplate) {
         confirmSaveTemplate.addEventListener('click', function () {
             saveTemplateFromDialog();
@@ -557,10 +553,10 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // 添加删除服务按钮的事件监听
+    // 添加删除服务按钮的事件监�?
     if (deleteServiceBtn) {
         deleteServiceBtn.addEventListener('click', function () {
-            if (confirm('确定要删除此服务吗？此操作不可恢复。')) {
+            if (confirm('确定要删除此服务吗？此操作不可恢复�?)) {
                 deleteService(currentServiceId);
             }
         });
@@ -574,7 +570,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // 检查认证状态
+    // 检查认证状�?
     checkAuthRequired();
 
     // 检查Docker环境并显示nftables警告
@@ -585,14 +581,14 @@ document.addEventListener('DOMContentLoaded', function () {
         autoRestartToggle.addEventListener('change', function () {
             const enabled = this.checked;
             toggleAutoRestart(currentServiceId, enabled);
-            autoRestartStatus.textContent = enabled ? '已启用' : '已禁用';
+            autoRestartStatus.textContent = enabled ? '已启�? : '已禁�?;
 
             // 添加状态样式类
             autoRestartStatus.className = enabled ? 'status-enabled' : 'status-disabled';
         });
     }
 
-    // 获取版本号
+    // 获取版本�?
     fetchVersion();
 
     // IYUU相关
@@ -633,14 +629,14 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // 添加时间段按钮事件
+    // 添加时间段按钮事�?
     if (addScheduleTimeBtn) {
         addScheduleTimeBtn.addEventListener('click', function () {
             addScheduleTime();
         });
     }
 
-    // 立即推送所有服务状态按钮事件
+    // 立即推送所有服务状态按钮事�?
     if (pushAllServicesBtn) {
         pushAllServicesBtn.addEventListener('click', function () {
             pushServicesNow();
@@ -657,7 +653,7 @@ function loadServices() {
         })
         .catch(error => {
             console.error('加载服务列表出错:', error);
-            servicesList.innerHTML = '<div class="no-services">加载服务失败，请刷新页面重试。</div>';
+            servicesList.innerHTML = '<div class="no-services">加载服务失败，请刷新页面重试�?/div>';
         });
 }
 
@@ -681,24 +677,24 @@ function renderServicesList(services) {
 
         // 设置服务ID
         serviceCard.dataset.id = service.id;
-        serviceCard.dataset.status = service.status === '运行中' ? 'running' : 'stopped';
+        serviceCard.dataset.status = service.status === '运行�? ? 'running' : 'stopped';
 
         // 填充数据
-        card.querySelector('.service-mapped-address').textContent = formatAddressShort(service.mapped_address || '未映射');
+        card.querySelector('.service-mapped-address').textContent = formatAddressShort(service.mapped_address || '未映�?);
         card.querySelector('.service-status').textContent = service.status;
-        card.querySelector('.service-status').className = `service-status service-status-${service.status === '运行中' ? 'running' : 'stopped'}`;
-        card.querySelector('.service-address').textContent = service.mapped_address || '未映射';
+        card.querySelector('.service-status').className = `service-status service-status-${service.status === '运行�? ? 'running' : 'stopped'}`;
+        card.querySelector('.service-address').textContent = service.mapped_address || '未映�?;
         card.querySelector('.service-cmd-text').textContent = service.cmd_args.join(' ');
 
         // 设置备注
         const remarkText = card.querySelector('.service-remark-text');
-        remarkText.textContent = service.remark || '无';
+        remarkText.textContent = service.remark || '�?;
 
         // 如果有备注，显示备注行，否则隐藏
         const remarkRow = card.querySelector('.service-remark');
         remarkRow.style.display = service.remark ? 'block' : 'none';
 
-        // 添加事件监听器
+        // 添加事件监听�?
         card.querySelector('.service-detail-btn').addEventListener('click', () => {
             showServiceDetails(service.id);
         });
@@ -719,7 +715,7 @@ function renderServicesList(services) {
             copyToClipboard(service.mapped_address, button);
         });
 
-        // 添加到列表
+        // 添加到列�?
         servicesList.appendChild(card);
     });
 }
@@ -731,14 +727,14 @@ function updateServiceRuntime(service, element) {
         return;
     }
 
-    // 保存开始时间以便后续更新
+    // 保存开始时间以便后续更�?
     servicesRuntime[service.id] = service.start_time;
 
     const runtime = formatRuntime(Date.now() / 1000 - service.start_time);
     element.textContent = `运行时间: ${runtime}`;
 }
 
-// 格式化运行时间
+// 格式化运行时�?
 function formatRuntime(seconds) {
     if (isNaN(seconds) || seconds < 0) {
         return 'N/A';
@@ -750,7 +746,7 @@ function formatRuntime(seconds) {
     const secs = Math.floor(seconds % 60);
 
     if (days > 0) {
-        return `${days}天 ${hours}小时 ${minutes}分钟`;
+        return `${days}�?${hours}小时 ${minutes}分钟`;
     } else if (hours > 0) {
         return `${hours}小时 ${minutes}分钟 ${secs}秒`;
     } else if (minutes > 0) {
@@ -764,7 +760,7 @@ function formatRuntime(seconds) {
 function buildArgsFromBasicMode() {
     let args = [];
 
-    // 必须有目标端口
+    // 必须有目标端�?
     if (!targetPort.value) {
         alert('请输入目标端口！');
         return null;
@@ -775,7 +771,7 @@ function buildArgsFromBasicMode() {
     if (targetIpValue) {
         args.push('-t', targetIpValue); // 假设 -t 是目标地址参数
     }
-    // 注意: 这里没有添加默认的 127.0.0.1，假设 natter.py 在没有 -t 参数时默认就是本地
+    // 注意: 这里没有添加默认�?127.0.0.1，假�?natter.py 在没�?-t 参数时默认就是本�?
 
     args.push('-p', targetPort.value);
 
@@ -830,14 +826,14 @@ function buildArgsFromBasicMode() {
     return args;
 }
 
-// 启动新服务
+// 启动新服�?
 function startNewService() {
     let args = [];
     let auto_restart = autoRestart.checked;
     let remark = document.getElementById('service-remark')?.value || "";
 
     if (serviceMode.value === 'basic') {
-        // 基础模式，构建参数列表
+        // 基础模式，构建参数列�?
         args = buildArgsFromBasicMode();
         if (!args) return;
     } else {
@@ -850,7 +846,7 @@ function startNewService() {
         args = commandArgs.value.trim().split(/\s+/);
     }
 
-    // 发送请求启动服务
+    // 发送请求启动服�?
     fetchWithAuth(API.startService, {
             method: 'POST',
             headers: {
@@ -865,20 +861,20 @@ function startNewService() {
         .then(response => response.json())
         .then(data => {
             if (data.service_id) {
-                alert('服务启动成功！');
+                alert('服务启动成功�?);
                 loadServices();
 
                 // 重置表单
                 newServiceForm.reset();
-                // 手动清空 targetIp，因为 reset 可能对后面添加的字段无效
+                // 手动清空 targetIp，因�?reset 可能对后面添加的字段无效
                 if (targetIp) targetIp.value = '';
             } else {
-                alert('服务启动失败：' + (data.error || '未知错误'));
+                alert('服务启动失败�? + (data.error || '未知错误'));
             }
         })
         .catch(error => {
             console.error('启动服务出错:', error);
-            alert('启动服务时发生错误，请检查控制台查看详情。');
+            alert('启动服务时发生错误，请检查控制台查看详情�?);
         });
 }
 
@@ -902,7 +898,7 @@ function stopService(id) {
             if (data.success) {
                 alert('服务已停止！');
 
-                // 如果当前正在查看该服务的详情，则返回列表页
+                // 如果当前正在查看该服务的详情，则返回列表�?
                 if (currentServiceId === id) {
                     showServicesList();
                 }
@@ -910,12 +906,12 @@ function stopService(id) {
                 // 刷新服务列表
                 loadServices();
             } else {
-                alert('停止服务失败：' + (data.error || '未知错误'));
+                alert('停止服务失败�? + (data.error || '未知错误'));
             }
         })
         .catch(error => {
             console.error('停止服务出错:', error);
-            alert('停止服务时发生错误，请检查控制台查看详情。');
+            alert('停止服务时发生错误，请检查控制台查看详情�?);
         });
 }
 
@@ -940,18 +936,18 @@ function restartService(id) {
                 alert('服务已重启！');
                 loadServiceDetails(id);
             } else {
-                alert('重启服务失败：' + (data.error || '未知错误'));
+                alert('重启服务失败�? + (data.error || '未知错误'));
             }
         })
         .catch(error => {
             console.error('重启服务出错:', error);
-            alert('重启服务时发生错误，请检查控制台查看详情。');
+            alert('重启服务时发生错误，请检查控制台查看详情�?);
         });
 }
 
-// 停止所有服务
+// 停止所有服�?
 function stopAllServices() {
-    if (!confirm('确定要停止所有运行中的服务吗？')) {
+    if (!confirm('确定要停止所有运行中的服务吗�?)) {
         return;
     }
 
@@ -965,7 +961,7 @@ function stopAllServices() {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                alert(`已停止 ${data.stopped_count} 个服务！`);
+                alert(`已停�?${data.stopped_count} 个服务！`);
 
                 // 如果当前在查看服务详情，则返回列表页
                 if (currentServiceId) {
@@ -974,12 +970,12 @@ function stopAllServices() {
                     loadServices();
                 }
             } else {
-                alert('停止服务失败：' + (data.error || '未知错误'));
+                alert('停止服务失败�? + (data.error || '未知错误'));
             }
         })
         .catch(error => {
-            console.error('停止所有服务出错:', error);
-            alert('停止服务时发生错误，请检查控制台查看详情。');
+            console.error('停止所有服务出�?', error);
+            alert('停止服务时发生错误，请检查控制台查看详情�?);
         });
 }
 
@@ -998,7 +994,7 @@ function setAutoRestart(id, enabled) {
         .then(response => response.json())
         .then(data => {
             if (!data.success) {
-                alert('设置自动重启失败：' + (data.error || '未知错误'));
+                alert('设置自动重启失败�? + (data.error || '未知错误'));
             }
         })
         .catch(error => {
@@ -1022,12 +1018,12 @@ function clearServiceLogs(id) {
             if (data.success) {
                 serviceOutput.textContent = '';
             } else {
-                alert('清空日志失败：' + (data.error || '未知错误'));
+                alert('清空日志失败�? + (data.error || '未知错误'));
             }
         })
         .catch(error => {
             console.error('清空日志出错:', error);
-            alert('清空日志时发生错误，请检查控制台查看详情。');
+            alert('清空日志时发生错误，请检查控制台查看详情�?);
         });
 }
 
@@ -1063,7 +1059,7 @@ function showServiceDetails(id) {
     runtimeIntervalId = setInterval(updateDetailRuntime, 1000);
 }
 
-// 更新详情页运行时间
+// 更新详情页运行时�?
 function updateDetailRuntime() {
     if (!currentServiceId || !servicesRuntime[currentServiceId]) return;
 
@@ -1089,7 +1085,7 @@ function loadServiceDetails(id) {
         })
         .catch(error => {
             console.error('获取服务详情出错:', error);
-            showNotification('获取服务详情时发生错误', 'error');
+            showNotification('获取服务详情时发生错�?, 'error');
         });
 }
 
@@ -1097,7 +1093,7 @@ function loadServiceDetails(id) {
 function showServiceDetailsPanel(service) {
     hideAllPanels();
 
-    // 存储当前服务数据供其他函数使用
+    // 存储当前服务数据供其他函数使�?
     window.currentServiceData = service;
 
     // 显示面板
@@ -1107,7 +1103,7 @@ function showServiceDetailsPanel(service) {
     // 填充数据
     document.querySelectorAll('#service-id').forEach(el => el.textContent = service.id);
     document.getElementById('service-status').textContent = service.status;
-    document.getElementById('service-mapped-address').textContent = service.mapped_address || '未映射';
+    document.getElementById('service-mapped-address').textContent = service.mapped_address || '未映�?;
     document.getElementById('service-cmd-args').textContent = service.cmd_args.join(' ');
 
     // 设置备注区域
@@ -1121,12 +1117,12 @@ function showServiceDetailsPanel(service) {
         event.preventDefault();
         if (debugRemarkArea) {
             const debugValue = debugRemarkArea.value;
-            console.log('获取备注值:', debugValue);
+            console.log('获取备注�?', debugValue);
             saveServiceRemark(service.id, debugValue);
         }
     });
 
-    // 添加推送单个服务状态按钮事件监听
+    // 添加推送单个服务状态按钮事件监�?
     replaceButtonAndAddListener('push-service-now', function (event) {
         event.preventDefault();
         pushServiceNow(service.id);
@@ -1137,12 +1133,12 @@ function showServiceDetailsPanel(service) {
     setStatusColor(serviceStatus, service.status);
 
     // 设置映射地址
-    serviceMappedAddress.textContent = service.mapped_address || '未映射';
+    serviceMappedAddress.textContent = service.mapped_address || '未映�?;
 
     // 设置命令参数
     serviceCmdArgs.textContent = service.cmd_args.join(' ');
 
-    // 设置运行时间并启动定时更新
+    // 设置运行时间并启动定时更�?
     updateDetailPanelRuntime(service);
     if (runtimeIntervalId) {
         clearInterval(runtimeIntervalId);
@@ -1156,11 +1152,11 @@ function showServiceDetailsPanel(service) {
     wanStatus.textContent = service.wan_status || '未知';
     natType.textContent = service.nat_type || '未知';
 
-    // 设置LAN/WAN状态颜色
+    // 设置LAN/WAN状态颜�?
     setStatusColor(lanStatus, service.lan_status);
     setStatusColor(wanStatus, service.wan_status);
 
-    // 更新状态面板中的可用性信息
+    // 更新状态面板中的可用性信�?
     const statusPanelLanStatus = document.querySelector('.status-panel #lan-status');
     const statusPanelWanStatus = document.querySelector('.status-panel #wan-status');
     const statusPanelNatType = document.querySelector('.status-panel #nat-type');
@@ -1179,10 +1175,10 @@ function showServiceDetailsPanel(service) {
         statusPanelNatType.textContent = service.nat_type || '未知';
     }
 
-    // 设置自动重启状态
+    // 设置自动重启状�?
     if (autoRestartToggle) {
         autoRestartToggle.checked = service.auto_restart;
-        autoRestartStatus.textContent = service.auto_restart ? '已启用' : '已禁用';
+        autoRestartStatus.textContent = service.auto_restart ? '已启�? : '已禁�?;
 
         // 添加状态样式类
         autoRestartStatus.className = service.auto_restart ? 'status-enabled' : 'status-disabled';
@@ -1191,12 +1187,12 @@ function showServiceDetailsPanel(service) {
     // 显示输出日志
     updateServiceLog(service.last_output);
 
-    // 设置服务详情页标题
+    // 设置服务详情页标�?
     document.querySelector('#service-details-panel h2').textContent =
-        `服务详情: ${formatAddressShort(service.mapped_address || '未映射')}`;
+        `服务详情: ${formatAddressShort(service.mapped_address || '未映�?)}`;
 
     // 如果服务已停止，禁用停止按钮，但启用重启按钮
-    if (service.status === '已停止' || !service.running) {
+    if (service.status === '已停�? || !service.running) {
         stopServiceBtn.disabled = true;
         restartServiceBtn.disabled = false; // 允许重启已停止的服务
     } else {
@@ -1208,31 +1204,31 @@ function showServiceDetailsPanel(service) {
     startDetailRefresh();
 }
 
-// 辅助函数：替换按钮并添加新的事件监听器
+// 辅助函数：替换按钮并添加新的事件监听�?
 function replaceButtonAndAddListener(buttonId, clickHandler) {
     const button = document.getElementById(buttonId);
     if (!button) return;
 
-    // 创建新按钮并复制属性
+    // 创建新按钮并复制属�?
     const newButton = document.createElement('button');
     newButton.id = buttonId;
     newButton.className = button.className;
     newButton.textContent = button.textContent;
 
-    // 添加事件监听器
+    // 添加事件监听�?
     newButton.addEventListener('click', clickHandler);
 
-    // 替换原按钮
+    // 替换原按�?
     button.parentNode.replaceChild(newButton, button);
 }
 
 // 保存服务备注 - 简化并完全重构
 function saveServiceRemark(serviceId, remark) {
-    // 强制转换为字符串并进行简单清理
+    // 强制转换为字符串并进行简单清�?
     const remarkValue = String(remark || '').trim();
 
     console.log('准备保存备注 - 服务ID:', serviceId);
-    console.log('准备保存备注 - 最终值:', remarkValue);
+    console.log('准备保存备注 - 最终�?', remarkValue);
 
     fetchWithAuth(API.setRemark, {
             method: 'POST',
@@ -1247,24 +1243,24 @@ function saveServiceRemark(serviceId, remark) {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                showNotification('备注已保存: ' + remarkValue, 'success');
+                showNotification('备注已保�? ' + remarkValue, 'success');
 
-                // 更新所有显示和跟踪的值
+                // 更新所有显示和跟踪的�?
                 updateAllRemarkDisplays(serviceId, remarkValue);
 
                 // 刷新服务列表
                 loadServices();
             } else {
-                showNotification('保存备注失败：' + (data.error || '未知错误'), 'error');
+                showNotification('保存备注失败�? + (data.error || '未知错误'), 'error');
             }
         })
         .catch(error => {
             console.error('保存备注出错:', error);
-            showNotification('保存备注时发生错误', 'error');
+            showNotification('保存备注时发生错�?, 'error');
         });
 }
 
-// 更新所有备注显示
+// 更新所有备注显�?
 function updateAllRemarkDisplays(serviceId, remarkValue) {
     // 更新备用输入区域
     const debugRemarkArea = document.getElementById('remark-debug-area');
@@ -1277,7 +1273,7 @@ function updateAllRemarkDisplays(serviceId, remarkValue) {
         window.currentServiceData.remark = remarkValue;
     }
 
-    console.log('所有备注显示已更新为:', remarkValue);
+    console.log('所有备注显示已更新�?', remarkValue);
 }
 
 // 设置状态显示的颜色
@@ -1293,9 +1289,9 @@ function setStatusColor(element, status) {
     }
 }
 
-// 返回服务列表页
+// 返回服务列表�?
 function showServicesList() {
-    // 清除自动刷新定时器
+    // 清除自动刷新定时�?
     if (refreshIntervalId) {
         clearInterval(refreshIntervalId);
         refreshIntervalId = null;
@@ -1311,7 +1307,7 @@ function showServicesList() {
     helpPanel.style.display = 'none';
     templatesPanel.style.display = 'none';
 
-    // 显示服务列表和新建服务面板
+    // 显示服务列表和新建服务面�?
     servicesPanel.style.display = 'block';
     newServicePanel.style.display = 'block';
 
@@ -1400,14 +1396,14 @@ function loadTemplates() {
         })
         .catch(error => {
             console.error('加载模板列表出错:', error);
-            templatesList.innerHTML = '<div class="no-services">没有保存的模板。</div>';
+            templatesList.innerHTML = '<div class="no-services">没有保存的模板�?/div>';
         });
 }
 
 // 渲染模板列表
 function renderTemplatesList(templates) {
     if (!templates || templates.length === 0) {
-        templatesList.innerHTML = '<div class="no-services">没有保存的模板。</div>';
+        templatesList.innerHTML = '<div class="no-services">没有保存的模板�?/div>';
         return;
     }
 
@@ -1425,10 +1421,10 @@ function renderTemplatesList(templates) {
         const date = new Date(tmpl.created_at * 1000);
         card.querySelector('.template-date').textContent = date.toLocaleString();
 
-        card.querySelector('.template-description').textContent = `描述: ${tmpl.description || '无描述'}`;
+        card.querySelector('.template-description').textContent = `描述: ${tmpl.description || '无描�?}`;
         card.querySelector('.template-cmd-args').textContent = `命令: python natter.py ${tmpl.cmd_args.join(' ')}`;
 
-        // 为卡片按钮添加事件
+        // 为卡片按钮添加事�?
         card.querySelector('.use-template-btn').addEventListener('click', function () {
             useTemplate(tmpl);
         });
@@ -1444,7 +1440,7 @@ function renderTemplatesList(templates) {
 
 // 使用模板
 function useTemplate(tmpl) {
-    // 切换到高级模式
+    // 切换到高级模�?
     serviceMode.value = 'advanced';
     basicModeOptions.style.display = 'none';
     advancedModeOptions.style.display = 'block';
@@ -1458,7 +1454,7 @@ function useTemplate(tmpl) {
 
 // 删除模板
 function deleteTemplate(id) {
-    if (!confirm('确定要删除此模板吗？此操作不可撤销。')) {
+    if (!confirm('确定要删除此模板吗？此操作不可撤销�?)) {
         return;
     }
 
@@ -1477,29 +1473,29 @@ function deleteTemplate(id) {
                 alert('模板已删除！');
                 loadTemplates();
             } else {
-                alert('删除模板失败：' + (data.error || '未知错误'));
+                alert('删除模板失败�? + (data.error || '未知错误'));
             }
         })
         .catch(error => {
             console.error('删除模板出错:', error);
-            alert('删除模板时发生错误，请检查控制台查看详情。');
+            alert('删除模板时发生错误，请检查控制台查看详情�?);
         });
 }
 
-// 显示保存模板对话框
+// 显示保存模板对话�?
 function showSaveTemplateDialog(serviceId) {
-    // 清空输入框
+    // 清空输入�?
     templateName.value = '';
     templateDescription.value = '';
 
-    // 保存当前正在查看的服务ID（如果有）
+    // 保存当前正在查看的服务ID（如果有�?
     saveTemplateDialog.dataset.serviceId = serviceId || '';
 
-    // 显示对话框
+    // 显示对话�?
     saveTemplateDialog.classList.add('active');
 }
 
-// 隐藏保存模板对话框
+// 隐藏保存模板对话�?
 function hideSaveTemplateDialog() {
     saveTemplateDialog.classList.remove('active');
 }
@@ -1516,12 +1512,12 @@ function saveTemplateFromDialog() {
     const serviceId = saveTemplateDialog.dataset.serviceId;
 
     if (serviceId) {
-        // 从服务详情保存
+        // 从服务详情保�?
         fetchWithAuth(`${API.service}?id=${serviceId}`)
             .then(response => response.json())
             .then(data => {
                 if (!data.service) {
-                    alert('无法找到该服务，可能已被删除。');
+                    alert('无法找到该服务，可能已被删除�?);
                     hideSaveTemplateDialog();
                     return;
                 }
@@ -1530,7 +1526,7 @@ function saveTemplateFromDialog() {
             })
             .catch(error => {
                 console.error('获取服务详情出错:', error);
-                alert('获取服务详情失败，无法保存模板。');
+                alert('获取服务详情失败，无法保存模板�?);
             });
     } else {
         // 从命令行参数保存
@@ -1565,15 +1561,15 @@ function saveTemplateToServer(name, description, cmd_args) {
         .then(response => response.json())
         .then(data => {
             if (data.template_id) {
-                alert('模板保存成功！');
+                alert('模板保存成功�?);
                 hideSaveTemplateDialog();
             } else {
-                alert('保存模板失败：' + (data.error || '未知错误'));
+                alert('保存模板失败�? + (data.error || '未知错误'));
             }
         })
         .catch(error => {
             console.error('保存模板出错:', error);
-            alert('保存模板时发生错误，请检查控制台查看详情。');
+            alert('保存模板时发生错误，请检查控制台查看详情�?);
         });
 }
 
@@ -1584,7 +1580,7 @@ function copyToClipboard(text, button) {
         return;
     }
 
-    // 如果没有传入button参数，尝试从事件中获取
+    // 如果没有传入button参数，尝试从事件中获�?
     if (!button && event) {
         button = event.currentTarget;
     }
@@ -1593,7 +1589,7 @@ function copyToClipboard(text, button) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(text)
             .then(() => {
-                showNotification('已复制到剪贴板: ' + text, 'success');
+                showNotification('已复制到剪贴�? ' + text, 'success');
                 showCopyFeedback(button);
             })
             .catch(err => {
@@ -1601,12 +1597,12 @@ function copyToClipboard(text, button) {
                 fallbackCopyToClipboard(text, button);
             });
     } else {
-        // 回退到传统方法
+        // 回退到传统方�?
         fallbackCopyToClipboard(text, button);
     }
 }
 
-// 显示复制成功的视觉反馈
+// 显示复制成功的视觉反�?
 function showCopyFeedback(button) {
     if (!button) return;
 
@@ -1614,34 +1610,34 @@ function showCopyFeedback(button) {
     const originalText = button.textContent;
     const originalHTML = button.innerHTML;
 
-    // 修改按钮文本和样式
+    // 修改按钮文本和样�?
     button.innerHTML = '<i class="icon-check"></i> 已复制！';
     button.classList.add('copy-success');
 
-    // 恢复原始状态
+    // 恢复原始状�?
     setTimeout(() => {
         button.innerHTML = originalHTML;
         button.classList.remove('copy-success');
     }, 1500);
 }
 
-// 传统复制方法（回退方案）
+// 传统复制方法（回退方案�?
 function fallbackCopyToClipboard(text, button) {
     try {
-        // 创建临时输入框
+        // 创建临时输入�?
         const tempInput = document.createElement('input');
         tempInput.value = text;
         document.body.appendChild(tempInput);
 
-        // 选择并复制
+        // 选择并复�?
         tempInput.select();
         document.execCommand('copy');
 
-        // 移除临时输入框
+        // 移除临时输入�?
         document.body.removeChild(tempInput);
 
         // 提示用户
-        showNotification('已复制到剪贴板: ' + text, 'success');
+        showNotification('已复制到剪贴�? ' + text, 'success');
         showCopyFeedback(button);
     } catch (err) {
         console.error('复制失败:', err);
@@ -1650,7 +1646,7 @@ function fallbackCopyToClipboard(text, button) {
 }
 
 /**
- * 删除指定的服务
+ * 删除指定的服�?
  * @param {string} id - 服务ID
  */
 function deleteService(id) {
@@ -1666,8 +1662,8 @@ function deleteService(id) {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                // 删除成功，返回服务列表
-                showNotification('服务已成功删除', 'success');
+                // 删除成功，返回服务列�?
+                showNotification('服务已成功删�?, 'success');
                 showServicesList();
                 loadServices(); // 刷新服务列表
             } else {
@@ -1676,7 +1672,7 @@ function deleteService(id) {
         })
         .catch(error => {
             console.error('删除服务出错:', error);
-            showNotification('删除服务时发生错误', 'error');
+            showNotification('删除服务时发生错�?, 'error');
         });
 }
 
@@ -1691,7 +1687,7 @@ function showNotification(message, type = 'info', duration = 5000) {
     notification.className = `notification ${type}`;
     notification.innerHTML = message; // 使用innerHTML支持HTML内容
 
-    // 添加到页面
+    // 添加到页�?
     document.body.appendChild(notification);
 
     // 显示通知
@@ -1707,7 +1703,7 @@ function showNotification(message, type = 'info', duration = 5000) {
                 document.body.removeChild(notification);
             }
         }, 300);
-    }, duration); // 使用传入的持续时间
+    }, duration); // 使用传入的持续时�?
 }
 
 /**
@@ -1715,7 +1711,7 @@ function showNotification(message, type = 'info', duration = 5000) {
  * @param {string} tool - 工具名称
  */
 function installTool(tool) {
-    showNotification(`正在安装 ${tool}，请稍候...`, 'info');
+    showNotification(`正在安装 ${tool}，请稍�?..`, 'info');
 
     fetchWithAuth(API.toolsInstall, {
             method: 'POST',
@@ -1730,7 +1726,7 @@ function installTool(tool) {
         .then(data => {
             if (data.success) {
                 showNotification(data.message, 'success');
-                // 更新工具状态
+                // 更新工具状�?
                 toolsStatus[tool].installed = true;
                 updateToolInstallButtons();
             } else {
@@ -1744,7 +1740,7 @@ function installTool(tool) {
 }
 
 /**
- * 格式化地址为简短显示
+ * 格式化地址为简短显�?
  * @param {string} address - 完整地址
  * @returns {string} - 简短格式的地址
  */
@@ -1754,7 +1750,7 @@ function formatAddressShort(address) {
     }
 
     try {
-        // 从地址中提取主机名/IP和端口
+        // 从地址中提取主机名/IP和端�?
         let result = address;
 
         // 移除协议部分 (tcp://, udp://)
@@ -1768,7 +1764,7 @@ function formatAddressShort(address) {
             if (parts.length > 1) {
                 // 获取最后一部分作为端口
                 const port = parts[parts.length - 1];
-                // 获取IP或主机名的前15个字符
+                // 获取IP或主机名的前15个字�?
                 const host = parts.slice(0, -1).join(':');
                 const shortHost = host.length > 15 ? host.substring(0, 12) + '...' : host;
                 return shortHost + ':' + port;
@@ -1784,20 +1780,71 @@ function formatAddressShort(address) {
 
 // 添加登录表单HTML
 function createLoginForm() {
-    // 直接重定向到登录页面
-    window.location.href = 'login.html';
+    if (document.getElementById('login-form')) {
+        return; // 已存在，不重复创�?
+    }
+
+    const loginHtml = `
+    <div class="card">
+        <div class="logo-container">
+            <div class="logo">N</div>
+        </div>
+        <h2>Natter管理界面登录</h2>
+        <form id="login-form">
+            <div class="form-group">
+                <label for="password">请输入管理密�?</label>
+                <input type="password" id="password" placeholder="输入密码" required autocomplete="current-password">
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn-primary">�?�?/button>
+            </div>
+            <div id="login-error" class="login-error" style="display:none;"></div>
+        </form>
+        <div class="footer-text">
+            Natter Web管理界面 - 安全登录
+        </div>
+    </div>
+    `;
+
+    document.querySelector('.container').appendChild(loginPanel);
+
+    // 添加登录表单事件监听
+    const loginForm = document.getElementById('login-form');
+    loginForm.addEventListener('submit', function (e) {
+        e.preventDefault();
+        const password = document.getElementById('password').value;
+
+        // 为按钮添加加载状�?
+        const submitBtn = this.querySelector('button[type="submit"]');
+        const originalText = submitBtn.textContent;
+        submitBtn.textContent = '登录�?..';
+        submitBtn.disabled = true;
+
+        login(password)
+            .catch(() => {
+                // 恢复按钮状�?
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
+            });
+    });
+
+    // 聚焦密码输入�?
+    setTimeout(() => {
+        const passwordInput = document.getElementById('password');
+        if (passwordInput) {
+            passwordInput.focus();
+        }
+    }, 100);
 }
 
-// 检查是否需要认证
+// 检查是否需要认�?
 function checkAuthRequired() {
     return fetchWithAuth(API.authCheck)
         .then(response => {
-            // 检查响应状态
+            // 检查响应状�?
             if (!response.ok) {
-                // 如果响应不成功（例如500错误），视为配置加载失败
-                console.error('配置加载失败，重定向到登录页面');
-                window.location.href = 'login.html';
-                // 抛出错误终止后续处理
+                // 如果响应不成功（例如500错误），重定向到登录页面
+                window.location.href = '/login.html';
                 throw new Error('配置加载失败');
             }
             return response.json();
@@ -1805,12 +1852,12 @@ function checkAuthRequired() {
         .then(data => {
             const authRequired = data.auth_required;
             if (authRequired) {
-                // 如果需要认证但未认证，则重定向到登录页面
+                // 如果需要认证但未认证，则重定向到登录页�?
                 if (!isAuthenticated && !authToken) {
-                    window.location.href = 'login.html';
-                    return;
+                    window.location.href = '/login.html';
+                    return authRequired;
                 } else if (authToken) {
-                    // 已有token，尝试使用
+                    // 已有token，尝试使�?
                     isAuthenticated = true;
 
                     // 显示登出按钮
@@ -1822,10 +1869,10 @@ function checkAuthRequired() {
                     showServicesList();
                 }
             } else {
-                // 不需要认证
+                // 不需要认�?
                 isAuthenticated = true;
 
-                // 隐藏登出按钮，因为不需要认证
+                // 隐藏登出按钮，因为不需要认�?
                 const logoutBtn = document.getElementById('logout-btn');
                 if (logoutBtn) {
                     logoutBtn.style.display = 'none';
@@ -1837,18 +1884,76 @@ function checkAuthRequired() {
         })
         .catch(error => {
             console.error('检查认证状态时出错:', error);
-            // 出错时重定向到登录页面
-            window.location.href = 'login.html';
-            return true; // 默认需要认证
+            // 出错时重定向到登录页�?
+            window.location.href = '/login.html';
+            return true; // 默认需要认�?
         });
 }
 
-// 登录功能 - 现在已不需要，登录在login.html中处理
+// 登录功能
 function login(password) {
-    // 这个函数现在不再使用，因为登录已移至login.html
-    // 保留此函数以避免可能的引用错误
-    console.warn('login函数不再使用，请使用login.html进行登录');
-    return Promise.reject(new Error('请使用login.html进行登录'));
+    const loginError = document.getElementById('login-error');
+    loginError.style.display = 'none';
+
+    return fetchWithAuth(API.authLogin, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                password: password
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // 保存认证token
+                authToken = data.token;
+                localStorage.setItem('natter_auth_token', authToken);
+                isAuthenticated = true;
+
+                // 显示登出按钮
+                const logoutBtn = document.getElementById('logout-btn');
+                if (logoutBtn) {
+                    logoutBtn.style.display = 'block';
+                }
+
+                // 隐藏登录面板
+
+                // 显示成功通知
+                showNotification('登录成功，欢迎使用Natter管理界面', 'success');
+
+                // 显示服务列表
+                showServicesList();
+            } else {
+                // 显示错误
+                loginError.textContent = data.error || '密码错误，请重试';
+                loginError.style.display = 'block';
+
+                // 恢复按钮状�?
+                const submitBtn = document.querySelector('#login-form button[type="submit"]');
+                if (submitBtn) {
+                    submitBtn.textContent = '�?�?;
+                    submitBtn.disabled = false;
+                }
+
+                throw new Error('登录失败');
+            }
+        })
+        .catch(error => {
+            console.error('登录请求出错:', error);
+            loginError.textContent = '登录请求失败，请检查网络连�?;
+            loginError.style.display = 'block';
+
+            // 恢复按钮状�?
+            const submitBtn = document.querySelector('#login-form button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.textContent = '�?�?;
+                submitBtn.disabled = false;
+            }
+
+            throw error;
+        });
 }
 
 // 登出功能
@@ -1861,7 +1966,7 @@ function logout() {
     window.location.href = '/login.html';
 }
 
-// 隐藏所有面板
+// 隐藏所有面�?
 function hideAllPanels() {
     servicesPanel.style.display = 'none';
     newServicePanel.style.display = 'none';
@@ -1879,12 +1984,9 @@ function fetchWithAuth(url, options = {}) {
     // 确保headers对象存在
     newOptions.headers = newOptions.headers || {};
 
-    // 每次都从localStorage中读取最新的token
-    const currentToken = localStorage.getItem('natter_auth_token');
-
-    // 添加认证头（如果有token）
-    if (currentToken) {
-        newOptions.headers['Authorization'] = `Bearer ${currentToken}`;
+    // 添加认证头（如果有token�?
+    if (authToken) {
+        newOptions.headers['Authorization'] = `Basic ${authToken}`;
     }
 
     return fetch(url, newOptions)
@@ -1918,8 +2020,8 @@ function fetchWithAuth(url, options = {}) {
 
 // 添加新函数，用于检查Docker环境
 function checkDockerEnvironment() {
-    // 由于前端无法直接检测Docker环境，我们假设在Docker中运行
-    // 因为这个应用主要设计为在Docker中使用
+    // 由于前端无法直接检测Docker环境，我们假设在Docker中运�?
+    // 因为这个应用主要设计为在Docker中使�?
 
     // 获取nftables选项
     const nftablesOption = document.querySelector('option[value="nftables"]');
@@ -1927,14 +2029,14 @@ function checkDockerEnvironment() {
     if (nftablesOption && nftablesOption.disabled) {
         // 如果已禁用，显示全局通知
         showNotification(`
-            <strong>注意：</strong> 检测到Docker容器环境，已禁用nftables转发方法。<br>
-            Docker容器缺少运行nftables所需的内核权限。<br>
-            请使用<strong>socket</strong>或<strong>iptables</strong>转发方法。
-        `, 'warning', 10000); // 显示10秒
+            <strong>注意�?/strong> 检测到Docker容器环境，已禁用nftables转发方法�?br>
+            Docker容器缺少运行nftables所需的内核权限�?br>
+            请使�?strong>socket</strong>�?strong>iptables</strong>转发方法�?
+        `, 'warning', 10000); // 显示10�?
     }
 }
 
-// 切换服务的自动重启功能
+// 切换服务的自动重启功�?
 function toggleAutoRestart(serviceId, enabled) {
     fetchWithAuth(API.autoRestart, {
             method: 'POST',
@@ -1949,38 +2051,38 @@ function toggleAutoRestart(serviceId, enabled) {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                showNotification(`服务自动重启已${enabled ? '启用' : '禁用'}`, 'success');
+                showNotification(`服务自动重启�?{enabled ? '启用' : '禁用'}`, 'success');
                 // 更新状态样式类
                 if (autoRestartStatus) {
                     autoRestartStatus.className = enabled ? 'status-enabled' : 'status-disabled';
                 }
             } else {
                 showNotification('设置自动重启失败', 'error');
-                // 回滚UI状态
+                // 回滚UI状�?
                 if (autoRestartToggle) {
                     autoRestartToggle.checked = !enabled;
                 }
                 if (autoRestartStatus) {
-                    autoRestartStatus.textContent = !enabled ? '已启用' : '已禁用';
+                    autoRestartStatus.textContent = !enabled ? '已启�? : '已禁�?;
                     autoRestartStatus.className = !enabled ? 'status-enabled' : 'status-disabled';
                 }
             }
         })
         .catch(error => {
             console.error('设置自动重启出错:', error);
-            showNotification('设置自动重启时发生错误', 'error');
-            // 回滚UI状态
+            showNotification('设置自动重启时发生错�?, 'error');
+            // 回滚UI状�?
             if (autoRestartToggle) {
                 autoRestartToggle.checked = !enabled;
             }
             if (autoRestartStatus) {
-                autoRestartStatus.textContent = !enabled ? '已启用' : '已禁用';
+                autoRestartStatus.textContent = !enabled ? '已启�? : '已禁�?;
                 autoRestartStatus.className = !enabled ? 'status-enabled' : 'status-disabled';
             }
         });
 }
 
-// 更新服务详情面板的运行时间
+// 更新服务详情面板的运行时�?
 function updateDetailPanelRuntime(service) {
     if (!service.start_time) {
         serviceRuntime.textContent = 'N/A';
@@ -1993,12 +2095,12 @@ function updateDetailPanelRuntime(service) {
 
 // 更新服务日志
 function updateServiceLog(logs) {
-    // 更新输出日志，限制最多显示100条
+    // 更新输出日志，限制最多显�?00�?
     let outputLines = logs || [];
     if (outputLines.length > 100) {
-        // 只保留最新的100条日志
+        // 只保留最新的100条日�?
         outputLines = outputLines.slice(-100);
-        serviceOutput.textContent = `[显示最新100条日志，共${logs.length}条]\n` + outputLines.join('\n');
+        serviceOutput.textContent = `[显示最�?00条日志，�?{logs.length}条]\n` + outputLines.join('\n');
     } else {
         serviceOutput.textContent = outputLines.join('\n');
     }
@@ -2015,19 +2117,19 @@ function startDetailRefresh() {
         clearInterval(refreshIntervalId);
     }
 
-    // 设置新的刷新定时器，每5秒刷新一次服务详情
+    // 设置新的刷新定时器，�?秒刷新一次服务详�?
     refreshIntervalId = setInterval(() => {
         if (currentServiceId) {
             loadServiceDetails(currentServiceId);
         } else {
-            // 如果没有当前服务ID，停止刷新
+            // 如果没有当前服务ID，停止刷�?
             clearInterval(refreshIntervalId);
             refreshIntervalId = null;
         }
     }, 5000);
 }
 
-// 获取版本号
+// 获取版本�?
 function fetchVersion() {
     fetch(API.version)
         .then(response => response.json())
@@ -2035,7 +2137,7 @@ function fetchVersion() {
             document.getElementById('version').textContent = data.version;
         })
         .catch(error => {
-            console.error('获取版本号失败:', error);
+            console.error('获取版本号失�?', error);
             document.getElementById('version').textContent = '未知';
         });
 }
@@ -2083,18 +2185,18 @@ function loadIyuuConfig() {
             if (data.config) {
                 const config = data.config;
 
-                // 设置启用状态
+                // 设置启用状�?
                 iyuuEnabled.checked = config.enabled;
 
                 // 加载令牌列表
                 renderIyuuTokens(config.tokens || []);
 
-                // 设置定时推送配置
+                // 设置定时推送配�?
                 const schedule = config.schedule || {};
                 iyuuScheduleEnabled.checked = schedule.enabled || false;
-                iyuuScheduleMessage.value = schedule.message || "Natter服务状态日报";
+                iyuuScheduleMessage.value = schedule.message || "Natter服务状态日�?;
 
-                // 渲染时间段列表
+                // 渲染时间段列�?
                 renderScheduleTimes(schedule.times || ["08:00"]);
 
                 // 根据定时推送状态显示或隐藏选项
@@ -2139,17 +2241,17 @@ function renderScheduleTimes(times) {
     });
 }
 
-// 添加时间段
+// 添加时间�?
 function addScheduleTime() {
     const newTimeInput = document.getElementById('new-schedule-time');
     const newTime = newTimeInput.value.trim();
 
     if (!newTime) {
-        showNotification('请选择有效的时间', 'warning');
+        showNotification('请选择有效的时�?, 'warning');
         return;
     }
 
-    // 获取当前配置中的时间段列表
+    // 获取当前配置中的时间段列�?
     fetchWithAuth(API.iyuuConfig)
         .then(response => response.json())
         .then(data => {
@@ -2160,7 +2262,7 @@ function addScheduleTime() {
 
                 // 检查是否已存在相同时间
                 if (times.includes(newTime)) {
-                    showNotification('该时间段已存在', 'warning');
+                    showNotification('该时间段已存�?, 'warning');
                     return;
                 }
 
@@ -2180,7 +2282,7 @@ function addScheduleTime() {
                 // 保存更新后的配置
                 saveIyuuConfigWithData(updatedConfig);
 
-                // 清空输入框
+                // 清空输入�?
                 newTimeInput.value = '08:00';
             }
         })
@@ -2190,9 +2292,9 @@ function addScheduleTime() {
         });
 }
 
-// 移除时间段
+// 移除时间�?
 function removeScheduleTime(time) {
-    if (!confirm('确定要删除此时间段吗？')) {
+    if (!confirm('确定要删除此时间段吗�?)) {
         return;
     }
 
@@ -2205,7 +2307,7 @@ function removeScheduleTime(time) {
                 const schedule = config.schedule || {};
                 let times = schedule.times || [];
 
-                // 移除指定时间段
+                // 移除指定时间�?
                 times = times.filter(t => t !== time);
 
                 // 更新配置
@@ -2240,19 +2342,19 @@ function saveIyuuConfigWithData(config) {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                showNotification('IYUU配置已保存', 'success');
-                loadIyuuConfig(); // 重新加载确认配置已更新
+                showNotification('IYUU配置已保�?, 'success');
+                loadIyuuConfig(); // 重新加载确认配置已更�?
             } else {
                 showNotification('保存IYUU配置失败', 'error');
             }
         })
         .catch(error => {
             console.error('保存IYUU配置出错:', error);
-            showNotification('保存IYUU配置时发生错误', 'error');
+            showNotification('保存IYUU配置时发生错�?, 'error');
         });
 }
 
-// 修改保存IYUU配置函数，支持多时间段
+// 修改保存IYUU配置函数，支持多时间�?
 function saveIyuuConfig() {
     // 收集当前配置
     const config = {
@@ -2263,7 +2365,7 @@ function saveIyuuConfig() {
         }
     };
 
-    // 获取当前配置中的时间段列表
+    // 获取当前配置中的时间段列�?
     fetchWithAuth(API.iyuuConfig)
         .then(response => response.json())
         .then(data => {
@@ -2284,7 +2386,7 @@ function saveIyuuConfig() {
         });
 }
 
-// 立即推送当前服务状态
+// 立即推送当前服务状�?
 function pushServicesNow() {
     fetchWithAuth(API.iyuuPushNow, {
             method: 'POST',
@@ -2296,18 +2398,18 @@ function pushServicesNow() {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                showNotification('服务状态推送成功', 'success');
+                showNotification('服务状态推送成�?, 'success');
             } else {
-                showNotification(`推送失败: ${data.errors ? data.errors.join(', ') : '未知错误'}`, 'error');
+                showNotification(`推送失�? ${data.errors ? data.errors.join(', ') : '未知错误'}`, 'error');
             }
         })
         .catch(error => {
-            console.error('推送服务状态出错:', error);
+            console.error('推送服务状态出�?', error);
             showNotification('推送服务状态时发生错误', 'error');
         });
 }
 
-// 立即推送指定服务状态
+// 立即推送指定服务状�?
 function pushServiceNow(serviceId) {
     fetchWithAuth(API.iyuuPushNow, {
             method: 'POST',
@@ -2321,13 +2423,13 @@ function pushServiceNow(serviceId) {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                showNotification('服务状态推送成功', 'success');
+                showNotification('服务状态推送成�?, 'success');
             } else {
-                showNotification(`推送失败: ${data.errors ? data.errors.join(', ') : '未知错误'}`, 'error');
+                showNotification(`推送失�? ${data.errors ? data.errors.join(', ') : '未知错误'}`, 'error');
             }
         })
         .catch(error => {
-            console.error('推送服务状态出错:', error);
+            console.error('推送服务状态出�?', error);
             showNotification('推送服务状态时发生错误', 'error');
         });
 }
@@ -2338,7 +2440,7 @@ function renderIyuuTokens(tokens) {
     tokensList.innerHTML = '';
 
     if (!tokens || tokens.length === 0) {
-        tokensList.innerHTML = '<div class="empty-tokens">未添加任何令牌</div>';
+        tokensList.innerHTML = '<div class="empty-tokens">未添加任何令�?/div>';
         return;
     }
 
@@ -2381,7 +2483,7 @@ function deleteIyuuToken(token) {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                showNotification(data.message || '令牌已删除', 'success');
+                showNotification(data.message || '令牌已删�?, 'success');
                 loadIyuuConfig(); // 重新加载令牌列表
             } else {
                 showNotification(data.message || '删除令牌失败', 'error');
@@ -2389,23 +2491,23 @@ function deleteIyuuToken(token) {
         })
         .catch(error => {
             console.error('删除IYUU令牌出错:', error);
-            showNotification('删除令牌时发生错误', 'error');
+            showNotification('删除令牌时发生错�?, 'error');
         });
 }
 
-// 测试IYUU推送（改名避免冲突）
+// 测试IYUU推送（改名避免冲突�?
 function testIyuuPushMessage() {
     fetchWithAuth(API.iyuuTest)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                showNotification('测试消息已成功发送', 'success');
+                showNotification('测试消息已成功发�?, 'success');
             } else {
-                showNotification(`测试消息发送失败: ${data.errors ? data.errors.join(', ') : '未知错误'}`, 'error');
+                showNotification(`测试消息发送失�? ${data.errors ? data.errors.join(', ') : '未知错误'}`, 'error');
             }
         })
         .catch(error => {
-            console.error('测试IYUU推送出错:', error);
+            console.error('测试IYUU推送出�?', error);
             showNotification('测试推送时发生错误', 'error');
         });
 }
@@ -2431,8 +2533,8 @@ function addIyuuTokenAction() {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                showNotification(data.message || '令牌已添加', 'success');
-                newIyuuToken.value = ''; // 清空输入框
+                showNotification(data.message || '令牌已添�?, 'success');
+                newIyuuToken.value = ''; // 清空输入�?
                 loadIyuuConfig(); // 重新加载令牌列表
             } else {
                 showNotification(data.message || '添加令牌失败', 'error');
@@ -2440,7 +2542,7 @@ function addIyuuTokenAction() {
         })
         .catch(error => {
             console.error('添加IYUU令牌出错:', error);
-            showNotification('添加令牌时发生错误', 'error');
+            showNotification('添加令牌时发生错�?, 'error');
         });
 }
 
@@ -2452,7 +2554,7 @@ function checkAuth() {
         return false;
     }
 
-    // 验证token有效性
+    // 验证token有效�?
     fetch('/api/auth/check', {
             headers: {
                 'Authorization': `Bearer ${token}`
@@ -2461,34 +2563,20 @@ function checkAuth() {
         .then(response => response.json())
         .then(data => {
             if (data.authenticated) {
-                // 已认证，显示主界面
+                // 已认证，显示主界�?
                 showMainInterface();
             } else {
-                // token无效，清除并跳转到登录页面
+                // token无效，清除并跳转到登录页�?
                 localStorage.removeItem('natter_auth_token');
                 window.location.href = '/login.html';
             }
         })
         .catch(error => {
-            console.error('认证检查失败:', error);
-            // 网络错误，也跳转到登录页面
+            console.error('认证检查失�?', error);
+            // 网络错误，也跳转到登录页�?
             localStorage.removeItem('natter_auth_token');
             window.location.href = '/login.html';
         });
 
     return true;
-}
-
-// 显示主界面
-function showMainInterface() {
-    // 加载服务列表
-    loadServices();
-
-    // 获取版本号
-    fetchVersion();
-
-    // 设置页面刷新定时器 (每10秒刷新一次列表)
-    if (!window.refreshTimer) {
-        window.refreshTimer = setInterval(loadServices, 10000);
-    }
 }
