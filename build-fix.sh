@@ -1,4 +1,11 @@
 #!/bin/bash
+###
+ # @Author: Await
+ # @Date: 2025-05-29 10:40:48
+ # @LastEditors: Await
+ # @LastEditTime: 2025-05-29 10:47:53
+ # @Description: 请填写简介
+### 
 # Natter Web Docker构建修复脚本
 # 解决Python镜像digest不匹配问题
 
@@ -44,12 +51,14 @@ docker run -d \
     --name natter-web-container \
     --network host \
     -v /volume1/docker/1panel/apps/www/natter-web/data:/app/data \
+    -v /volume1/docker/1panel/apps/www/natter-web/logs:/app/logs \
     --cap-add NET_ADMIN \
     --restart always \
     -e TZ=Asia/Shanghai \
     -e PYTHONUNBUFFERED=1 \
     -e NATTER_PATH=/app/natter/natter.py \
     -e DATA_DIR=/app/data \
+    -e LOGS_DIR=/app/logs \
     -e WEB_PORT=7111 \
     -e WEB_PASSWORD=zd2580 \
     natter-web:latest

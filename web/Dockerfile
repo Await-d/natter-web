@@ -39,13 +39,14 @@ RUN mkdir -p /app/natter && \
     wget -q https://raw.githubusercontent.com/MikeWang000000/Natter/master/natter.py -O /app/natter/natter.py && \
     chmod +x /app/natter/natter.py
 
-# 创建数据目录
-RUN mkdir -p /app/data && \
-    chmod -R 777 /app/data
+# 创建数据目录和日志目录
+RUN mkdir -p /app/data /app/logs && \
+    chmod -R 777 /app/data /app/logs
 
 # 设置环境变量
 ENV NATTER_PATH=/app/natter/natter.py \
     DATA_DIR=/app/data \
+    LOGS_DIR=/app/logs \
     WEB_PORT=8080 \
     PYTHONUNBUFFERED=1
 

@@ -25,12 +25,15 @@ NATTER_PATH = os.environ.get('NATTER_PATH') or os.path.join(os.path.dirname(os.p
 
 # 数据存储目录，优先使用环境变量定义的路径
 DATA_DIR = os.environ.get('DATA_DIR') or os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+# 日志存储目录，优先使用环境变量定义的路径
+LOGS_DIR = os.environ.get('LOGS_DIR') or os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
 TEMPLATES_FILE = os.path.join(DATA_DIR, "templates.json")
 SERVICES_DB_FILE = os.path.join(DATA_DIR, "services.json")
 IYUU_CONFIG_FILE = os.path.join(DATA_DIR, "iyuu_config.json")  # IYUU配置文件
 
-# 确保数据目录存在
+# 确保数据目录和日志目录存在
 os.makedirs(DATA_DIR, exist_ok=True)
+os.makedirs(LOGS_DIR, exist_ok=True)
 
 # 存储运行中的Natter服务进程
 running_services = {}
@@ -831,9 +834,15 @@ class NatterService:
         self.remote_port = None  # 添加远程端口属性
         self.remark = remark     # 添加备注属性
         self.last_mapped_address = None  # 记录上一次的映射地址，用于检测变更
+        
+        # 日志文件路径
+        self.log_file = os.path.join(LOGS_DIR, f"service_{service_id}.log")
 
         # 尝试从命令参数中解析端口信息
         self._parse_ports_from_args()
+        
+        # 加载历史日志
+        self._load_logs()
 
     def _parse_ports_from_args(self):
         """从命令参数中解析端口信息"""
@@ -935,6 +944,9 @@ class NatterService:
             # 限制保存的日志行数为100行
             if len(self.output_lines) > 100:
                 self.output_lines.pop(0)
+            
+            # 保存日志到文件
+            self._save_logs()
 
             # 尝试提取映射地址
             if '<--Natter-->' in line:
@@ -987,6 +999,9 @@ class NatterService:
                 self.output_lines.append("⚠️ 检测到nftables不可用错误！Docker容器可能缺少所需权限或内核支持。")
                 self.output_lines.append("💡 建议：尝试使用其他转发方法，如'socket'（内置）或'iptables'。")
                 self.output_lines.append("📋 步骤：停止此服务，重新创建服务并在'转发方法'中选择'socket'或'iptables'。")
+                
+                # 保存错误信息到日志
+                self._save_logs()
 
                 # 发送错误推送 - 使用消息队列
                 service_name = self.remark or f"服务 {self.service_id}"
@@ -1000,6 +1015,9 @@ class NatterService:
             if "pcap initialization failed" in line:
                 self.output_lines.append("⚠️ 检测到pcap初始化错误！这通常与nftables功能有关。")
                 self.output_lines.append("💡 建议：尝试使用其他转发方法，如'socket'（内置）或'iptables'。")
+                
+                # 保存错误信息到日志
+                self._save_logs()
 
                 # 发送错误推送 - 使用消息队列
                 service_name = self.remark or f"服务 {self.service_id}"
@@ -1034,8 +1052,9 @@ class NatterService:
                 if old_wan_status != self.wan_status:
                     self._update_nat_type_inference()
 
-        # 进程结束后更新状态
+        # 进程结束后更新状态并保存日志
         self.status = "已停止"
+        self._save_logs()
 
         # 发送服务停止推送 - 使用消息队列
         service_name = self.remark or f"服务 {self.service_id}"
@@ -1057,6 +1076,7 @@ class NatterService:
             self.restart_thread.start()
         elif nftables_error_detected:
             self.output_lines.append("🔄 因nftables错误，已禁用自动重启。请使用其他转发方法重新配置。")
+            self._save_logs()
 
     def _restart_service(self):
         """自动重启服务"""
@@ -1184,6 +1204,12 @@ class NatterService:
     def clear_logs(self):
         """清空日志"""
         self.output_lines = []
+        # 清空日志文件
+        try:
+            with open(self.log_file, 'w', encoding='utf-8') as f:
+                f.write('')
+        except Exception as e:
+            print(f"清空日志文件出错: {e}")
         return True
 
     def get_info(self):
@@ -1216,6 +1242,27 @@ class NatterService:
             "created_at": self.start_time or time.time(),
             "remark": self.remark
         }
+
+    def _load_logs(self):
+        """加载历史日志"""
+        try:
+            if os.path.exists(self.log_file):
+                with open(self.log_file, 'r', encoding='utf-8') as f:
+                    self.output_lines = [line.strip() for line in f.readlines()]
+            else:
+                self.output_lines = []
+        except Exception as e:
+            print(f"加载历史日志出错: {e}")
+            self.output_lines = []
+
+    def _save_logs(self):
+        """保存日志到文件"""
+        try:
+            with open(self.log_file, 'w', encoding='utf-8') as f:
+                for line in self.output_lines:
+                    f.write(line + '\n')
+        except Exception as e:
+            print(f"保存日志文件出错: {e}")
 
 def generate_service_id():
     """生成唯一的服务ID"""
@@ -1321,6 +1368,15 @@ class NatterManager:
                 service = running_services[service_id]
                 # 确保服务已停止
                 service.stop()
+                
+                # 删除日志文件
+                try:
+                    if os.path.exists(service.log_file):
+                        os.remove(service.log_file)
+                        print(f"已删除服务 {service_id} 的日志文件")
+                except Exception as e:
+                    print(f"删除日志文件出错: {e}")
+                
                 # 从字典中删除服务
                 del running_services[service_id]
                 # 保存服务配置（移除服务后）
