@@ -236,22 +236,22 @@ def create_beautiful_notification_layout(categories, total_messages):
 
 def collect_services_summary(categories):
     """收集服务摘要信息"""
-    running_services = []
-    services_with_mappings = {}
+        running_services = []
+        services_with_mappings = {}
 
-    for cat, messages in categories.items():
-        for msg in messages:
-            content = msg["content"]
+        for cat, messages in categories.items():
+            for msg in messages:
+                content = msg["content"]
             service_name = extract_service_name(msg["title"])
 
-            # 提取服务的运行状态
+                # 提取服务的运行状态
             if cat == "启动" or "启动" in msg["title"]:
-                running_services.append(service_name)
+                    running_services.append(service_name)
 
-            # 提取映射地址
+                # 提取映射地址
             mapping = extract_mapping_address(content)
             if mapping:
-                services_with_mappings[service_name] = mapping
+                        services_with_mappings[service_name] = mapping
 
     return {
         "running": running_services,
@@ -325,8 +325,8 @@ def format_scheduled_report(messages):
         return ""
     
     msg = messages[0]  # 使用第一条消息作为代表
-    content = msg["content"]
-    
+                    content = msg["content"]
+                    
     result = ""
     
     # 提取服务概况
@@ -340,17 +340,17 @@ def format_scheduled_report(messages):
 """
     
     # 提取并美化服务详情
-    services_section = re.search(r"服务详情\*\*\n(.*?)(?=\n\s*━━━|\Z)", content, re.DOTALL)
-    if services_section:
-        services_text = services_section.group(1)
-        service_blocks = re.findall(r"([🟢⚪].*?\n(?:.*?─.*?\n)*)", services_text, re.DOTALL)
+                    services_section = re.search(r"服务详情\*\*\n(.*?)(?=\n\s*━━━|\Z)", content, re.DOTALL)
+                    if services_section:
+                        services_text = services_section.group(1)
+                        service_blocks = re.findall(r"([🟢⚪].*?\n(?:.*?─.*?\n)*)", services_text, re.DOTALL)
         
         if service_blocks:
             result += "🎯 **服务详情列表**\n"
             for i, block in enumerate(service_blocks, 1):
                 lines = block.strip().split('\n')
                 if lines:
-                    # 提取服务名称和状态
+                                # 提取服务名称和状态
                     service_line = lines[0]
                     status_emoji = "🟢" if "🟢" in service_line else "🔴"
                     
@@ -358,10 +358,10 @@ def format_scheduled_report(messages):
                     name_match = re.search(r'\*\*(.*?)\*\*', service_line)
                     service_name = name_match.group(1) if name_match else f"服务 {i}"
                     
-                    # 提取映射地址
+                                # 提取映射地址
                     mapping_line = next((line for line in lines if "映射" in line), None)
                     mapping = "无映射"
-                    if mapping_line:
+                                if mapping_line:
                         mapping_match = re.search(r'`(.*?)`', mapping_line)
                         if mapping_match:
                             mapping = mapping_match.group(1)
@@ -379,8 +379,8 @@ def format_important_messages(messages):
     
     for i, msg in enumerate(messages, 1):
         service_name = extract_service_name(msg["title"])
-        content = msg["content"]
-        
+                    content = msg["content"]
+
         result += f"""
 🔹 **任务 {i}：{service_name}**
 ```
@@ -411,24 +411,24 @@ def format_regular_messages(messages):
 def extract_key_info_from_content(content):
     """从消息内容中提取关键信息"""
     # 检查消息类型并提取相应信息
-    if "服务已成功启动" in content:
+                    if "服务已成功启动" in content:
         return "✅ 服务已成功启动"
-    elif "服务已停止" in content:
+                    elif "服务已停止" in content:
         return "⏹️ 服务已停止运行"
-    elif "映射地址已变更" in content:
+                    elif "映射地址已变更" in content:
         old_addr = re.search(r"旧地址[：:]\s*([^\n]+)", content)
         new_addr = re.search(r"新地址[：:]\s*([^\n]+)", content)
         if old_addr and new_addr:
             return f"🔄 地址变更：`{old_addr.group(1)}` → `{new_addr.group(1)}`"
         return "🔄 映射地址已变更"
-    elif "服务获取到映射地址" in content:
+                    elif "服务获取到映射地址" in content:
         mapping = extract_mapping_address(content)
         if mapping:
             return f"🆕 获取新地址：`{mapping}`"
         return "🆕 获取到映射地址"
     else:
         # 返回第一行作为摘要
-        first_line = content.split('\n', 1)[0] if '\n' in content else content
+                        first_line = content.split('\n', 1)[0] if '\n' in content else content
         return first_line[:50] + ("..." if len(first_line) > 50 else "")
 
 def format_content_as_code_block(content):
@@ -611,18 +611,18 @@ def create_daily_report_layout(services_info, running_count, stopped_count):
 
 """
 
-    if services_info:
+                if services_info:
         content += """🔸 **服务详情**
 ═══════════════════════════════════════════
 """
         for i, service in enumerate(services_info, 1):
-            service_id = service.get("id", "未知")
-            remark = service.get("remark") or f"服务 {service_id}"
-            status = service.get("status", "未知")
-            mapped_address = service.get("mapped_address", "无映射")
-            lan_status = service.get("lan_status", "未知")
-            wan_status = service.get("wan_status", "未知")
-            nat_type = service.get("nat_type", "未知")
+                        service_id = service.get("id", "未知")
+                        remark = service.get("remark") or f"服务 {service_id}"
+                        status = service.get("status", "未知")
+                        mapped_address = service.get("mapped_address", "无映射")
+                        lan_status = service.get("lan_status", "未知")
+                        wan_status = service.get("wan_status", "未知")
+                        nat_type = service.get("nat_type", "未知")
 
             # 根据状态选择图标
             status_emoji = "🟢" if status == "运行中" else "🔴"
@@ -635,7 +635,7 @@ def create_daily_report_layout(services_info, running_count, stopped_count):
    ├─ WAN： {"🟢" if wan_status == "OPEN" else "🔴"} {wan_status}
    └─ NAT： 🔍 {nat_type}
 """
-    else:
+                else:
         content += """❗ **暂无服务运行**
 ───────────────────────────────────────────
    目前没有配置任何 Natter 服务
@@ -1047,7 +1047,7 @@ class NatterService:
             if wan_match:
                 old_wan_status = self.wan_status
                 self.wan_status = wan_match.group(2).strip()
-                
+
                 # 如果WAN状态变化，更新NAT类型推断
                 if old_wan_status != self.wan_status:
                     self._update_nat_type_inference()
@@ -1199,7 +1199,7 @@ class NatterService:
             error_msg = f"重启过程中发生错误: {str(e)}"
             self.output_lines.append(f"❌ {error_msg}")
             print(f"Service {self.service_id} restart error: {e}")
-            return False
+        return False
 
     def clear_logs(self):
         """清空日志"""
