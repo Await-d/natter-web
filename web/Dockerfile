@@ -1,5 +1,5 @@
 # 使用更稳定的Python镜像版本，指定具体的digest
-FROM python:3.11.11-slim-bullseye
+FROM python:3.11.8-slim
 
 WORKDIR /app
 
