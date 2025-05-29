@@ -1677,3 +1677,268 @@ input:checked + .slider:before {
         padding: 1px 6px;
     }
 }
+
+/* =============================================================================
+   图标替代样式 - 使用Unicode字符替代Font Awesome
+   ============================================================================= */
+
+/* 基础图标样式 */
+.icon-replacement {
+    display: inline-block;
+    font-style: normal;
+    font-variant: normal;
+    text-rendering: auto;
+    line-height: 1;
+    font-family: "Segoe UI Symbol", "Apple Color Emoji", "Noto Color Emoji", "Segoe UI Emoji", sans-serif;
+}
+
+/* 复制图标 */
+.fas.fa-copy::before, 
+i.fas.fa-copy::before {
+    content: "📋";
+    font-family: "Segoe UI Symbol", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
+}
+
+/* 外部链接图标 */
+.fas.fa-external-link-alt::before,
+i.fas.fa-external-link-alt::before {
+    content: "↗";
+    font-family: "Segoe UI Symbol", "Arial Unicode MS", sans-serif;
+    font-weight: bold;
+}
+
+/* 信息图标 */
+.fas.fa-info-circle::before,
+i.fas.fa-info-circle::before {
+    content: "ℹ";
+    font-family: "Segoe UI Symbol", "Arial Unicode MS", sans-serif;
+    color: #17a2b8;
+    font-weight: bold;
+}
+
+/* 重启图标 */
+.fas.fa-redo::before,
+i.fas.fa-redo::before {
+    content: "↻";
+    font-family: "Segoe UI Symbol", "Arial Unicode MS", sans-serif;
+    font-weight: bold;
+}
+
+/* 播放/启动图标 */
+.fas.fa-play::before,
+i.fas.fa-play::before {
+    content: "▶";
+    font-family: "Segoe UI Symbol", "Arial Unicode MS", sans-serif;
+    color: #28a745;
+}
+
+/* 停止图标 */
+.fas.fa-stop::before,
+i.fas.fa-stop::before {
+    content: "⏹";
+    font-family: "Segoe UI Symbol", "Apple Color Emoji", sans-serif;
+    color: #dc3545;
+}
+
+/* 删除/垃圾桶图标 */
+.fas.fa-trash::before,
+i.fas.fa-trash::before {
+    content: "🗑";
+    font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+}
+
+/* 铃铛/通知图标 */
+.fas.fa-bell::before,
+i.fas.fa-bell::before {
+    content: "🔔";
+    font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+}
+
+/* 隐藏原本的图标文本，只显示::before内容 */
+.fas, i.fas {
+    font-size: inherit;
+    color: inherit;
+}
+
+.fas::before, i.fas::before {
+    margin-right: 4px;
+}
+
+/* 确保图标在按钮中正确对齐 */
+button .fas, button i.fas {
+    vertical-align: middle;
+}
+
+/* 服务卡片按钮图标优化 */
+.service-card-actions button .fas::before,
+.service-card-actions button i.fas::before {
+    margin-right: 2px;
+    font-size: 0.9em;
+}
+
+/* 修复列表布局问题 */
+.service-card-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 12px;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.service-card-actions button {
+    padding: 4px 8px;
+    border: none;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    min-width: 55px;
+    justify-content: center;
+    height: 28px;
+    line-height: 1;
+}
+
+/* 地址容器布局优化 */
+.service-address-container {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 6px 0;
+    padding: 6px 8px;
+    background-color: rgba(0, 0, 0, 0.02);
+    border-radius: 6px;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    min-height: 36px;
+}
+
+.service-address-label {
+    font-weight: 500;
+    color: var(--dark-color);
+    white-space: nowrap;
+    font-size: 0.85rem;
+}
+
+.service-address {
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+    color: var(--secondary-color);
+    background-color: rgba(255, 255, 255, 0.8);
+    padding: 2px 4px;
+    border-radius: 3px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    flex: 1;
+    min-width: 100px;
+    word-break: break-all;
+}
+
+/* 复制和打开按钮优化 */
+.copy-address-btn, .open-address-btn {
+    padding: 2px 6px;
+    border: none;
+    border-radius: 3px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-left: 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    height: 24px;
+}
+
+.copy-address-btn {
+    background-color: #4CAF50;
+    color: white;
+}
+
+.copy-address-btn:hover {
+    background-color: #45a049;
+}
+
+.open-address-btn {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.open-address-btn:hover {
+    background-color: #2a4570;
+}
+
+/* 服务卡片整体布局优化 */
+.service-card {
+    background-color: #fff;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    margin-bottom: 12px;
+    overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.service-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.service-card-body {
+    padding: 12px;
+}
+
+/* 状态显示区域优化 */
+.penetration-status {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 8px;
+    margin-bottom: 8px;
+    font-size: 0.85em;
+}
+
+.status-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+    flex-wrap: wrap;
+}
+
+.status-row:last-child {
+    margin-bottom: 0;
+}
+
+.status-label {
+    font-weight: 500;
+    color: #495057;
+    min-width: 55px;
+    font-size: 0.8em;
+}
+
+/* 响应式优化 */
+@media (max-width: 480px) {
+    .service-card-actions {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 4px;
+    }
+    
+    .service-card-actions button {
+        min-width: auto;
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .service-address-container {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 4px;
+    }
+    
+    .copy-address-btn, .open-address-btn {
+        align-self: flex-end;
+        margin-left: 0;
+    }
+}
