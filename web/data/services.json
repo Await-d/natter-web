@@ -6,8 +6,9 @@
     ],
     "status": "运行中",
     "auto_restart": false,
-    "start_time": 1748485279.5411558,
+    "start_time": 1748502173.6653795,
     "remark": "sss",
-    "local_port": 80
+    "local_port": 80,
+    "remote_port": 11642
   }
 }

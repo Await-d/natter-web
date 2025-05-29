@@ -30,10 +30,11 @@ RUN apt-get update && \
 # 安装psutil等Python依赖
 RUN pip install --no-cache-dir psutil requests
 
-# 拷贝web目录内容
-COPY *.py *.html *.css *.js *.svg *.md *.sh *.yml /app/web/
-COPY data/ /app/web/data/
-COPY images/ /app/web/images/
+# 拷贝web目录内容到工作目录
+COPY . /app/web/
+
+# 确保图标文件存在的权限正确
+RUN ls -la /app/web/*.svg
 
 # 获取natter
 RUN mkdir -p /app/natter && \

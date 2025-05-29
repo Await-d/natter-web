@@ -18,7 +18,7 @@ from collections import deque  # 添加队列用于消息批量发送
 import psutil
 
 # 版本号定义
-VERSION = "1.0.5"
+VERSION = "1.0.6"
 
 # 确保能够访问到natter.py，优先使用环境变量定义的路径
 NATTER_PATH = os.environ.get('NATTER_PATH') or os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "natter", "natter.py")
@@ -1578,7 +1578,7 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                 return
 
             # 总是允许访问登录页和静态资源
-            if path == "/" or path == "" or path.endswith('.html') or path.endswith('.css') or path.endswith('.js'):
+            if path == "/" or path == "" or path.endswith('.html') or path.endswith('.css') or path.endswith('.js') or path.endswith('.svg'):
                 # 为前端文件提供静态服务
                 if path == "/" or path == "":
                     self._serve_file("index.html", "text/html")
@@ -1591,6 +1591,9 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                     return
                 elif path.endswith(".js"):
                     self._serve_file(path[1:], "application/javascript")
+                    return
+                elif path.endswith(".svg"):
+                    self._serve_file(path[1:], "image/svg+xml")
                     return
 
             # API请求需要验证
