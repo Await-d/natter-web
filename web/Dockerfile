@@ -1,8 +1,15 @@
-FROM python:3.9-slim
+# 使用更稳定的Python镜像版本，指定具体的digest
+FROM python:3.11-slim
 
 WORKDIR /app
 
-# 安装必要的依赖
+# 设置环境变量避免交互式安装
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# 更新包管理器并安装必要的依赖
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     procps \
@@ -15,10 +22,13 @@ RUN apt-get update && \
     iproute2 \
     wget \
     curl \
-    && rm -rf /var/lib/apt/lists/*
+    ca-certificates \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /tmp/* /var/tmp/*
 
 # 安装psutil等Python依赖
-RUN pip install psutil requests --no-cache-dir
+RUN pip install --no-cache-dir psutil requests
 
 # 拷贝web目录内容
 COPY . /app/web/

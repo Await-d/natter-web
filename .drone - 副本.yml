@@ -1,39 +1,51 @@
 kind: pipeline
 type: docker
-name: natter-web-deployment
+name: natter-web-backup
 
 steps:
-  - name: build-and-deploy
+  - name: cleanup-and-build
     image: docker:dind
     volumes:
       - name: docker-socket
         path: /var/run/docker.sock
-      - name: app-data
-        path: /data/natter-web
     commands:
-      - docker build -t natter-web:latest .
+      # 强制清理所有Docker缓存
+      - docker system prune -af --volumes
+      - docker builder prune -af
+      # 强制拉取最新的基础镜像
+      - docker pull python:3.11-slim-bullseye
+      # 使用buildkit构建，避免缓存问题
+      - DOCKER_BUILDKIT=1 docker build --no-cache --pull --progress=plain -t natter-web:latest ./web
+      
+  - name: deploy
+    image: docker:dind
+    volumes:
+      - name: docker-socket
+        path: /var/run/docker.sock
+    commands:
       - docker stop natter-web-container || true
       - docker rm natter-web-container || true
       - >
         docker run -d --name natter-web-container 
         --network host
-        -v /data/natter-web/data:/app/data
+        -v /volume1/docker/1panel/apps/www/natter-web/data:/app/data
         --cap-add NET_ADMIN
         --restart always
         -e TZ=Asia/Shanghai
         -e PYTHONUNBUFFERED=1
         -e NATTER_PATH=/app/natter/natter.py
         -e DATA_DIR=/app/data
+        -e WEB_PORT=7111
+        -e WEB_PASSWORD=zd2580
         natter-web:latest
+    depends_on:
+      - cleanup-and-build
 
 volumes:
   - name: docker-socket
     host:
       path: /var/run/docker.sock
-  - name: app-data
-    host:
-      path: /data/natter-web
 
 trigger:
   branch:
-    - main 
+    - master 
