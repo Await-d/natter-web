@@ -698,16 +698,16 @@ function renderServicesList(services) {
         remarkRow.style.display = service.remark ? 'block' : 'none';
 
         // 添加事件监听器
-        card.querySelector('.btn-details').addEventListener('click', () => {
+        card.querySelector('.service-detail-btn').addEventListener('click', () => {
             showServiceDetails(service.id);
         });
 
-        card.querySelector('.btn-stop').addEventListener('click', (e) => {
+        card.querySelector('.service-stop-btn').addEventListener('click', (e) => {
             e.stopPropagation();
             stopService(service.id);
         });
 
-        card.querySelector('.btn-delete').addEventListener('click', (e) => {
+        card.querySelector('.service-delete-btn').addEventListener('click', (e) => {
             e.stopPropagation();
             deleteService(service.id);
         });
