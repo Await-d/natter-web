@@ -338,7 +338,7 @@ def format_scheduled_report(messages):
 └─────────────────┘
 
 """
-    
+                    
     # 提取并美化服务详情
                     services_section = re.search(r"服务详情\*\*\n(.*?)(?=\n\s*━━━|\Z)", content, re.DOTALL)
                     if services_section:
@@ -626,7 +626,7 @@ def create_daily_report_layout(services_info, running_count, stopped_count):
 
             # 根据状态选择图标
             status_emoji = "🟢" if status == "运行中" else "🔴"
-            
+
             content += f"""
 🔹 **{i:02d}. {remark}**
    ├─ 状态：{status_emoji} {status}

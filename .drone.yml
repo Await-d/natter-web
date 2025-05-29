@@ -9,8 +9,8 @@ steps:
       - name: docker-socket
         path: /var/run/docker.sock
     commands:
-      - docker system prune -f --volumes
-      - docker build --no-cache --pull -t natter-web:latest ./web
+      # - docker system prune -f --volumes
+      - docker build -t natter-web:latest ./web
       - docker stop natter-web-container || true
       - docker rm natter-web-container || true
       - >
