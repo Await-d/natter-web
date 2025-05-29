@@ -5,35 +5,767 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Natter 管理界面</title>
-    <link rel="icon" type="image/svg+xml" href="favicon.svg">
-    <link rel="stylesheet" href="style.css">
+    <style>
+        /* 基础样式重置和变量 */
+        :root {
+            --primary-color: #667eea;
+            --primary-dark: #5a6fd8;
+            --secondary-color: #6c757d;
+            --success-color: #28a745;
+            --danger-color: #dc3545;
+            --warning-color: #ffc107;
+            --info-color: #17a2b8;
+            --light-color: #f8f9fa;
+            --dark-color: #343a40;
+            --border-color: #dee2e6;
+            --shadow-color: rgba(0, 0, 0, 0.1);
+            --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-family);
+            line-height: 1.5;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* Logo区域 */
+        .logo-section {
+            width: 100%;
+            text-align: center;
+            margin: 32px 0 8px 0;
+        }
+
+        .logo-section img {
+            height: 56px;
+            max-width: 90vw;
+            filter: drop-shadow(0 2px 8px rgba(0, 230, 195, 0.3));
+        }
+
+        /* 头部样式 */
+        header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            padding: 2rem;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        header h1 {
+            color: var(--primary-color);
+            margin-bottom: 0.5rem;
+            font-size: 2.5rem;
+            font-weight: 600;
+        }
+
+        header p {
+            color: var(--secondary-color);
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+        }
+
+        .header-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+
+        /* 卡片样式 */
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            padding: 2rem;
+            margin-bottom: 2rem;
+            border: none;
+        }
+
+        .card h2 {
+            color: var(--primary-color);
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--border-color);
+            font-size: 1.8rem;
+            font-weight: 600;
+        }
+
+        /* 按钮样式 */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            text-align: center;
+            line-height: 1;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, var(--secondary-color) 0%, #5a6268 100%);
+            color: white;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, var(--danger-color) 0%, #c82333 100%);
+            color: white;
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, var(--warning-color) 0%, #e0a800 100%);
+            color: #212529;
+        }
+
+        .btn-info {
+            background: linear-gradient(135deg, var(--info-color) 0%, #138496 100%);
+            color: white;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, var(--success-color) 0%, #218838 100%);
+            color: white;
+        }
+
+        .btn-guest {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .settings-btn {
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            color: white;
+        }
+
+        .logout-btn {
+            background: linear-gradient(135deg, var(--secondary-color) 0%, var(--danger-color) 100%);
+            color: white;
+        }
+
+        .btn-small {
+            padding: 8px 12px;
+            font-size: 12px;
+        }
+
+        .btn:disabled {
+            background: #e9ecef;
+            color: #6c757d;
+            cursor: not-allowed;
+            opacity: 0.65;
+        }
+
+        .btn:disabled:hover {
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* 表单样式 */
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: var(--dark-color);
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            background-color: rgba(255, 255, 255, 0.8);
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+        }
+
+        .form-group textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .form-group small {
+            display: block;
+            margin-top: 0.5rem;
+            color: var(--secondary-color);
+            font-size: 12px;
+        }
+
+        /* 表单选项卡 */
+        .form-tabs {
+            display: flex;
+            margin-bottom: 1.5rem;
+            border-bottom: 2px solid var(--border-color);
+            border-radius: 12px 12px 0 0;
+            overflow: hidden;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 12px 20px;
+            cursor: pointer;
+            font-weight: 500;
+            color: var(--secondary-color);
+            background: var(--light-color);
+            border: none;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        .tab:hover {
+            color: var(--primary-color);
+            background: rgba(102, 126, 234, 0.1);
+        }
+
+        .tab.active {
+            color: white;
+            background: var(--primary-color);
+        }
+
+        .tab-content {
+            padding: 1rem 0;
+        }
+
+        /* 服务列表样式 */
+        .services-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .loading {
+            text-align: center;
+            font-style: italic;
+            color: var(--secondary-color);
+            grid-column: 1 / -1;
+            padding: 3rem;
+            font-size: 1.1rem;
+        }
+
+        .service-card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            transition: all 0.3s ease;
+            border: 1px solid var(--border-color);
+        }
+
+        .service-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
+        }
+
+        .service-card-header {
+            background: linear-gradient(135deg, var(--light-color) 0%, #e9ecef 100%);
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .service-card-body {
+            padding: 1.5rem;
+        }
+
+        .service-status {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        .service-status-running {
+            background: rgba(40, 167, 69, 0.1);
+            color: var(--success-color);
+            border: 1px solid var(--success-color);
+        }
+
+        .service-status-stopped {
+            background: rgba(220, 53, 69, 0.1);
+            color: var(--danger-color);
+            border: 1px solid var(--danger-color);
+        }
+
+        /* 服务详情页样式 */
+        .service-details {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .detail-row {
+            display: flex;
+            align-items: flex-start;
+            padding: 1rem;
+            background: var(--light-color);
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+        }
+
+        .detail-row label {
+            width: 140px;
+            font-weight: 600;
+            color: var(--dark-color);
+            margin-bottom: 0;
+        }
+
+        .detail-row>span,
+        .detail-row>div {
+            flex: 1;
+        }
+
+        /* 状态面板 */
+        .status-panel {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .status-item {
+            padding: 1.5rem;
+            background: white;
+            border-radius: 15px;
+            border: 1px solid var(--border-color);
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+        }
+
+        .status-label {
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            color: var(--secondary-color);
+        }
+
+        .status-value {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--dark-color);
+        }
+
+        /* 输出日志 */
+        .output-container {
+            margin-bottom: 2rem;
+        }
+
+        .output-log {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            border-radius: 12px;
+            padding: 1.5rem;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            white-space: pre-wrap;
+            border: 1px solid var(--border-color);
+        }
+
+        /* 操作按钮区域 */
+        .bulk-actions,
+        .action-buttons,
+        .form-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 2px solid var(--border-color);
+        }
+
+        /* 开关样式 */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 24px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked+.slider {
+            background-color: var(--primary-color);
+        }
+
+        input:checked+.slider:before {
+            transform: translateX(26px);
+        }
+
+        /* 图标样式 */
+        .icon {
+            display: inline-block;
+            margin-right: 5px;
+        }
+
+        .icon-users::before {
+            content: "👥";
+        }
+
+        .icon-settings::before {
+            content: "⚙️";
+        }
+
+        .icon-bell::before {
+            content: "🔔";
+        }
+
+        .icon-info::before {
+            content: "ℹ️";
+        }
+
+        .icon-stop::before {
+            content: "⏹️";
+        }
+
+        .icon-trash::before {
+            content: "🗑️";
+        }
+
+        .icon-restart::before {
+            content: "🔄";
+        }
+
+        .icon-copy::before {
+            content: "📋";
+        }
+
+        .icon-play::before {
+            content: "▶️";
+        }
+
+        .icon-pause::before {
+            content: "⏸️";
+        }
+
+        /* 登录面板 */
+        .login-panel {
+            max-width: 450px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            padding: 3rem;
+            text-align: center;
+        }
+
+        .login-panel h2 {
+            color: var(--primary-color);
+            margin-bottom: 2rem;
+            font-size: 2rem;
+        }
+
+        .login-error {
+            background: rgba(220, 53, 69, 0.1);
+            border: 1px solid var(--danger-color);
+            color: var(--danger-color);
+            padding: 12px;
+            border-radius: 10px;
+            margin-top: 1rem;
+            text-align: center;
+        }
+
+        /* 对话框 */
+        .dialog {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .dialog.active {
+            display: flex;
+        }
+
+        .dialog-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 20px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        .dialog-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 1.5rem;
+        }
+
+        /* 通知样式 */
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 12px;
+            color: white;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+            opacity: 0;
+            transform: translateY(-20px);
+            transition: all 0.3s ease;
+            z-index: 9999;
+            max-width: 350px;
+        }
+
+        .notification.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .notification.success {
+            background: var(--success-color);
+        }
+
+        .notification.error {
+            background: var(--danger-color);
+        }
+
+        .notification.warning {
+            background: var(--warning-color);
+            color: #333;
+        }
+
+        .notification.info {
+            background: var(--info-color);
+        }
+
+        /* 页脚 */
+        footer {
+            text-align: center;
+            padding: 2rem 1rem;
+            color: rgba(255, 255, 255, 0.8);
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            margin-top: 2rem;
+        }
+
+        footer a {
+            color: rgba(255, 255, 255, 0.9);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        footer a:hover {
+            color: white;
+            text-decoration: underline;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .header-actions {
+                justify-content: center;
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .services-list {
+                grid-template-columns: 1fr;
+            }
+
+            .form-tabs {
+                flex-direction: column;
+            }
+
+            .tab {
+                border-bottom: 1px solid var(--border-color);
+            }
+
+            .status-panel {
+                grid-template-columns: 1fr;
+            }
+
+            .bulk-actions,
+            .action-buttons,
+            .form-actions {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .btn {
+                width: 100%;
+                justify-content: center;
+            }
+
+            header h1 {
+                font-size: 2rem;
+            }
+
+            .card {
+                padding: 1.5rem;
+            }
+        }
+
+        /* 动画效果 */
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* 加载动画 */
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
 </head>
 
 <body>
-    <!-- Await科技感LOGO展示区 -->
-    <div style="width:100%;text-align:center;margin:32px 0 8px 0;">
-      <img src="await-logo.svg" alt="Await Logo" style="height:56px;max-width:90vw;filter:drop-shadow(0 2px 8px #00e6c355);">
+    <!-- Logo区域 -->
+    <div class="logo-section">
+        <img src="await-logo.svg" alt="Await Logo" style="display: none;" onerror="this.style.display='none';">
     </div>
+
     <div class="container">
-        <header>
+        <header class="fade-in">
             <h1>Natter 管理界面</h1>
             <p>管理您的Natter服务</p>
-            <div class="header-actions" style="display: flex; justify-content: flex-end; margin-top: 10px;">
-                <button id="iyuu-settings-btn" class="settings-btn" title="IYUU推送设置" style="display: none;"><i class="fas fa-bell"></i>
-                    推送设置</button>
-                <button id="logout-btn" class="logout-btn" style="display: none;">退出登录</button>
+            <div class="header-actions">
+                <button id="guest-entrance-btn" class="btn btn-guest" title="访客入口"
+                    onclick="window.open('/guest.html', '_blank')">
+                    <span class="icon icon-users"></span> 访客入口
+                </button>
+                <button id="groups-management-btn" class="btn settings-btn" title="服务组管理" style="display: none;">
+                    <span class="icon icon-settings"></span> 服务组管理
+                </button>
+                <button id="iyuu-settings-btn" class="btn settings-btn" title="IYUU推送设置" style="display: none;">
+                    <span class="icon icon-bell"></span> 推送设置
+                </button>
+                <button id="logout-btn" class="btn logout-btn" style="display: none;">退出登录</button>
             </div>
         </header>
 
         <main>
-            <section class="card" id="services-panel">
+            <section class="card fade-in" id="services-panel">
                 <h2>运行中的服务</h2>
                 <div class="services-list" id="services-list">
-                    <div class="loading">加载中...</div>
+                    <div class="loading">
+                        <div class="loading-spinner"></div>
+                        加载中...
+                    </div>
                 </div>
                 <div class="bulk-actions">
-                    <button id="refresh-all-btn" class="btn-secondary">刷新所有</button>
-                    <button id="stop-all-btn" class="btn-danger">停止所有服务</button>
+                    <button id="refresh-all-btn" class="btn btn-secondary">刷新所有</button>
+                    <button id="stop-all-btn" class="btn btn-danger">停止所有服务</button>
                 </div>
             </section>
 
@@ -131,9 +863,9 @@
                                 <small>不同转发方法适用于不同场景，鼠标悬停在问号上查看详情</small>
                                 <div class="tool-install-buttons">
                                     <button type="button" id="install-socat-btn"
-                                        class="btn-small btn-secondary">安装socat</button>
+                                        class="btn btn-small btn-secondary">安装socat</button>
                                     <button type="button" id="install-gost-btn"
-                                        class="btn-small btn-secondary">安装gost</button>
+                                        class="btn btn-small btn-secondary">安装gost</button>
                                 </div>
                             </div>
                         </div>
@@ -190,40 +922,25 @@
                                     <input type="checkbox" id="retry-mode">
                                     持续重试直到目标端口打开
                                 </label>
-                            </div>
-
-                            <div class="form-group">
-                                <label for="quit-on-change">
-                                    <input type="checkbox" id="quit-on-change">
-                                    映射地址变更时退出
-                                </label>
-                            </div>
-
-                            <div class="form-group">
-                                <label for="auto-restart">
-                                    <input type="checkbox" id="auto-restart">
-                                    服务异常时自动重启
-                                </label>
-                                <small>Web管理工具提供的功能，非Natter原生功能</small>
+                                <small>启用持续重试机制</small>
                             </div>
                         </div>
                     </div>
 
                     <div id="advanced-mode-options" style="display:none;">
                         <div class="form-group">
-                            <label for="command-args">命令参数:</label>
-                            <input type="text" id="command-args" placeholder="例如: -p 80 -m socket">
-                            <small>完整的命令行参数，如同直接运行natter.py</small>
-                        </div>
-                        <div class="config-save-load">
-                            <button type="button" id="save-config-btn" class="btn-secondary">保存配置</button>
-                            <button type="button" id="load-config-btn" class="btn-secondary">加载配置</button>
+                            <label for="custom-command">自定义命令:</label>
+                            <textarea id="custom-command"
+                                placeholder="输入完整的natter命令，例如：--bind-port 8080 --target-port 80"></textarea>
+                            <small>高级用户可以直接输入natter的完整参数</small>
                         </div>
                     </div>
 
                     <div class="form-actions">
-                        <button type="submit" class="btn-primary">启动服务</button>
-                        <button type="button" id="help-btn" class="btn-info">帮助</button>
+                        <button type="submit" class="btn btn-primary">
+                            <span class="icon icon-play"></span>
+                            启动服务
+                        </button>
                     </div>
                 </form>
             </section>
@@ -243,8 +960,10 @@
                         <label>映射地址:</label>
                         <div class="service-address-detail">
                             <span id="service-mapped-address"></span>
-                            <button id="copy-address-btn" class="copy-address-btn"><i class="fas fa-copy"></i>
-                                复制地址</button>
+                            <button id="copy-address-btn" class="btn copy-address-btn">
+                                <span class="icon icon-copy"></span>
+                                复制地址
+                            </button>
                         </div>
                     </div>
                     <div class="detail-row">
@@ -355,17 +1074,20 @@
                         <div class="faq-answer">尝试减少保活间隔时间，或检查网络连接稳定性。</div>
                     </div>
 
-                    <button id="close-help-btn" class="btn-secondary">关闭帮助</button>
+                    <button id="close-help-btn" class="btn btn-secondary">关闭帮助</button>
                 </div>
             </section>
 
             <section class="card" id="templates-panel" style="display:none;">
                 <h2>配置模板</h2>
                 <div class="templates-list" id="templates-list">
-                    <div class="loading">加载中...</div>
+                    <div class="loading">
+                        <div class="loading-spinner"></div>
+                        加载中...
+                    </div>
                 </div>
                 <div class="templates-actions">
-                    <button id="back-from-templates-btn" class="btn-secondary">返回</button>
+                    <button id="back-from-templates-btn" class="btn btn-secondary">返回</button>
                 </div>
             </section>
 
@@ -383,11 +1105,14 @@
                     <div class="form-group">
                         <label>IYUU令牌:</label>
                         <div id="iyuu-tokens-list" class="tokens-list">
-                            <div class="loading">加载中...</div>
+                            <div class="loading">
+                                <div class="loading-spinner"></div>
+                                加载中...
+                            </div>
                         </div>
                         <div class="token-actions">
                             <input type="text" id="new-iyuu-token" placeholder="输入IYUU令牌">
-                            <button id="add-iyuu-token" class="btn-primary">添加令牌</button>
+                            <button id="add-iyuu-token" class="btn btn-primary">添加令牌</button>
                         </div>
                         <small>支持多个令牌，获取令牌请访问 <a href="https://iyuu.cn" target="_blank">https://iyuu.cn</a></small>
                     </div>
@@ -407,7 +1132,7 @@
                         </div>
                         <div class="time-actions">
                             <input type="time" id="new-schedule-time" value="08:00">
-                            <button id="add-schedule-time" class="btn-primary">添加时间</button>
+                            <button id="add-schedule-time" class="btn btn-primary">添加时间</button>
                         </div>
                         <small>每天的这些时间将发送服务状态摘要</small>
                     </div>
@@ -421,15 +1146,15 @@
                     <div class="form-group">
                         <label>立即推送:</label>
                         <div class="push-now-actions">
-                            <button id="push-all-services" class="btn-primary">推送所有服务状态</button>
+                            <button id="push-all-services" class="btn btn-primary">推送所有服务状态</button>
                         </div>
                         <small>立即发送一次当前所有服务的状态报告</small>
                     </div>
 
                     <div class="iyuu-actions">
-                        <button id="test-iyuu-push" class="btn-secondary">测试推送</button>
-                        <button id="save-iyuu-settings" class="btn-primary">保存设置</button>
-                        <button id="back-from-iyuu-btn" class="btn-secondary">返回</button>
+                        <button id="test-iyuu-push" class="btn btn-secondary">测试推送</button>
+                        <button id="save-iyuu-settings" class="btn btn-primary">保存设置</button>
+                        <button id="back-from-iyuu-btn" class="btn btn-secondary">返回</button>
                     </div>
                 </div>
             </section>
@@ -439,9 +1164,11 @@
             <p>Natter Web管理界面 v<span id="version">加载中...</span> &copy; 2025</p>
             <div style="margin-top:8px;font-size:15px;">
                 项目地址：
-                <a href="https://gitee.com/await29/natter-web" target="_blank" style="margin:0 8px;color:#00b3ff;text-decoration:none;font-weight:bold;">Gitee</a>
+                <a href="https://gitee.com/await29/natter-web" target="_blank"
+                    style="margin:0 8px;color:#00b3ff;text-decoration:none;font-weight:bold;">Gitee</a>
                 |
-                <a href="https://github.com/Await-d/natter-web" target="_blank" style="margin:0 8px;color:#222;text-decoration:none;font-weight:bold;">GitHub</a>
+                <a href="https://github.com/Await-d/natter-web" target="_blank"
+                    style="margin:0 8px;color:#222;text-decoration:none;font-weight:bold;">GitHub</a>
             </div>
         </footer>
     </div>
@@ -458,20 +1185,21 @@
                     <span class="service-address-label">映射地址：</span>
                     <span class="service-address">未映射</span>
                     <button class="copy-address-btn" title="复制地址">
-                        <i class="fas fa-copy"></i> 复制
+                        <span class="icon icon-copy"></span>
+                        复制地址
                     </button>
                 </div>
                 <p class="service-cmd">命令: <span class="service-cmd-text">未知</span></p>
                 <p class="service-remark">备注: <span class="service-remark-text">无</span></p>
                 <div class="service-card-actions">
-                    <button class="btn-details" title="查看详情">
-                        <i class="fas fa-info-circle"></i> 详情
+                    <button class="btn btn-secondary service-detail-btn" data-service-id="{{id}}">
+                        <span class="icon icon-info"></span> 详情
                     </button>
-                    <button class="btn-stop" title="停止服务">
-                        <i class="fas fa-stop"></i> 停止
+                    <button class="btn btn-danger service-stop-btn" data-service-id="{{id}}">
+                        <span class="icon icon-stop"></span> 停止
                     </button>
-                    <button class="btn-delete" title="删除服务">
-                        <i class="fas fa-trash"></i> 删除
+                    <button class="btn btn-danger service-delete-btn" data-service-id="{{id}}">
+                        <span class="icon icon-trash"></span> 删除
                     </button>
                 </div>
             </div>
@@ -490,8 +1218,8 @@
                 <div class="template-cmd-args">命令: </div>
             </div>
             <div class="template-card-footer">
-                <button class="btn-primary use-template-btn">使用此模板</button>
-                <button class="btn-danger delete-template-btn">删除</button>
+                <button class="btn btn-primary use-template-btn">使用此模板</button>
+                <button class="btn btn-danger delete-template-btn">删除</button>
             </div>
         </div>
     </template>
@@ -509,8 +1237,8 @@
                 <textarea id="template-description" placeholder="描述这个模板的用途"></textarea>
             </div>
             <div class="dialog-buttons">
-                <button id="confirm-save-template" class="btn-primary">保存</button>
-                <button id="cancel-save-template" class="btn-secondary">取消</button>
+                <button id="confirm-save-template" class="btn btn-primary">保存</button>
+                <button id="cancel-save-template" class="btn btn-secondary">取消</button>
             </div>
         </div>
     </div>

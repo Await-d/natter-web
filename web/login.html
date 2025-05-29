@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Natter 系统登录</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1.5;
+            color: #333;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 450px;
+        }
+
+        .login-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: none;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            animation: slideIn 0.6s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .login-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .login-header h1 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        .login-header p {
+            opacity: 0.9;
+            font-size: 1rem;
+        }
+
+        .login-body {
+            padding: 2rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .password-input-wrapper {
+            position: relative;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 15px 50px 15px 15px;
+            border: 2px solid #e1e5e9;
+            border-radius: 12px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            background-color: rgba(255, 255, 255, 0.8);
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+        }
+
+        .toggle-password {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #666;
+            font-size: 18px;
+            padding: 5px;
+            border-radius: 4px;
+            transition: color 0.3s ease;
+        }
+
+        .toggle-password:hover {
+            color: #667eea;
+        }
+
+        .login-btn {
+            width: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 20px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .login-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+        }
+
+        .login-btn:active {
+            transform: translateY(0);
+        }
+
+        .login-btn:disabled {
+            background: #e9ecef;
+            color: #6c757d;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid transparent;
+            border-top: 2px solid currentColor;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .error-message {
+            background: rgba(220, 53, 69, 0.1);
+            border: 1px solid #dc3545;
+            color: #dc3545;
+            padding: 12px 15px;
+            border-radius: 10px;
+            margin-top: 1rem;
+            text-align: center;
+            display: none;
+        }
+
+        .login-tips {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background: rgba(102, 126, 234, 0.1);
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .login-tips h4 {
+            color: #667eea;
+            margin-bottom: 0.5rem;
+            font-size: 1rem;
+        }
+
+        .login-tips ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .login-tips li {
+            margin-bottom: 0.3rem;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .login-tips li::before {
+            content: "•";
+            color: #667eea;
+            margin-right: 8px;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 2rem;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .footer a {
+            color: rgba(255, 255, 255, 0.9);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .footer a:hover {
+            color: white;
+            text-decoration: underline;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 480px) {
+            body {
+                padding: 10px;
+            }
+
+            .login-header {
+                padding: 1.5rem;
+            }
+
+            .login-header h1 {
+                font-size: 1.6rem;
+            }
+
+            .login-body {
+                padding: 1.5rem;
+            }
+        }
+
+        /* 输入框图标 */
+        .input-icon {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #666;
+            font-size: 18px;
+        }
+
+        .form-group input.with-icon {
+            padding-left: 50px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="login-card">
+            <div class="login-header">
+                <h1>🔐 Natter 系统</h1>
+                <p>请输入您的访问密码</p>
+            </div>
+
+            <div class="login-body">
+                <form id="login-form">
+                    <div class="form-group">
+                        <label for="password">访问密码:</label>
+                        <div class="password-input-wrapper">
+                            <span class="input-icon">🔑</span>
+                            <input type="password" id="password" class="with-icon" placeholder="请输入访问密码" required
+                                autocomplete="current-password">
+                            <button type="button" class="toggle-password" onclick="togglePassword()">👁️</button>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="login-btn" id="login-btn">
+                        <span id="login-text">登录</span>
+                        <span id="login-spinner" class="loading-spinner" style="display: none;"></span>
+                    </button>
+
+                    <div class="error-message" id="error-message"></div>
+                </form>
+
+                <div class="login-tips">
+                    <h4>💡 登录说明</h4>
+                    <ul>
+                        <li>管理员密码：进入完整的管理界面</li>
+                        <li>访客密码：进入只读的服务查看界面</li>
+                        <li>系统会自动识别密码类型并跳转</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Natter Web管理系统 &copy; 2025</p>
+            <div style="margin-top: 8px;">
+                <a href="https://gitee.com/await29/natter-web" target="_blank">Gitee</a>
+                |
+                <a href="https://github.com/Await-d/natter-web" target="_blank">GitHub</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 切换密码显示/隐藏
+        function togglePassword() {
+            const passwordInput = document.getElementById('password');
+            const toggleBtn = document.querySelector('.toggle-password');
+
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                toggleBtn.textContent = '🙈';
+            } else {
+                passwordInput.type = 'password';
+                toggleBtn.textContent = '👁️';
+            }
+        }
+
+        // 显示错误信息
+        function showError(message) {
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+
+            // 3秒后自动隐藏
+            setTimeout(() => {
+                errorDiv.style.display = 'none';
+            }, 3000);
+        }
+
+        // 设置加载状态
+        function setLoading(loading) {
+            const loginBtn = document.getElementById('login-btn');
+            const loginText = document.getElementById('login-text');
+            const loginSpinner = document.getElementById('login-spinner');
+
+            if (loading) {
+                loginBtn.disabled = true;
+                loginText.textContent = '验证中...';
+                loginSpinner.style.display = 'inline-block';
+            } else {
+                loginBtn.disabled = false;
+                loginText.textContent = '登录';
+                loginSpinner.style.display = 'none';
+            }
+        }
+
+        // 登录表单提交
+        document.getElementById('login-form').addEventListener('submit', async function (e) {
+            e.preventDefault();
+
+            const password = document.getElementById('password').value.trim();
+
+            if (!password) {
+                showError('请输入密码');
+                return;
+            }
+
+            setLoading(true);
+
+            try {
+                // 统一登录验证API
+                const response = await fetch('/api/auth/unified-login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ password: password })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // 根据用户类型跳转
+                    if (result.user_type === 'admin') {
+                        // 管理员，保存token并跳转到管理界面
+                        localStorage.setItem('natter_auth_token', result.token);
+                        window.location.href = '/index.html';
+                    } else if (result.user_type === 'guest') {
+                        // 访客，保存访客信息并跳转到访客界面
+                        localStorage.setItem('guest_group_id', result.group_id);
+                        localStorage.setItem('guest_group_name', result.group_name);
+                        window.location.href = '/guest.html';
+                    }
+                } else {
+                    showError(result.message || '密码错误，请重试');
+                }
+            } catch (error) {
+                console.error('登录请求失败:', error);
+                showError('网络错误，请检查连接');
+            } finally {
+                setLoading(false);
+            }
+        });
+
+        // 页面加载时检查是否已登录
+        window.addEventListener('load', function () {
+            // 检查管理员token
+            const adminToken = localStorage.getItem('natter_auth_token');
+            if (adminToken) {
+                // 验证token是否有效
+                fetch('/api/auth/check', {
+                    headers: {
+                        'Authorization': `Bearer ${adminToken}`
+                    }
+                })
+                    .then(response => response.json())
+                    .then(result => {
+                        if (result.authenticated) {
+                            window.location.href = '/index.html';
+                        }
+                    })
+                    .catch(() => {
+                        // token无效，清除
+                        localStorage.removeItem('natter_auth_token');
+                    });
+            }
+
+            // 检查访客登录状态
+            const guestGroupId = localStorage.getItem('guest_group_id');
+            if (guestGroupId) {
+                // 可以选择直接跳转到访客界面，或者让用户重新输入密码
+                // 这里选择让用户重新输入密码以提高安全性
+            }
+
+            // 聚焦到密码输入框
+            document.getElementById('password').focus();
+        });
+
+        // 回车键快捷登录
+        document.getElementById('password').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                document.getElementById('login-form').dispatchEvent(new Event('submit'));
+            }
+        });
+    </script>
+</body>
+
+</html>

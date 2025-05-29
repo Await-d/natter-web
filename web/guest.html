@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Natter 访客入口</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1.5;
+            color: #333;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            padding: 0 20px;
+        }
+
+        .guest-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: none;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+            margin: 20px auto;
+        }
+
+        .text-center {
+            text-align: center;
+        }
+
+        .logo {
+            font-size: 3rem;
+            color: #667eea;
+            margin-bottom: 1rem;
+            display: inline-block;
+        }
+
+        .logo::before {
+            content: "🔒";
+        }
+
+        h2,
+        h3 {
+            margin-bottom: 1rem;
+            color: #333;
+        }
+
+        .text-muted {
+            color: #6c757d;
+            margin-bottom: 1rem;
+        }
+
+        .login-form {
+            margin-top: 2rem;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .form-control {
+            width: 100%;
+            border-radius: 15px;
+            border: 2px solid #e9ecef;
+            padding: 15px 20px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            outline: none;
+        }
+
+        .form-control:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 15px;
+            font-size: 16px;
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+            line-height: 1;
+        }
+
+        .btn-guest {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            width: 100%;
+        }
+
+        .btn-guest:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+            color: white;
+        }
+
+        .btn-outline-secondary {
+            background: transparent;
+            border: 2px solid #6c757d;
+            color: #6c757d;
+            padding: 8px 16px;
+            font-size: 14px;
+        }
+
+        .btn-outline-secondary:hover {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-link {
+            background: transparent;
+            border: none;
+            color: #667eea;
+            text-decoration: none;
+            padding: 8px 16px;
+            font-size: 14px;
+        }
+
+        .btn-link:hover {
+            color: #5a6fd8;
+            text-decoration: underline;
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 14px;
+        }
+
+        .back-link {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+            display: inline-block;
+            margin-top: 1rem;
+        }
+
+        .back-link:hover {
+            color: #5a6fd8;
+        }
+
+        .service-list {
+            margin-top: 2rem;
+        }
+
+        .service-item {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 15px;
+            border: 1px solid #e9ecef;
+            transition: all 0.3s ease;
+        }
+
+        .service-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .service-status {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        .status-running {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-stopped {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .service-address {
+            font-family: 'Courier New', monospace;
+            background: #f8f9fa;
+            padding: 8px 12px;
+            border-radius: 8px;
+            margin-top: 10px;
+            word-break: break-all;
+        }
+
+        .d-flex {
+            display: flex;
+        }
+
+        .justify-content-between {
+            justify-content: space-between;
+        }
+
+        .align-items-center {
+            align-items: center;
+        }
+
+        .align-items-start {
+            align-items: flex-start;
+        }
+
+        .flex-grow-1 {
+            flex-grow: 1;
+        }
+
+        .mb-1 {
+            margin-bottom: 0.25rem;
+        }
+
+        .mb-2 {
+            margin-bottom: 0.5rem;
+        }
+
+        .mb-3 {
+            margin-bottom: 1rem;
+        }
+
+        .mb-4 {
+            margin-bottom: 1.5rem;
+        }
+
+        .mb-0 {
+            margin-bottom: 0;
+        }
+
+        .mt-2 {
+            margin-top: 0.5rem;
+        }
+
+        .mt-3 {
+            margin-top: 1rem;
+        }
+
+        .mt-4 {
+            margin-top: 1.5rem;
+        }
+
+        .me-1 {
+            margin-right: 0.25rem;
+        }
+
+        .me-2 {
+            margin-right: 0.5rem;
+        }
+
+        .ms-3 {
+            margin-left: 1rem;
+        }
+
+        .py-4 {
+            padding-top: 1.5rem;
+            padding-bottom: 1.5rem;
+        }
+
+        .alert {
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+
+        .alert-warning {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+
+        .icon {
+            display: inline-block;
+            margin-right: 0.5rem;
+        }
+
+        .icon-users::before {
+            content: "👥";
+        }
+
+        .icon-lock::before {
+            content: "🔒";
+        }
+
+        .icon-arrow-left::before {
+            content: "←";
+        }
+
+        .icon-arrow-right::before {
+            content: "→";
+        }
+
+        .icon-exclamation::before {
+            content: "⚠️";
+        }
+
+        .icon-play::before {
+            content: "▶️";
+        }
+
+        .icon-stop::before {
+            content: "⏹️";
+        }
+
+        .icon-link::before {
+            content: "🔗";
+        }
+
+        .icon-info::before {
+            content: "ℹ️";
+        }
+
+        .icon-clock::before {
+            content: "🕒";
+        }
+
+        .icon-refresh::before {
+            content: "🔄";
+        }
+
+        .icon-inbox::before {
+            content: "📥";
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .guest-card {
+                padding: 20px;
+                margin: 10px;
+            }
+
+            .d-flex {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .justify-content-between {
+                justify-content: stretch;
+            }
+        }
+
+        /* 动画效果 */
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        .fade-out {
+            animation: fadeOut 0.5s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeOut {
+            from {
+                opacity: 1;
+                transform: translateY(0);
+            }
+
+            to {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+        }
+
+        /* 状态图标样式 */
+        .status-icon {
+            margin-right: 8px;
+            font-size: 1.2em;
+        }
+
+        .status-icon.running::before {
+            content: "🟢";
+        }
+
+        .status-icon.stopped::before {
+            content: "⚪";
+        }
+
+        /* 小号文本 */
+        small {
+            font-size: 0.875em;
+            color: #6c757d;
+        }
+
+        .guest-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+            position: relative;
+        }
+
+        .guest-header h1 {
+            margin-bottom: 0.5rem;
+            font-size: 2rem;
+            font-weight: 600;
+        }
+
+        .guest-header .welcome-text {
+            margin-bottom: 1rem;
+            opacity: 0.9;
+        }
+
+        .header-actions {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+        }
+
+        .logout-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .logout-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+
+        .guest-content {
+            padding: 2rem;
+        }
+
+        .section-header {
+            margin-bottom: 1.5rem;
+        }
+
+        .section-header h3 {
+            color: #333;
+            margin-bottom: 1rem;
+            font-size: 1.5rem;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .info-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .services-list {
+            min-height: 200px;
+            margin-bottom: 1.5rem;
+        }
+
+        .service-item {
+            background: white;
+            border: 1px solid #e1e5e9;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+        }
+
+        .service-item:hover {
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .service-header h5 {
+            margin: 0 0 1rem 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 1.2rem;
+        }
+
+        .service-status {
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-weight: 500;
+        }
+
+        .status-running {
+            background: rgba(40, 167, 69, 0.1);
+            color: #28a745;
+            border: 1px solid #28a745;
+        }
+
+        .status-stopped {
+            background: rgba(220, 53, 69, 0.1);
+            color: #dc3545;
+            border: 1px solid #dc3545;
+        }
+
+        .address-info {
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .address-value {
+            font-family: 'Courier New', monospace;
+            background: #f8f9fa;
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: 1px solid #e1e5e9;
+        }
+
+        .btn-copy {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-copy:hover {
+            background: #5a6fd8;
+        }
+
+        .service-info {
+            color: #666;
+            font-size: 13px;
+        }
+
+        .loading-state,
+        .empty-state,
+        .error-state {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: #666;
+        }
+
+        .loading-state .loading-spinner {
+            margin-bottom: 1rem;
+        }
+
+        .empty-state span {
+            display: block;
+            margin-bottom: 1rem;
+        }
+
+        .error-state p {
+            margin: 1rem 0;
+        }
+
+        .section-footer {
+            text-align: center;
+            padding-top: 1rem;
+            border-top: 1px solid #e1e5e9;
+        }
+
+        .btn-refresh {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-refresh:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+        }
+
+        /* 通知样式 */
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 20px;
+            border-radius: 8px;
+            color: white;
+            z-index: 9999;
+            opacity: 0;
+            transform: translateY(-20px);
+            transition: all 0.3s ease;
+        }
+
+        .notification.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .notification.success {
+            background: #28a745;
+        }
+
+        .notification.error {
+            background: #dc3545;
+        }
+
+        .notification.info {
+            background: #17a2b8;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="guest-card fade-in">
+            <div class="guest-header">
+                <h1>🎯 Natter 访客系统</h1>
+                <p class="welcome-text">欢迎访问服务列表</p>
+                <div class="header-actions">
+                    <button class="btn logout-btn" onclick="logout()">
+                        🚪 退出登录
+                    </button>
+                </div>
+            </div>
+
+            <div class="guest-content">
+                <div class="services-section">
+                    <div class="section-header">
+                        <h3>📋 服务列表</h3>
+                        <div class="info-row">
+                            <span class="info-item">
+                                <span class="icon icon-group"></span>
+                                <span id="group-info">loading...</span>
+                            </span>
+                            <span class="info-item">
+                                <span class="icon icon-clock"></span>
+                                最后更新: <span id="last-update">--</span>
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="services-list" id="services-list">
+                        <div class="loading-state">
+                            <div class="loading-spinner"></div>
+                            <span>加载服务列表中...</span>
+                        </div>
+                    </div>
+
+                    <div class="section-footer">
+                        <button class="btn btn-refresh" onclick="refreshServices()">
+                            <span class="icon icon-refresh"></span>刷新
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        let currentGroupId = null;
+        let currentGroupName = '';
+        let currentGroupDescription = '';
+
+        // 页面加载时检查登录状态
+        window.addEventListener('load', function () {
+            // 检查访客登录状态
+            const groupId = localStorage.getItem('guest_group_id');
+            const groupName = localStorage.getItem('guest_group_name');
+
+            if (!groupId) {
+                // 未登录，跳转到登录页面
+                window.location.href = '/login.html';
+                return;
+            }
+
+            // 设置全局变量
+            currentGroupId = groupId;
+            currentGroupName = groupName;
+
+            // 更新页面标题和欢迎信息
+            document.title = `Natter 访客系统 - ${groupName}`;
+            document.querySelector('.welcome-text').textContent = `欢迎访问 ${groupName} 服务列表`;
+            document.getElementById('group-info').textContent = groupName;
+
+            // 加载对应分组的服务
+            loadServices();
+        });
+
+        // 加载服务列表
+        async function loadServices() {
+            if (!currentGroupId) return;
+
+            try {
+                showLoading(true);
+
+                const response = await fetch(`/api/guest/services?group_id=${currentGroupId}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    displayServices(result.services || []);
+                    updateLastUpdateTime();
+                } else {
+                    showError(result.message || '加载服务列表失败');
+                }
+            } catch (error) {
+                console.error('加载服务列表失败:', error);
+                showError('网络错误，请稍后重试');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 显示服务列表
+        function displayServices(services) {
+            const servicesList = document.getElementById('services-list');
+
+            if (services.length === 0) {
+                servicesList.innerHTML = `
+                    <div class="empty-state">
+                        <span class="icon icon-inbox" style="font-size: 3rem; opacity: 0.3;"></span>
+                        <p>此分组暂无服务</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+            services.forEach(service => {
+                const statusClass = service.status === '运行中' ? 'status-running' : 'status-stopped';
+                const statusIcon = service.status === '运行中' ? '🟢' : '🔴';
+
+                html += `
+                    <div class="service-item">
+                        <div class="service-header">
+                            <h5>
+                                ${statusIcon} ${service.remark || `服务 ${service.id}`}
+                                <span class="service-status ${statusClass}">${service.status}</span>
+                            </h5>
+                        </div>
+                        
+                        <div class="service-details">
+                            ${service.mapped_address && service.mapped_address !== '无' ? `
+                                <div class="address-info">
+                                    <strong>🔗 访问地址:</strong> 
+                                    <span class="address-value">${service.mapped_address}</span>
+                                    <button class="btn btn-small btn-copy" onclick="copyAddress('${service.mapped_address}')">
+                                        📋 复制
+                                    </button>
+                                </div>
+                            ` : `
+                                <div class="address-info text-muted">
+                                    ⏳ 等待分配访问地址...
+                                </div>
+                            `}
+                            
+                            <div class="service-info">
+                                <small>
+                                    🏠 LAN: ${service.lan_status || '未知'} | 
+                                    🌍 WAN: ${service.wan_status || '未知'} | 
+                                    🔀 NAT: ${service.nat_type || '未知'}
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            servicesList.innerHTML = html;
+        }
+
+        // 显示加载状态
+        function showLoading(loading) {
+            const servicesList = document.getElementById('services-list');
+            if (loading) {
+                servicesList.innerHTML = `
+                    <div class="loading-state">
+                        <div class="loading-spinner"></div>
+                        <span>加载服务列表中...</span>
+                    </div>
+                `;
+            }
+        }
+
+        // 显示错误信息
+        function showError(message) {
+            const servicesList = document.getElementById('services-list');
+            servicesList.innerHTML = `
+                <div class="error-state">
+                    <span class="icon icon-exclamation" style="font-size: 2rem; color: #dc3545;"></span>
+                    <p>${message}</p>
+                    <button class="btn btn-secondary" onclick="loadServices()">重试</button>
+                </div>
+            `;
+        }
+
+        // 刷新服务列表
+        async function refreshServices() {
+            await loadServices();
+        }
+
+        // 复制地址到剪贴板
+        function copyAddress(address) {
+            navigator.clipboard.writeText(address).then(() => {
+                showNotification('地址已复制到剪贴板', 'success');
+            }).catch(() => {
+                // 备用方法
+                const textArea = document.createElement('textarea');
+                textArea.value = address;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                showNotification('地址已复制到剪贴板', 'success');
+            });
+        }
+
+        // 显示通知
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+
+            setTimeout(() => {
+                notification.classList.add('show');
+            }, 100);
+
+            setTimeout(() => {
+                notification.classList.remove('show');
+                setTimeout(() => {
+                    document.body.removeChild(notification);
+                }, 300);
+            }, 3000);
+        }
+
+        // 退出登录
+        function logout() {
+            // 清除登录信息
+            localStorage.removeItem('guest_group_id');
+            localStorage.removeItem('guest_group_name');
+
+            // 跳转到登录页面
+            window.location.href = '/login.html';
+        }
+
+        // 更新最后更新时间
+        function updateLastUpdateTime() {
+            const now = new Date();
+            const timeString = now.toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            document.getElementById('last-update').textContent = timeString;
+        }
+
+        // 定时刷新服务状态（每30秒）
+        setInterval(() => {
+            if (currentGroupId) {
+                refreshServices();
+            }
+        }, 30000);
+    </script>
+</body>
+
+</html>

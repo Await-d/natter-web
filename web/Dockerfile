@@ -37,6 +37,8 @@ RUN mkdir -p /app/data && \
 ENV NATTER_PATH=/app/natter/natter.py \
     DATA_DIR=/app/data \
     WEB_PORT=8080 \
+    ADMIN_PASSWORD="" \
+    GUEST_ENABLED=true \
     PYTHONUNBUFFERED=1
 
 # 暴露Web管理界面端口

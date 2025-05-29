@@ -4,7 +4,7 @@
  # @Date: 2025-04-12 15:27:12
  # @LastEditors: Await
  # @LastEditTime: 2025-04-14 09:46:10
- # @Description: 请填写简介
+ # @Description: Natter Web管理工具启动脚本 - 支持统一登录
 ### 
 
 # 确保目录结构正确
@@ -100,7 +100,9 @@ APP_PARENT_DIR=$(dirname "$APP_DIR")
 NATTER_PATH=${NATTER_PATH:-"$APP_PARENT_DIR/natter/natter.py"}
 DATA_DIR=${DATA_DIR:-"$APP_DIR/data"}
 WEB_PORT=${WEB_PORT:-8080}
-WEB_PASSWORD=${WEB_PASSWORD:-""}
+ADMIN_PASSWORD=${ADMIN_PASSWORD:-""}
+GUEST_ENABLED=${GUEST_ENABLED:-"true"}
+IYUU_ENABLED=${IYUU_ENABLED:-"true"}
 
 # 调试信息
 echo "NATTER_PATH设置为: $NATTER_PATH"
@@ -126,18 +128,34 @@ else
   echo "✅ requests模块已安装"
 fi
 
+# 显示启动配置信息
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "🚀 Natter Web管理界面配置信息"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "📁 使用的Natter路径: $NATTER_PATH"
+echo "💾 数据存储目录: $DATA_DIR"
+echo "🌐 Web服务端口: $WEB_PORT"
+echo "🔐 管理员密码: ${ADMIN_PASSWORD:+已设置} ${ADMIN_PASSWORD:-未设置（开放访问）}"
+echo "👥 访客功能: ${GUEST_ENABLED}"
+echo "📢 IYUU推送: ${IYUU_ENABLED}"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
 # 启动Web管理服务
 echo "切换到web目录并启动服务..."
 cd /app/web
 
-echo "启动Natter Web管理界面"
-echo "使用的Natter路径: $NATTER_PATH"
-echo "数据存储目录: $DATA_DIR"
-echo "Web端口: $WEB_PORT"
-if [ -n "$WEB_PASSWORD" ]; then
-    echo "已配置访问密码，访问界面需要认证"
-    python3 -u "$APP_DIR/server.py" "$WEB_PORT" "$WEB_PASSWORD"
+echo "🚀 启动Natter Web管理界面"
+echo "📍 访问地址: http://localhost:$WEB_PORT"
+
+if [ -n "$ADMIN_PASSWORD" ]; then
+    echo "🔐 统一登录已启用 - 管理员和访客将使用统一的登录页面"
+    echo "   - 管理员密码: 使用环境变量ADMIN_PASSWORD设置的密码"
+    echo "   - 访客密码: 在管理界面中创建服务组时设置"
+    # 设置全局变量供server.py使用
+    export ADMIN_PASSWORD="$ADMIN_PASSWORD"
+    python3 -u "$APP_DIR/server.py" "$WEB_PORT"
 else
-    echo "未配置访问密码，所有人均可访问"
+    echo "⚠️  未设置管理员密码，系统将开放访问（不推荐用于生产环境）"
+    echo "   建议设置环境变量 ADMIN_PASSWORD 来启用密码保护"
     python3 -u "$APP_DIR/server.py" "$WEB_PORT" 
 fi 

@@ -1997,15 +1997,8 @@ function logout() {
     isAuthenticated = false;
     localStorage.removeItem('natter_auth_token');
 
-    // 隐藏登出按钮
-    const logoutBtn = document.getElementById('logout-btn');
-    if (logoutBtn) {
-        logoutBtn.style.display = 'none';
-    }
-
-    createLoginForm();
-    hideAllPanels();
-    loginPanel.style.display = 'block';
+    // 跳转到统一登录页面
+    window.location.href = '/login.html';
 }
 
 // 隐藏所有面板
@@ -2586,4 +2579,39 @@ function addIyuuTokenAction() {
             console.error('添加IYUU令牌出错:', error);
             showNotification('添加令牌时发生错误', 'error');
         });
+}
+
+function checkAuth() {
+    const token = localStorage.getItem('natter_auth_token');
+    if (!token) {
+        // 没有token，跳转到统一登录页面
+        window.location.href = '/login.html';
+        return false;
+    }
+
+    // 验证token有效性
+    fetch('/api/auth/check', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.authenticated) {
+                // 已认证，显示主界面
+                showMainInterface();
+            } else {
+                // token无效，清除并跳转到登录页面
+                localStorage.removeItem('natter_auth_token');
+                window.location.href = '/login.html';
+            }
+        })
+        .catch(error => {
+            console.error('认证检查失败:', error);
+            // 网络错误，也跳转到登录页面
+            localStorage.removeItem('natter_auth_token');
+            window.location.href = '/login.html';
+        });
+
+    return true;
 }

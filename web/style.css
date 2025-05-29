@@ -1460,4 +1460,39 @@ input:checked + .slider:before {
 
 .push-now-service-btn:hover {
     background-color: #218838;
+    transform: translateY(-1px);
+}
+
+/* 访客入口按钮样式 */
+.btn-guest {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s ease;
+    margin-right: 10px;
+    text-decoration: none;
+    box-shadow: 0 2px 4px rgba(102, 126, 234, 0.2);
+}
+
+.btn-guest:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    color: white;
+    text-decoration: none;
+}
+
+.btn-guest:active {
+    transform: translateY(0);
+}
+
+.btn-guest i {
+    font-size: 16px;
 }

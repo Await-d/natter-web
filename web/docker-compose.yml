@@ -24,10 +24,12 @@ services:
       - NATTER_PATH=/app/natter/natter.py
       - DATA_DIR=/app/data
       - WEB_PORT=8080 # Web服务端口，可自定义
-      - WEB_PASSWORD=zd2580
+      - ADMIN_PASSWORD=admin2025 # 管理员密码，建议修改为强密码
+      - GUEST_ENABLED=true # 是否启用访客功能
+      - IYUU_ENABLED=true # 是否启用IYUU推送功能
     # 添加健康检查
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:${WEB_PORT:-8080}"]
+      test: ["CMD", "curl", "-f", "http://localhost:${WEB_PORT:-8080}/api/version"]
       interval: 30s
       timeout: 10s
       retries: 3

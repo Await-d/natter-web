@@ -16,18 +16,24 @@ from urllib.parse import urlparse, parse_qs
 from collections import deque  # 添加队列用于消息批量发送
 
 import psutil
+import secrets
 
 # 版本号定义
-VERSION = "1.0.5"
+VERSION = "1.0.6"
 
 # 确保能够访问到natter.py，优先使用环境变量定义的路径
-NATTER_PATH = os.environ.get('NATTER_PATH') or os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "natter", "natter.py")
+NATTER_PATH = os.environ.get("NATTER_PATH") or os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "natter", "natter.py"
+)
 
 # 数据存储目录，优先使用环境变量定义的路径
-DATA_DIR = os.environ.get('DATA_DIR') or os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+DATA_DIR = os.environ.get("DATA_DIR") or os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "data"
+)
 TEMPLATES_FILE = os.path.join(DATA_DIR, "templates.json")
 SERVICES_DB_FILE = os.path.join(DATA_DIR, "services.json")
 IYUU_CONFIG_FILE = os.path.join(DATA_DIR, "iyuu_config.json")  # IYUU配置文件
+SERVICE_GROUPS_FILE = os.path.join(DATA_DIR, "service_groups.json")  # 服务组配置文件
 
 # 确保数据目录存在
 os.makedirs(DATA_DIR, exist_ok=True)
@@ -36,15 +42,21 @@ os.makedirs(DATA_DIR, exist_ok=True)
 running_services = {}
 service_lock = threading.RLock()
 
+# 服务组配置
+service_groups = {
+    "groups": {},  # 组ID -> {name, password, services}
+    "default_group": None,  # 默认组ID
+}
+
 # IYUU配置
 iyuu_config = {
     "tokens": [],  # IYUU令牌列表
     "enabled": True,  # 是否启用IYUU推送
     "schedule": {
         "enabled": False,  # 是否启用定时推送
-        "times": ["08:00"],   # 定时推送时间数组，支持多个时间段
-        "message": "Natter服务状态日报"  # 定时推送消息
-    }
+        "times": ["08:00"],  # 定时推送时间数组，支持多个时间段
+        "message": "Natter服务状态日报",  # 定时推送消息
+    },
 }
 
 # 消息队列用于事件整合推送
@@ -62,6 +74,14 @@ WAN_STATUS_PATTERN = re.compile(r"WAN > ([^\[]+)\[ ([^\]]+) \]")
 # 默认密码为None，表示不启用验证
 PASSWORD = None
 
+# 获取环境变量中的管理员密码
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD") or None
+
+# 认证token管理
+auth_tokens = {}  # token -> 过期时间戳
+AUTH_TOKEN_EXPIRE = 24 * 60 * 60  # token有效期24小时
+
+
 # 修改添加消息到推送队列函数
 def queue_message(category, title, content, important=False):
     """添加消息到队列，等待批量推送
@@ -76,13 +96,15 @@ def queue_message(category, title, content, important=False):
         return
 
     with message_lock:
-        message_queue.append({
-            "category": category,  # 消息类别: 启动, 停止, 地址变更, 错误等
-            "title": title,        # 消息标题
-            "content": content,    # 消息内容
-            "time": time.time(),   # 消息生成时间
-            "important": important # 是否为重要消息
-        })
+        message_queue.append(
+            {
+                "category": category,  # 消息类别: 启动, 停止, 地址变更, 错误等
+                "title": title,  # 消息标题
+                "content": content,  # 消息内容
+                "time": time.time(),  # 消息生成时间
+                "important": important,  # 是否为重要消息
+            }
+        )
 
         # 如果消息标记为重要，或满足特定条件，考虑立即发送
         should_send_now = important or len(message_queue) >= 10
@@ -94,23 +116,32 @@ def queue_message(category, title, content, important=False):
 
         if should_send_now and time_since_last_send >= MIN_SEND_INTERVAL:
             # 立即发送
-            print(f"触发立即发送: {'重要消息' if important else '消息队列已满'}, 距上次发送已过{time_since_last_send:.1f}秒")
+            print(
+                f"触发立即发送: {'重要消息' if important else '消息队列已满'}, 距上次发送已过{time_since_last_send:.1f}秒"
+            )
             send_batch_messages()
         else:
             # 否则，设置或重置定时器
             global message_batch_timer
             if message_batch_timer is None or not message_batch_timer.is_alive():
                 # 计算下次发送时间：确保至少间隔MIN_SEND_INTERVAL
-                next_send_delay = max(MIN_SEND_INTERVAL - time_since_last_send, 5)  # 至少等待5秒，原来是60秒
+                next_send_delay = max(
+                    MIN_SEND_INTERVAL - time_since_last_send, 5
+                )  # 至少等待5秒，原来是60秒
 
                 # 如果消息是重要的但未达到发送间隔，使用较短的延迟
                 if important and next_send_delay > 5:
                     next_send_delay = 5  # 重要消息使用5秒延迟，原来是60秒
 
-                message_batch_timer = threading.Timer(next_send_delay, send_batch_messages)
+                message_batch_timer = threading.Timer(
+                    next_send_delay, send_batch_messages
+                )
                 message_batch_timer.daemon = True
                 message_batch_timer.start()
-                print(f"消息整合推送定时器已启动，将在{next_send_delay:.1f}秒后发送批量消息")
+                print(
+                    f"消息整合推送定时器已启动，将在{next_send_delay:.1f}秒后发送批量消息"
+                )
+
 
 # 修改批量发送消息队列中的所有消息函数
 def send_batch_messages():
@@ -166,7 +197,11 @@ def send_batch_messages():
             for msg in messages:
                 # 尝试从消息内容中提取服务ID和映射地址
                 content = msg["content"]
-                service_name = msg["title"].split(']')[-1].strip() if ']' in msg["title"] else msg["title"]
+                service_name = (
+                    msg["title"].split("]")[-1].strip()
+                    if "]" in msg["title"]
+                    else msg["title"]
+                )
 
                 # 提取服务的运行状态
                 if cat == "启动":
@@ -198,14 +233,27 @@ def send_batch_messages():
 
         # 优先处理错误和重要类别
         priority_cats = ["错误", "服务状态", "定时报告"]
-        sorted_cats = sorted(categories.keys(),
-                           key=lambda x: (0 if x in priority_cats else 1, x))
+        sorted_cats = sorted(
+            categories.keys(), key=lambda x: (0 if x in priority_cats else 1, x)
+        )
 
         # 按类别添加消息
         for cat in sorted_cats:
             messages = categories[cat]
             # 添加类别图标
-            cat_icon = "⚠️" if cat == "错误" else "📊" if cat == "定时报告" else "🔄" if cat == "地址变更" else "▶️" if cat == "启动" else "⏹️" if cat == "停止" else "📋"
+            cat_icon = (
+                "⚠️"
+                if cat == "错误"
+                else (
+                    "📊"
+                    if cat == "定时报告"
+                    else (
+                        "🔄"
+                        if cat == "地址变更"
+                        else "▶️" if cat == "启动" else "⏹️" if cat == "停止" else "📋"
+                    )
+                )
+            )
             message_content += f"📌 **{cat_icon} {cat} ({len(messages)}条)**\n"
             message_content += f"┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n"
 
@@ -213,10 +261,16 @@ def send_batch_messages():
             if cat in ["错误", "服务状态"]:
                 for msg in messages:
                     # 提取消息标题中服务名称部分
-                    service_name = msg["title"].split(']')[-1].strip() if ']' in msg["title"] else msg["title"]
+                    service_name = (
+                        msg["title"].split("]")[-1].strip()
+                        if "]" in msg["title"]
+                        else msg["title"]
+                    )
                     # 使用完整内容，但进行格式优化
-                    formatted_content = msg['content'].replace('\n', '\n  ')
-                    message_content += f"➤ **{service_name}**:\n  {formatted_content}\n\n"
+                    formatted_content = msg["content"].replace("\n", "\n  ")
+                    message_content += (
+                        f"➤ **{service_name}**:\n  {formatted_content}\n\n"
+                    )
             # 定时报告特殊处理，提取并高亮显示服务状态
             elif cat == "定时报告":
                 # 只显示一次定时报告的整体摘要，避免冗余
@@ -224,33 +278,50 @@ def send_batch_messages():
                     # 使用第一条消息作为代表
                     msg = messages[0]
                     content = msg["content"]
-                    
+
                     # 提取服务总数等信息的更好方法
-                    summary_sections = re.findall(r"总服务数.*?运行中.*?已停止.*?", content, re.DOTALL)
+                    summary_sections = re.findall(
+                        r"总服务数.*?运行中.*?已停止.*?", content, re.DOTALL
+                    )
                     if summary_sections:
                         summary = summary_sections[0].strip()
                         # 美化格式
-                        summary = summary.replace("总服务数", "总服务数").replace("运行中", "🟢 运行中").replace("已停止", "⚪ 已停止")
+                        summary = (
+                            summary.replace("总服务数", "总服务数")
+                            .replace("运行中", "🟢 运行中")
+                            .replace("已停止", "⚪ 已停止")
+                        )
                         message_content += f"➤ **服务概况**:\n  {summary}\n\n"
-                    
+
                     # 提取服务列表并美化展示
                     message_content += f"➤ **服务详情**:\n"
-                    
+
                     # 使用正则表达式提取服务信息，支持树形格式的匹配
-                    services_section = re.search(r"服务详情\*\*\n(.*?)(?=\n\s*━━━|\Z)", content, re.DOTALL)
+                    services_section = re.search(
+                        r"服务详情\*\*\n(.*?)(?=\n\s*━━━|\Z)", content, re.DOTALL
+                    )
                     if services_section:
                         services_text = services_section.group(1)
                         # 按服务分块提取
-                        service_blocks = re.findall(r"([🟢⚪].*?\n(?:.*?─.*?\n)*)", services_text, re.DOTALL)
+                        service_blocks = re.findall(
+                            r"([🟢⚪].*?\n(?:.*?─.*?\n)*)", services_text, re.DOTALL
+                        )
                         for block in service_blocks:
-                            service_lines = block.strip().split('\n')
+                            service_lines = block.strip().split("\n")
                             if service_lines:
                                 # 提取服务名称和状态
-                                service_info = service_lines[0]  # 第一行包含服务名和状态emoji
+                                service_info = service_lines[
+                                    0
+                                ]  # 第一行包含服务名和状态emoji
                                 # 提取映射地址
-                                mapping_line = next((line for line in service_lines if "映射" in line), None)
+                                mapping_line = next(
+                                    (line for line in service_lines if "映射" in line),
+                                    None,
+                                )
                                 if mapping_line:
-                                    mapping_address = re.search(r"`(.*?)`", mapping_line)
+                                    mapping_address = re.search(
+                                        r"`(.*?)`", mapping_line
+                                    )
                                     if mapping_address:
                                         # 重构服务显示行，保持简洁
                                         emoji = "🟢" if "🟢" in service_info else "⚪"
@@ -259,16 +330,24 @@ def send_batch_messages():
                                             message_content += f"  {emoji} **{name.group(1)}**: `{mapping_address.group(1)}`\n"
                     else:
                         # 尝试备用方法提取服务信息 - 兼容旧格式
-                        services_details = re.findall(r"\[(运行中|已停止)\](.*?)-(.*?)(?=\n\[|\n\n|\Z)", content, re.DOTALL)
+                        services_details = re.findall(
+                            r"\[(运行中|已停止)\](.*?)-(.*?)(?=\n\[|\n\n|\Z)",
+                            content,
+                            re.DOTALL,
+                        )
                         for status, name, address in services_details:
                             status_emoji = "🟢" if status == "运行中" else "⚪"
                             message_content += f"  {status_emoji} **{name.strip()}**: `{address.strip()}`\n"
-                    
+
                     message_content += "\n"
             # 普通消息类别
             else:
                 for msg in messages:
-                    service_name = msg["title"].split(']')[-1].strip() if ']' in msg["title"] else msg["title"]
+                    service_name = (
+                        msg["title"].split("]")[-1].strip()
+                        if "]" in msg["title"]
+                        else msg["title"]
+                    )
                     content = msg["content"]
 
                     # 尝试提取并突出显示映射地址（如果有）
@@ -314,13 +393,17 @@ def send_batch_messages():
                         if old_addr_match and new_addr_match:
                             old_addr = old_addr_match.group(1).strip()
                             new_addr = new_addr_match.group(1).strip()
-                            important_items.append(f"🔄 映射地址变更: `{old_addr}` → `{new_addr}`")
+                            important_items.append(
+                                f"🔄 映射地址变更: `{old_addr}` → `{new_addr}`"
+                            )
                     elif "服务获取到映射地址" in content:
                         important_items.append(f"🆕 获取新映射地址{mapping_info}")
 
                     # 如果没有提取到特定信息，展示第一行
                     if not important_items:
-                        first_line = content.split('\n', 1)[0] if '\n' in content else content
+                        first_line = (
+                            content.split("\n", 1)[0] if "\n" in content else content
+                        )
                         important_items.append(first_line)
 
                     # 显示提取的重要信息
@@ -340,6 +423,7 @@ def send_batch_messages():
         message_queue.clear()
         print(f"已整合发送 {queue_len} 条服务状态消息")
 
+
 # 修改直接发送IYUU消息的内部函数
 def _send_iyuu_message_direct(text, desp):
     """直接发送IYUU消息，不经过队列
@@ -358,13 +442,8 @@ def _send_iyuu_message_direct(text, desp):
 
         try:
             url = f"https://iyuu.cn/{token}.send"
-            payload = {
-                "text": text,
-                "desp": desp
-            }
-            headers = {
-                "Content-Type": "application/json; charset=UTF-8"
-            }
+            payload = {"text": text, "desp": desp}
+            headers = {"Content-Type": "application/json; charset=UTF-8"}
 
             response = requests.post(url, json=payload, headers=headers, timeout=10)
 
@@ -373,7 +452,9 @@ def _send_iyuu_message_direct(text, desp):
                 if result.get("errcode") == 0:
                     success = True
                 else:
-                    errors.append(f"令牌 {token[:5]}...: {result.get('errmsg', '未知错误')}")
+                    errors.append(
+                        f"令牌 {token[:5]}...: {result.get('errmsg', '未知错误')}"
+                    )
             else:
                 errors.append(f"令牌 {token[:5]}...: HTTP错误 {response.status_code}")
         except Exception as e:
@@ -383,6 +464,7 @@ def _send_iyuu_message_direct(text, desp):
         return True, errors
     else:
         return False, errors
+
 
 # 修改公开的IYUU消息发送函数
 def send_iyuu_message(text, desp, force_send=False):
@@ -424,6 +506,7 @@ def send_iyuu_message(text, desp, force_send=False):
     queue_message(category, text, desp, important=is_important)
     return True, []
 
+
 # 修改定时推送函数
 def schedule_daily_notification():
     """设置每日定时推送任务"""
@@ -458,10 +541,16 @@ def schedule_daily_notification():
 
                 # 获取所有服务状态用于日报
                 services_info = NatterManager.list_services()
-                running_count = sum(1 for s in services_info if s.get("status") == "运行中")
-                stopped_count = sum(1 for s in services_info if s.get("status") == "已停止")
+                running_count = sum(
+                    1 for s in services_info if s.get("status") == "运行中"
+                )
+                stopped_count = sum(
+                    1 for s in services_info if s.get("status") == "已停止"
+                )
 
-                message = iyuu_config.get("schedule", {}).get("message", "Natter服务状态日报")
+                message = iyuu_config.get("schedule", {}).get(
+                    "message", "Natter服务状态日报"
+                )
                 detail = f"## 📊 Natter服务状态日报 ##\n\n"
                 detail += f"⏰ 报告时间: {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
                 detail += f"━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
@@ -510,8 +599,11 @@ def schedule_daily_notification():
             # 休眠5秒再检查
             time.sleep(5)
 
-    notification_thread = threading.Thread(target=check_and_send_notification, daemon=True)
+    notification_thread = threading.Thread(
+        target=check_and_send_notification, daemon=True
+    )
     notification_thread.start()
+
 
 class NatterService:
     def __init__(self, service_id, cmd_args, remark=""):
@@ -527,9 +619,9 @@ class NatterService:
         self.nat_type = "未知"
         self.auto_restart = False
         self.restart_thread = None
-        self.local_port = None   # 添加本地端口属性
+        self.local_port = None  # 添加本地端口属性
         self.remote_port = None  # 添加远程端口属性
-        self.remark = remark     # 添加备注属性
+        self.remark = remark  # 添加备注属性
         self.last_mapped_address = None  # 记录上一次的映射地址，用于检测变更
 
         # 尝试从命令参数中解析端口信息
@@ -540,13 +632,13 @@ class NatterService:
         try:
             # 查找 -p 参数后面的端口号
             for i, arg in enumerate(self.cmd_args):
-                if arg == '-p' and i + 1 < len(self.cmd_args):
+                if arg == "-p" and i + 1 < len(self.cmd_args):
                     self.local_port = int(self.cmd_args[i + 1])
                     break
 
             # 在映射地址中寻找远程端口
-            if self.mapped_address and ':' in self.mapped_address:
-                parts = self.mapped_address.split(':')
+            if self.mapped_address and ":" in self.mapped_address:
+                parts = self.mapped_address.split(":")
                 if len(parts) >= 2:
                     try:
                         self.remote_port = int(parts[-1])
@@ -561,8 +653,15 @@ class NatterService:
             return False
 
         # 检查Docker环境下是否尝试使用nftables
-        if os.path.exists('/.dockerenv') and any(arg == '-m' and i+1 < len(self.cmd_args) and self.cmd_args[i+1] == 'nftables' for i, arg in enumerate(self.cmd_args)):
-            print("错误: 在Docker环境中尝试使用nftables转发方法，此方法在Docker中不可用")
+        if os.path.exists("/.dockerenv") and any(
+            arg == "-m"
+            and i + 1 < len(self.cmd_args)
+            and self.cmd_args[i + 1] == "nftables"
+            for i, arg in enumerate(self.cmd_args)
+        ):
+            print(
+                "错误: 在Docker环境中尝试使用nftables转发方法，此方法在Docker中不可用"
+            )
             self.output_lines.append("❌ 错误: nftables在Docker容器中不可用")
             self.output_lines.append("💡 请使用socket或iptables转发方法")
             self.output_lines.append("➡️ 请停止此服务，然后使用其他转发方法重新创建服务")
@@ -574,7 +673,7 @@ class NatterService:
             queue_message(
                 "错误",
                 f"[错误] {service_name}",
-                f"服务启动失败\n错误原因: {error_msg}\n\n请停止此服务，然后使用其他转发方法重新创建服务"
+                f"服务启动失败\n错误原因: {error_msg}\n\n请停止此服务，然后使用其他转发方法重新创建服务",
             )
 
             return False
@@ -582,8 +681,8 @@ class NatterService:
         cmd = [sys.executable, NATTER_PATH] + self.cmd_args
 
         # 如果没有指定keepalive间隔，添加默认值
-        if not any(arg == '-k' for arg in self.cmd_args):
-            cmd.extend(['-k', '30'])
+        if not any(arg == "-k" for arg in self.cmd_args):
+            cmd.extend(["-k", "30"])
             print(f"自动添加保活间隔: 30秒")
 
         self.process = subprocess.Popen(
@@ -592,7 +691,7 @@ class NatterService:
             stderr=subprocess.STDOUT,
             text=True,
             bufsize=1,
-            universal_newlines=True
+            universal_newlines=True,
         )
         self.start_time = time.time()
         self.status = "运行中"
@@ -608,7 +707,7 @@ class NatterService:
         queue_message(
             "启动",
             f"[启动] {service_name}",
-            f"服务已成功启动\n服务ID: {self.service_id}\n本地端口: {local_port}\n启动时间: {time.strftime('%Y-%m-%d %H:%M:%S')}"
+            f"服务已成功启动\n服务ID: {self.service_id}\n本地端口: {local_port}\n启动时间: {time.strftime('%Y-%m-%d %H:%M:%S')}",
         )
 
         return True
@@ -624,8 +723,8 @@ class NatterService:
                 self.output_lines.pop(0)
 
             # 尝试提取映射地址
-            if '<--Natter-->' in line:
-                parts = line.split('<--Natter-->')
+            if "<--Natter-->" in line:
+                parts = line.split("<--Natter-->")
                 if len(parts) == 2:
                     new_mapped_address = parts[1].strip()
 
@@ -639,8 +738,8 @@ class NatterService:
 
                         # 解析远程端口
                         try:
-                            if self.mapped_address and ':' in self.mapped_address:
-                                addr_parts = self.mapped_address.split(':')
+                            if self.mapped_address and ":" in self.mapped_address:
+                                addr_parts = self.mapped_address.split(":")
                                 if len(addr_parts) >= 2:
                                     self.remote_port = int(addr_parts[-1])
                         except Exception as e:
@@ -655,42 +754,52 @@ class NatterService:
                             queue_message(
                                 "地址变更",
                                 f"[地址变更] {service_name}",
-                                f"服务映射地址已变更\n服务ID: {self.service_id}\n服务备注: {self.remark or '无'}\n本地端口: {local_port}\n\n旧地址: {old_address}\n新地址: {self.mapped_address}\n变更时间: {time.strftime('%Y-%m-%d %H:%M:%S')}"
+                                f"服务映射地址已变更\n服务ID: {self.service_id}\n服务备注: {self.remark or '无'}\n本地端口: {local_port}\n\n旧地址: {old_address}\n新地址: {self.mapped_address}\n变更时间: {time.strftime('%Y-%m-%d %H:%M:%S')}",
                             )
                         else:
                             # 首次获取地址时发送通知
                             queue_message(
                                 "地址分配",
                                 f"[地址分配] {service_name}",
-                                f"服务获取到映射地址\n服务ID: {self.service_id}\n服务备注: {self.remark or '无'}\n本地端口: {local_port}\n映射地址: {self.mapped_address}\n获取时间: {time.strftime('%Y-%m-%d %H:%M:%S')}"
+                                f"服务获取到映射地址\n服务ID: {self.service_id}\n服务备注: {self.remark or '无'}\n本地端口: {local_port}\n映射地址: {self.mapped_address}\n获取时间: {time.strftime('%Y-%m-%d %H:%M:%S')}",
                             )
 
             # 检测nftables错误
             if "nftables" in line and "not available" in line:
                 nftables_error_detected = True
-                self.output_lines.append("⚠️ 检测到nftables不可用错误！Docker容器可能缺少所需权限或内核支持。")
-                self.output_lines.append("💡 建议：尝试使用其他转发方法，如'socket'（内置）或'iptables'。")
-                self.output_lines.append("📋 步骤：停止此服务，重新创建服务并在'转发方法'中选择'socket'或'iptables'。")
+                self.output_lines.append(
+                    "⚠️ 检测到nftables不可用错误！Docker容器可能缺少所需权限或内核支持。"
+                )
+                self.output_lines.append(
+                    "💡 建议：尝试使用其他转发方法，如'socket'（内置）或'iptables'。"
+                )
+                self.output_lines.append(
+                    "📋 步骤：停止此服务，重新创建服务并在'转发方法'中选择'socket'或'iptables'。"
+                )
 
                 # 发送错误推送 - 使用消息队列
                 service_name = self.remark or f"服务 {self.service_id}"
                 queue_message(
                     "错误",
                     f"[错误] {service_name}",
-                    f"服务出现错误\n错误类型: nftables不可用\n服务ID: {self.service_id}\n\n建议：尝试使用其他转发方法，如'socket'（内置）或'iptables'。\n步骤：停止此服务，重新创建服务并在'转发方法'中选择'socket'或'iptables'。"
+                    f"服务出现错误\n错误类型: nftables不可用\n服务ID: {self.service_id}\n\n建议：尝试使用其他转发方法，如'socket'（内置）或'iptables'。\n步骤：停止此服务，重新创建服务并在'转发方法'中选择'socket'或'iptables'。",
                 )
 
             # 检测pcap初始化错误
             if "pcap initialization failed" in line:
-                self.output_lines.append("⚠️ 检测到pcap初始化错误！这通常与nftables功能有关。")
-                self.output_lines.append("💡 建议：尝试使用其他转发方法，如'socket'（内置）或'iptables'。")
+                self.output_lines.append(
+                    "⚠️ 检测到pcap初始化错误！这通常与nftables功能有关。"
+                )
+                self.output_lines.append(
+                    "💡 建议：尝试使用其他转发方法，如'socket'（内置）或'iptables'。"
+                )
 
                 # 发送错误推送 - 使用消息队列
                 service_name = self.remark or f"服务 {self.service_id}"
                 queue_message(
                     "错误",
                     f"[错误] {service_name}",
-                    f"服务出现错误\n错误类型: pcap初始化失败\n服务ID: {self.service_id}\n\n建议：尝试使用其他转发方法，如'socket'（内置）或'iptables'。"
+                    f"服务出现错误\n错误类型: pcap初始化失败\n服务ID: {self.service_id}\n\n建议：尝试使用其他转发方法，如'socket'（内置）或'iptables'。",
                 )
 
             # 提取NAT类型
@@ -720,7 +829,7 @@ class NatterService:
         queue_message(
             "停止",
             f"[停止] {service_name}",
-            f"服务已停止运行\n服务ID: {self.service_id}\n服务备注: {self.remark or '无'}\n本地端口: {local_port}\n映射地址: {mapped_address}\n停止时间: {time.strftime('%Y-%m-%d %H:%M:%S')}"
+            f"服务已停止运行\n服务ID: {self.service_id}\n服务备注: {self.remark or '无'}\n本地端口: {local_port}\n映射地址: {mapped_address}\n停止时间: {time.strftime('%Y-%m-%d %H:%M:%S')}",
         )
 
         # 如果启用了自动重启，且不是由于nftables错误导致的退出，则重新启动服务
@@ -730,7 +839,9 @@ class NatterService:
             self.restart_thread.daemon = True
             self.restart_thread.start()
         elif nftables_error_detected:
-            self.output_lines.append("🔄 因nftables错误，已禁用自动重启。请使用其他转发方法重新配置。")
+            self.output_lines.append(
+                "🔄 因nftables错误，已禁用自动重启。请使用其他转发方法重新配置。"
+            )
 
     def _restart_service(self):
         """自动重启服务"""
@@ -783,7 +894,7 @@ class NatterService:
             queue_message(
                 "手动停止",
                 f"[手动停止] {service_name}",
-                f"服务已被手动停止\n服务ID: {self.service_id}\n服务备注: {self.remark or '无'}\n本地端口: {local_port}\n映射地址: {mapped_address}\n停止时间: {time.strftime('%Y-%m-%d %H:%M:%S')}"
+                f"服务已被手动停止\n服务ID: {self.service_id}\n服务备注: {self.remark or '无'}\n本地端口: {local_port}\n映射地址: {mapped_address}\n停止时间: {time.strftime('%Y-%m-%d %H:%M:%S')}",
             )
 
             return True
@@ -819,7 +930,7 @@ class NatterService:
             "wan_status": self.wan_status,
             "nat_type": self.nat_type,
             "auto_restart": self.auto_restart,
-            "remark": self.remark
+            "remark": self.remark,
         }
 
     def to_dict(self):
@@ -829,12 +940,14 @@ class NatterService:
             "cmd_args": self.cmd_args,
             "auto_restart": self.auto_restart,
             "created_at": self.start_time or time.time(),
-            "remark": self.remark
+            "remark": self.remark,
         }
+
 
 def generate_service_id():
     """生成唯一的服务ID"""
     return str(int(time.time() * 1000))
+
 
 class TemplateManager:
     @staticmethod
@@ -844,7 +957,7 @@ class TemplateManager:
             return []
 
         try:
-            with open(TEMPLATES_FILE, 'r') as f:
+            with open(TEMPLATES_FILE, "r") as f:
                 return json.load(f)
         except Exception as e:
             print(f"加载模板文件出错: {e}")
@@ -864,7 +977,7 @@ class TemplateManager:
             "name": name,
             "description": description,
             "cmd_args": cmd_args,
-            "created_at": time.time()
+            "created_at": time.time(),
         }
 
         # 添加到模板列表
@@ -872,7 +985,7 @@ class TemplateManager:
 
         # 保存到文件
         try:
-            with open(TEMPLATES_FILE, 'w') as f:
+            with open(TEMPLATES_FILE, "w") as f:
                 json.dump(templates, f, indent=2)
             return template_id
         except Exception as e:
@@ -893,12 +1006,13 @@ class TemplateManager:
 
         # 保存更新后的模板列表
         try:
-            with open(TEMPLATES_FILE, 'w') as f:
+            with open(TEMPLATES_FILE, "w") as f:
                 json.dump(filtered_templates, f, indent=2)
             return True
         except Exception as e:
             print(f"删除模板出错: {e}")
             return False
+
 
 class NatterManager:
     @staticmethod
@@ -1011,9 +1125,14 @@ class NatterManager:
                 services_config = {}
                 for service_id, service in running_services.items():
                     # 确保获取端口信息
-                    if hasattr(service, 'mapped_address') and service.mapped_address and not service.remote_port and ':' in service.mapped_address:
+                    if (
+                        hasattr(service, "mapped_address")
+                        and service.mapped_address
+                        and not service.remote_port
+                        and ":" in service.mapped_address
+                    ):
                         try:
-                            addr_parts = service.mapped_address.split(':')
+                            addr_parts = service.mapped_address.split(":")
                             if len(addr_parts) >= 2:
                                 service.remote_port = int(addr_parts[-1])
                         except:
@@ -1021,23 +1140,29 @@ class NatterManager:
 
                     # 创建配置对象，只包含一定存在的属性
                     service_data = {
-                        'args': service.cmd_args,
-                        'status': service.status,
-                        'auto_restart': service.auto_restart,
-                        'start_time': service.start_time,
-                        'remark': service.remark if hasattr(service, 'remark') else ""
+                        "args": service.cmd_args,
+                        "status": service.status,
+                        "auto_restart": service.auto_restart,
+                        "start_time": service.start_time,
+                        "remark": service.remark if hasattr(service, "remark") else "",
                     }
 
                     # 添加可能不存在的属性
-                    if hasattr(service, 'local_port') and service.local_port is not None:
-                        service_data['local_port'] = service.local_port
+                    if (
+                        hasattr(service, "local_port")
+                        and service.local_port is not None
+                    ):
+                        service_data["local_port"] = service.local_port
 
-                    if hasattr(service, 'remote_port') and service.remote_port is not None:
-                        service_data['remote_port'] = service.remote_port
+                    if (
+                        hasattr(service, "remote_port")
+                        and service.remote_port is not None
+                    ):
+                        service_data["remote_port"] = service.remote_port
 
                     services_config[service_id] = service_data
 
-            with open(SERVICES_DB_FILE, 'w', encoding='utf-8') as f:
+            with open(SERVICES_DB_FILE, "w", encoding="utf-8") as f:
                 json.dump(services_config, f, indent=2, ensure_ascii=False)
             print(f"服务配置已保存到 {SERVICES_DB_FILE}")
         except Exception as e:
@@ -1051,7 +1176,7 @@ class NatterManager:
             return
 
         try:
-            with open(SERVICES_DB_FILE, 'r', encoding='utf-8') as f:
+            with open(SERVICES_DB_FILE, "r", encoding="utf-8") as f:
                 services_config = json.load(f)
 
             with service_lock:
@@ -1060,9 +1185,9 @@ class NatterManager:
                     if service_id in running_services:
                         continue
 
-                    args = config.get('args')
-                    auto_restart = config.get('auto_restart', False)
-                    remark = config.get('remark', "")
+                    args = config.get("args")
+                    auto_restart = config.get("auto_restart", False)
+                    remark = config.get("remark", "")
 
                     if args:
                         # 创建并启动服务
@@ -1070,10 +1195,10 @@ class NatterManager:
                         service.auto_restart = auto_restart
 
                         # 设置可能存在的端口信息
-                        if 'local_port' in config:
-                            service.local_port = config['local_port']
-                        if 'remote_port' in config:
-                            service.remote_port = config['remote_port']
+                        if "local_port" in config:
+                            service.local_port = config["local_port"]
+                        if "remote_port" in config:
+                            service.remote_port = config["remote_port"]
 
                         if service.start():
                             running_services[service_id] = service
@@ -1082,6 +1207,7 @@ class NatterManager:
             print(f"成功从 {SERVICES_DB_FILE} 加载服务配置")
         except Exception as e:
             print(f"加载服务配置失败: {str(e)}")
+
 
 class NatterHttpHandler(BaseHTTPRequestHandler):
     def _set_headers(self, content_type="application/json"):
@@ -1092,21 +1218,35 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
         self.end_headers()
 
+    def _authenticate_token(self):
+        """验证token认证"""
+        auth_header = self.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header[7:]  # 移除"Bearer "前缀
+            if token in auth_tokens:
+                # 检查token是否过期
+                if time.time() - auth_tokens[token] < AUTH_TOKEN_EXPIRE:
+                    return True
+                else:
+                    # token过期，清理
+                    del auth_tokens[token]
+        return False
+
     def _authenticate(self):
         """验证请求中的密码"""
         # 如果未设置密码，则允许所有访问
-        if PASSWORD is None:
+        if ADMIN_PASSWORD is None:
             return True
 
         # 检查Authorization头
-        auth_header = self.headers.get('Authorization', '')
-        if auth_header.startswith('Basic '):
+        auth_header = self.headers.get("Authorization", "")
+        if auth_header.startswith("Basic "):
             # 解析Basic认证头
             try:
-                auth_decoded = base64.b64decode(auth_header[6:]).decode('utf-8')
-                username, password = auth_decoded.split(':', 1)
+                auth_decoded = base64.b64decode(auth_header[6:]).decode("utf-8")
+                username, password = auth_decoded.split(":", 1)
                 # 检查密码是否匹配
-                if password == PASSWORD:
+                if password == ADMIN_PASSWORD:
                     return True
             except Exception as e:
                 print(f"认证解析出错: {e}")
@@ -1114,9 +1254,11 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
         # 如果是API请求，返回JSON格式的401错误
         # 但不发送WWW-Authenticate头，避免触发浏览器内置认证弹窗
         self.send_response(401)
-        self.send_header('Content-type', 'application/json')
+        self.send_header("Content-type", "application/json")
         self.end_headers()
-        self.wfile.write(json.dumps({"error": "需要认证", "auth_required": True}).encode())
+        self.wfile.write(
+            json.dumps({"error": "需要认证", "auth_required": True}).encode()
+        )
         return False
 
     def do_OPTIONS(self):
@@ -1130,14 +1272,63 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
             query_params = parse_qs(parsed_url.query)
 
             # 如果访问的是版本号API
-            if path == '/api/version':
+            if path == "/api/version":
                 self._set_headers(200)
-                response = {'version': VERSION}
+                response = {"version": VERSION}
                 self.wfile.write(json.dumps(response).encode())
                 return
 
+            # 访客模式API - 不需要管理员认证
+            if path == "/api/guest/auth":
+                # 访客密码验证
+                if "password" in query_params:
+                    password = query_params["password"][0]
+                    group_id, group = ServiceGroupManager.get_group_by_password(
+                        password
+                    )
+                    if group:
+                        self._set_headers()
+                        self.wfile.write(
+                            json.dumps(
+                                {
+                                    "success": True,
+                                    "group_id": group_id,
+                                    "group_name": group["name"],
+                                    "group_description": group.get("description", ""),
+                                }
+                            ).encode()
+                        )
+                    else:
+                        self._error(401, "访客密码错误")
+                else:
+                    self._error(400, "缺少密码参数")
+                return
+            elif path == "/api/guest/services":
+                # 访客获取服务列表
+                if "group_id" in query_params:
+                    group_id = query_params["group_id"][0]
+                    services = ServiceGroupManager.get_services_by_group(group_id)
+                    self._set_headers()
+                    self.wfile.write(json.dumps({"services": services}).encode())
+                else:
+                    self._error(400, "缺少group_id参数")
+                return
+            elif path == "/api/guest/check":
+                # 检查是否有配置的访客组
+                self._set_headers()
+                groups = ServiceGroupManager.list_groups()
+                has_groups = len(groups) > 0
+                self.wfile.write(json.dumps({"guest_available": has_groups}).encode())
+                return
+
             # 总是允许访问登录页和静态资源
-            if path == "/" or path == "" or path.endswith('.html') or path.endswith('.css') or path.endswith('.js'):
+            if (
+                path == "/"
+                or path == ""
+                or path.endswith(".html")
+                or path.endswith(".css")
+                or path.endswith(".js")
+            ):
                 # 为前端文件提供静态服务
                 if path == "/" or path == "":
                     self._serve_file("index.html", "text/html")
@@ -1153,7 +1344,11 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                     return
 
             # API请求需要验证
-            if not self._authenticate():
+            if (
+                path not in ["/api/auth/login", "/api/auth/unified-login"]
+                and not self._authenticate()
+                and not self._authenticate_token()
+            ):
                 return
 
             # API端点
@@ -1185,9 +1380,24 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                 else:
                     self._error(400, "Missing tool parameter")
             elif path == "/api/auth/check":
-                # 检查密码是否已设置
-                self._set_headers()
-                self.wfile.write(json.dumps({"auth_required": PASSWORD is not None}).encode())
+                # 检查认证状态
+                if self._authenticate_token():
+                    self._set_headers()
+                    self.wfile.write(json.dumps({"authenticated": True}).encode())
+                elif ADMIN_PASSWORD is not None:
+                    self._set_headers()
+                    self.wfile.write(
+                        json.dumps(
+                            {"authenticated": False, "auth_required": True}
+                        ).encode()
+                    )
+                else:
+                    self._set_headers()
+                    self.wfile.write(
+                        json.dumps(
+                            {"authenticated": True, "auth_required": False}
+                        ).encode()
+                    )
             elif path == "/api/iyuu/config":
                 # 获取IYUU配置
                 self._set_headers()
@@ -1222,8 +1432,12 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
 
                 # 获取所有服务数量
                 services_info = NatterManager.list_services()
-                running_count = sum(1 for s in services_info if s.get("status") == "运行中")
-                stopped_count = sum(1 for s in services_info if s.get("status") == "已停止")
+                running_count = sum(
+                    1 for s in services_info if s.get("status") == "运行中"
+                )
+                stopped_count = sum(
+                    1 for s in services_info if s.get("status") == "已停止"
+                )
 
                 test_message += f"📌 **服务概况**\n"
                 test_message += f"➤ 总服务数: {len(services_info)}\n"
@@ -1234,14 +1448,26 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                 test_message += f"💡 IYUU推送功能正常"
 
                 success, errors = _send_iyuu_message_direct(
-                    "Natter测试消息",
-                    test_message
+                    "Natter测试消息", test_message
                 )
                 self._set_headers()
-                self.wfile.write(json.dumps({
-                    "success": success,
-                    "errors": errors
-                }).encode())
+                self.wfile.write(
+                    json.dumps({"success": success, "errors": errors}).encode()
+                )
+            elif path == "/api/groups":
+                # 获取服务组列表
+                self._set_headers()
+                groups = ServiceGroupManager.list_groups()
+                self.wfile.write(json.dumps({"groups": groups}).encode())
+            elif path == "/api/groups/services":
+                # 根据组ID获取服务列表
+                if "group_id" in query_params:
+                    group_id = query_params["group_id"][0]
+                    services = ServiceGroupManager.get_services_by_group(group_id)
+                    self._set_headers()
+                    self.wfile.write(json.dumps({"services": services}).encode())
+                else:
+                    self._error(400, "Missing group_id parameter")
             else:
                 self._error(404, "Not found")
         except Exception as e:
@@ -1251,13 +1477,17 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
         parsed_url = urlparse(self.path)
         path = parsed_url.path
 
-        # API请求需要验证，除了密码验证API
-        if path != "/api/auth/login" and not self._authenticate():
+        # API请求需要验证，除了登录相关API
+        if (
+            path not in ["/api/auth/login", "/api/auth/unified-login"]
+            and not self._authenticate()
+            and not self._authenticate_token()
+        ):
             return
 
         # 读取请求体
-        content_length = int(self.headers['Content-Length'])
-        post_data = self.rfile.read(content_length).decode('utf-8')
+        content_length = int(self.headers["Content-Length"])
+        post_data = self.rfile.read(content_length).decode("utf-8")
         try:
             data = json.loads(post_data)
         except:
@@ -1267,12 +1497,14 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
         # 密码验证API
         if path == "/api/auth/login":
             if "password" in data:
-                if data["password"] == PASSWORD:
+                if data["password"] == ADMIN_PASSWORD:
                     self._set_headers()
                     # 返回base64编码的认证信息
-                    auth_string = f"user:{PASSWORD}"
+                    auth_string = f"user:{ADMIN_PASSWORD}"
                     auth_token = base64.b64encode(auth_string.encode()).decode()
-                    self.wfile.write(json.dumps({"success": True, "token": auth_token}).encode())
+                    self.wfile.write(
+                        json.dumps({"success": True, "token": auth_token}).encode()
+                    )
                 else:
                     self._error(401, "密码错误")
             else:
@@ -1333,7 +1565,9 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
         elif path == "/api/services/stop-all":
             count = NatterManager.stop_all_services()
             self._set_headers()
-            self.wfile.write(json.dumps({"success": True, "stopped_count": count}).encode())
+            self.wfile.write(
+                json.dumps({"success": True, "stopped_count": count}).encode()
+            )
         elif path == "/api/services/auto-restart":
             if "id" in data and "enabled" in data:
                 service_id = data["id"]
@@ -1408,8 +1642,11 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                     for token in new_tokens:
                         if token and "*" in token and len(token) > 10:
                             # 这是一个被掩码的令牌，保留原令牌
-                            matching_tokens = [t for t in iyuu_config.get("tokens", [])
-                                            if t.startswith(token[:5]) and t.endswith(token[-5:])]
+                            matching_tokens = [
+                                t
+                                for t in iyuu_config.get("tokens", [])
+                                if t.startswith(token[:5]) and t.endswith(token[-5:])
+                            ]
                             if matching_tokens:
                                 clean_tokens.append(matching_tokens[0])
                         else:
@@ -1435,15 +1672,18 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                     schedule_daily_notification()
 
                 self._set_headers()
-                self.wfile.write(json.dumps({
-                    "success": save_result,
-                    "config": iyuu_config
-                }).encode())
+                self.wfile.write(
+                    json.dumps({"success": save_result, "config": iyuu_config}).encode()
+                )
             except Exception as e:
                 self._error(500, f"更新IYUU配置失败: {e}")
         elif path == "/api/iyuu/add_token":
             # 添加新的IYUU令牌
-            if "token" in data and isinstance(data["token"], str) and data["token"].strip():
+            if (
+                "token" in data
+                and isinstance(data["token"], str)
+                and data["token"].strip()
+            ):
                 token = data["token"].strip()
 
                 # 验证令牌是否有效
@@ -1451,13 +1691,13 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                 try:
                     test_payload = {
                         "text": "Natter令牌验证",
-                        "desp": "这是一条验证IYUU令牌有效性的测试消息"
+                        "desp": "这是一条验证IYUU令牌有效性的测试消息",
                     }
-                    headers = {
-                        "Content-Type": "application/json; charset=UTF-8"
-                    }
+                    headers = {"Content-Type": "application/json; charset=UTF-8"}
 
-                    response = requests.post(test_url, json=test_payload, headers=headers, timeout=10)
+                    response = requests.post(
+                        test_url, json=test_payload, headers=headers, timeout=10
+                    )
 
                     if response.status_code == 200:
                         result = response.json()
@@ -1468,14 +1708,19 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                                 save_iyuu_config()
 
                             self._set_headers()
-                            self.wfile.write(json.dumps({
-                                "success": True,
-                                "message": "令牌已添加并验证成功"
-                            }).encode())
+                            self.wfile.write(
+                                json.dumps(
+                                    {"success": True, "message": "令牌已添加并验证成功"}
+                                ).encode()
+                            )
                         else:
-                            self._error(400, f"令牌验证失败: {result.get('errmsg', '未知错误')}")
+                            self._error(
+                                400, f"令牌验证失败: {result.get('errmsg', '未知错误')}"
+                            )
                     else:
-                        self._error(400, f"令牌验证失败: HTTP错误 {response.status_code}")
+                        self._error(
+                            400, f"令牌验证失败: HTTP错误 {response.status_code}"
+                        )
                 except Exception as e:
                     self._error(500, f"令牌验证过程出错: {e}")
             else:
@@ -1488,18 +1733,24 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                 # 如果是加星号的格式，查找匹配的令牌
                 if "*" in token and len(token) > 10:
                     original_tokens = iyuu_config.get("tokens", [])
-                    matched_tokens = [t for t in original_tokens
-                                     if t.startswith(token[:5]) and t.endswith(token[-5:])]
+                    matched_tokens = [
+                        t
+                        for t in original_tokens
+                        if t.startswith(token[:5]) and t.endswith(token[-5:])
+                    ]
 
                     if matched_tokens:
-                        iyuu_config["tokens"] = [t for t in original_tokens if t not in matched_tokens]
+                        iyuu_config["tokens"] = [
+                            t for t in original_tokens if t not in matched_tokens
+                        ]
                         save_iyuu_config()
 
                         self._set_headers()
-                        self.wfile.write(json.dumps({
-                            "success": True,
-                            "message": "令牌已删除"
-                        }).encode())
+                        self.wfile.write(
+                            json.dumps(
+                                {"success": True, "message": "令牌已删除"}
+                            ).encode()
+                        )
                     else:
                         self._error(404, "未找到匹配的令牌")
                 else:
@@ -1509,10 +1760,11 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                         save_iyuu_config()
 
                         self._set_headers()
-                        self.wfile.write(json.dumps({
-                            "success": True,
-                            "message": "令牌已删除"
-                        }).encode())
+                        self.wfile.write(
+                            json.dumps(
+                                {"success": True, "message": "令牌已删除"}
+                            ).encode()
+                        )
                     else:
                         self._error(404, "未找到指定令牌")
             else:
@@ -1523,7 +1775,7 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                 service_id = None
                 if "service_id" in data:
                     service_id = data["service_id"]
-                    
+
                 # 获取服务状态
                 services_info = []
                 if service_id:
@@ -1537,11 +1789,15 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                 else:
                     # 推送所有服务
                     services_info = NatterManager.list_services()
-                
+
                 # 生成推送内容
-                running_count = sum(1 for s in services_info if s.get("status") == "运行中")
-                stopped_count = sum(1 for s in services_info if s.get("status") == "已停止")
-                
+                running_count = sum(
+                    1 for s in services_info if s.get("status") == "运行中"
+                )
+                stopped_count = sum(
+                    1 for s in services_info if s.get("status") == "已停止"
+                )
+
                 message = "Natter服务状态即时报告"
                 detail = f"## 📊 Natter服务状态报告 ##\n\n"
                 detail += f"⏰ 报告时间: {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
@@ -1550,7 +1806,7 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                 detail += f"➤ 总服务数: {len(services_info)}\n"
                 detail += f"➤ 🟢 运行中: {running_count}\n"
                 detail += f"➤ ⚪ 已停止: {stopped_count}\n\n"
-                
+
                 if services_info:
                     detail += f"📌 **服务详情**\n"
                     for service in services_info:
@@ -1561,10 +1817,10 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                         lan_status = service.get("lan_status", "未知")
                         wan_status = service.get("wan_status", "未知")
                         nat_type = service.get("nat_type", "未知")
-                        
+
                         # 根据状态添加emoji
                         status_emoji = "🟢" if status == "运行中" else "⚪"
-                        
+
                         detail += f"{status_emoji} **{remark}**\n"
                         detail += f"  ├─ 状态: {status}\n"
                         detail += f"  ├─ 映射: `{mapped_address}`\n"
@@ -1573,27 +1829,133 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                         detail += f"  └─ NAT类型: {nat_type}\n\n"
                 else:
                     detail += "❗ 当前无服务运行\n\n"
-                
+
                 detail += f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
                 detail += f"💡 通过Natter管理界面可以管理服务"
-                
+
                 # 发送推送
                 success, errors = _send_iyuu_message_direct(message, detail)
-                
+
                 self._set_headers()
-                self.wfile.write(json.dumps({
-                    "success": success,
-                    "errors": errors
-                }).encode())
+                self.wfile.write(
+                    json.dumps({"success": success, "errors": errors}).encode()
+                )
             except Exception as e:
                 self._error(500, f"推送服务状态失败: {e}")
+        elif path == "/api/groups/create":
+            # 创建服务组
+            if "name" in data and "password" in data:
+                name = data["name"]
+                password = data["password"]
+                description = data.get("description", "")
+                group_id = ServiceGroupManager.create_group(name, password, description)
+                if group_id:
+                    self._set_headers()
+                    self.wfile.write(json.dumps({"group_id": group_id}).encode())
+                else:
+                    self._error(500, "创建服务组失败")
+            else:
+                self._error(400, "缺少必要参数")
+        elif path == "/api/groups/update":
+            # 更新服务组
+            if "group_id" in data:
+                group_id = data["group_id"]
+                name = data.get("name")
+                password = data.get("password")
+                description = data.get("description")
+                if ServiceGroupManager.update_group(
+                    group_id, name, password, description
+                ):
+                    self._set_headers()
+                    self.wfile.write(json.dumps({"success": True}).encode())
+                else:
+                    self._error(500, "更新服务组失败")
+            else:
+                self._error(400, "缺少group_id参数")
+        elif path == "/api/groups/delete":
+            # 删除服务组
+            if "group_id" in data:
+                group_id = data["group_id"]
+                if ServiceGroupManager.delete_group(group_id):
+                    self._set_headers()
+                    self.wfile.write(json.dumps({"success": True}).encode())
+                else:
+                    self._error(500, "删除服务组失败")
+            else:
+                self._error(400, "缺少group_id参数")
+        elif path == "/api/groups/add-service":
+            # 将服务添加到组
+            if "group_id" in data and "service_id" in data:
+                group_id = data["group_id"]
+                service_id = data["service_id"]
+                if ServiceGroupManager.add_service_to_group(group_id, service_id):
+                    self._set_headers()
+                    self.wfile.write(json.dumps({"success": True}).encode())
+                else:
+                    self._error(500, "添加服务到组失败")
+            else:
+                self._error(400, "缺少必要参数")
+        elif path == "/api/groups/remove-service":
+            # 从组中移除服务
+            if "group_id" in data and "service_id" in data:
+                group_id = data["group_id"]
+                service_id = data["service_id"]
+                if ServiceGroupManager.remove_service_from_group(group_id, service_id):
+                    self._set_headers()
+                    self.wfile.write(json.dumps({"success": True}).encode())
+                else:
+                    self._error(500, "从组中移除服务失败")
+            else:
+                self._error(400, "缺少必要参数")
+        elif path == "/api/auth/unified-login":
+            # 统一登录验证API
+            if "password" in data:
+                password = data["password"]
+
+                # 首先检查是否是管理员密码
+                if ADMIN_PASSWORD and password == ADMIN_PASSWORD:
+                    # 管理员登录
+                    token = secrets.token_urlsafe(32)
+                    auth_tokens[token] = time.time()
+                    self._set_headers()
+                    self.wfile.write(
+                        json.dumps(
+                            {"success": True, "user_type": "admin", "token": token}
+                        ).encode()
+                    )
+                    return
+
+                # 检查是否是访客组密码
+                group_id, group = ServiceGroupManager.get_group_by_password(password)
+                if group:
+                    # 访客登录
+                    self._set_headers()
+                    self.wfile.write(
+                        json.dumps(
+                            {
+                                "success": True,
+                                "user_type": "guest",
+                                "group_id": group_id,
+                                "group_name": group["name"],
+                                "group_description": group.get("description", ""),
+                            }
+                        ).encode()
+                    )
+                    return
+
+                # 密码不匹配
+                self._error(401, "密码错误")
+            else:
+                self._error(400, "缺少密码参数")
         else:
             self._error(404, "Not found")
 
     def _serve_file(self, filename, content_type):
         """提供静态文件服务"""
         try:
-            with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), filename), "rb") as f:
+            with open(
+                os.path.join(os.path.dirname(os.path.abspath(__file__)), filename), "rb"
+            ) as f:
                 self._set_headers(content_type)
                 self.wfile.write(f.read())
         except FileNotFoundError:
@@ -1612,22 +1974,35 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
             if tool == "socat":
                 # 安装socat
                 subprocess.run(["apt-get", "update"], check=True)
-                result = subprocess.run(["apt-get", "install", "-y", "socat"], capture_output=True, text=True)
+                result = subprocess.run(
+                    ["apt-get", "install", "-y", "socat"],
+                    capture_output=True,
+                    text=True,
+                )
                 success = result.returncode == 0
                 return {
                     "success": success,
-                    "message": "socat安装成功" if success else f"安装失败: {result.stderr}"
+                    "message": (
+                        "socat安装成功" if success else f"安装失败: {result.stderr}"
+                    ),
                 }
             elif tool == "gost":
                 # 安装gost
-                result = subprocess.run([
-                    "bash", "-c",
-                    "wget -qO- https://github.com/ginuerzh/gost/releases/download/v2.11.2/gost-linux-amd64-2.11.2.gz | gunzip > /usr/local/bin/gost && chmod +x /usr/local/bin/gost"
-                ], capture_output=True, text=True)
+                result = subprocess.run(
+                    [
+                        "bash",
+                        "-c",
+                        "wget -qO- https://github.com/ginuerzh/gost/releases/download/v2.11.2/gost-linux-amd64-2.11.2.gz | gunzip > /usr/local/bin/gost && chmod +x /usr/local/bin/gost",
+                    ],
+                    capture_output=True,
+                    text=True,
+                )
                 success = result.returncode == 0
                 return {
                     "success": success,
-                    "message": "gost安装成功" if success else f"安装失败: {result.stderr}"
+                    "message": (
+                        "gost安装成功" if success else f"安装失败: {result.stderr}"
+                    ),
                 }
             else:
                 return {"success": False, "message": f"未知工具: {tool}"}
@@ -1639,12 +2014,16 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
         try:
             if tool == "socat":
                 # 检查socat是否已安装
-                result = subprocess.run(["which", "socat"], capture_output=True, text=True)
+                result = subprocess.run(
+                    ["which", "socat"], capture_output=True, text=True
+                )
                 installed = result.returncode == 0
                 return {"installed": installed}
             elif tool == "gost":
                 # 检查gost是否已安装
-                result = subprocess.run(["which", "gost"], capture_output=True, text=True)
+                result = subprocess.run(
+                    ["which", "gost"], capture_output=True, text=True
+                )
                 installed = result.returncode == 0
                 return {"installed": installed}
             else:
@@ -1652,20 +2031,21 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
         except Exception as e:
             return {"installed": False, "error": f"检查过程出错: {str(e)}"}
 
+
 def get_free_port():
     """获取可用端口"""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(('', 0))
+        s.bind(("", 0))
         return s.getsockname()[1]
 
-def run_server(port=8080, password=None):
+
+def run_server(port=8080):
     """运行Web服务器"""
-    global PASSWORD
-    PASSWORD = password
+    # 不再需要设置全局PASSWORD变量，直接使用ADMIN_PASSWORD
 
     try:
         # 在Docker环境中自动安装nftables和gost
-        if os.path.exists('/.dockerenv'):
+        if os.path.exists("/.dockerenv"):
             print("检测到Docker环境，正在自动安装需要的工具...")
             try:
                 # 尝试安装nftables
@@ -1674,9 +2054,14 @@ def run_server(port=8080, password=None):
                 print("nftables安装完成")
 
                 # 尝试安装gost
-                subprocess.run(["bash", "-c",
-                    "wget -qO- https://github.com/ginuerzh/gost/releases/download/v2.11.2/gost-linux-amd64-2.11.2.gz | gunzip > /usr/local/bin/gost && chmod +x /usr/local/bin/gost"
-                ], check=False)
+                subprocess.run(
+                    [
+                        "bash",
+                        "-c",
+                        "wget -qO- https://github.com/ginuerzh/gost/releases/download/v2.11.2/gost-linux-amd64-2.11.2.gz | gunzip > /usr/local/bin/gost && chmod +x /usr/local/bin/gost",
+                    ],
+                    check=False,
+                )
                 print("gost安装完成")
             except Exception as e:
                 print(f"工具安装过程出错: {e}")
@@ -1687,16 +2072,21 @@ def run_server(port=8080, password=None):
 
         # 如果启用了定时推送，启动定时任务
         if iyuu_config.get("schedule", {}).get("enabled", False):
-            print(f"启用IYUU定时推送，每天 {iyuu_config.get('schedule', {}).get('times', ['08:00'])} 发送服务状态摘要")
+            print(
+                f"启用IYUU定时推送，每天 {iyuu_config.get('schedule', {}).get('times', ['08:00'])} 发送服务状态摘要"
+            )
             schedule_daily_notification()
 
-        server_address = ('0.0.0.0', port)  # 修改为明确绑定0.0.0.0，确保监听所有网络接口
+        server_address = (
+            "0.0.0.0",
+            port,
+        )  # 修改为明确绑定0.0.0.0，确保监听所有网络接口
         httpd = HTTPServer(server_address, NatterHttpHandler)
         print(f"Natter管理界面已启动: http://0.0.0.0:{port}")
         print(f"使用的Natter路径: {NATTER_PATH}")
         print(f"数据存储目录: {DATA_DIR}")
 
-        if PASSWORD:
+        if ADMIN_PASSWORD:
             print("已启用密码保护")
         else:
             print("未设置密码，所有人均可访问")
@@ -1735,12 +2125,20 @@ def run_server(port=8080, password=None):
                         running_count += 1
 
                     # 添加服务信息
-                    if mapped_address and mapped_address != "无" and mapped_address != "无映射":
-                        message_content += f"{status_icon} {remark}: `{mapped_address}`\n"
+                    if (
+                        mapped_address
+                        and mapped_address != "无"
+                        and mapped_address != "无映射"
+                    ):
+                        message_content += (
+                            f"{status_icon} {remark}: `{mapped_address}`\n"
+                        )
                     else:
                         message_content += f"{status_icon} {remark}: 等待分配映射地址\n"
 
-                message_content += f"\n共 {services_count} 个服务，{running_count} 个运行中"
+                message_content += (
+                    f"\n共 {services_count} 个服务，{running_count} 个运行中"
+                )
             else:
                 message_content += "暂无加载的服务\n"
 
@@ -1753,13 +2151,14 @@ def run_server(port=8080, password=None):
         if "Address already in use" in str(e):
             print(f"端口 {port} 已被占用，尝试其他端口...")
             new_port = get_free_port()
-            run_server(new_port, password)
+            run_server(new_port)
         else:
             print(f"启动服务器时发生错误: {e}")
             raise
     except Exception as e:
         print(f"启动服务器时发生未知错误: {e}")
         raise
+
 
 def cleanup():
     """清理资源，停止所有运行中的服务"""
@@ -1775,11 +2174,12 @@ def cleanup():
                 f"【服务关闭前最后通知】\n\n"
                 f"- 停止时间: {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
                 f"- 已停止服务数: {stopped_count}\n\n"
-                f"服务器即将关闭，所有运行中的服务已停止。"
+                f"服务器即将关闭，所有运行中的服务已停止。",
             )
             message_queue.clear()
 
     print(f"已停止 {stopped_count} 个服务")
+
 
 # 添加IYUU消息推送相关函数
 def load_iyuu_config():
@@ -1787,7 +2187,7 @@ def load_iyuu_config():
     global iyuu_config
     try:
         if os.path.exists(IYUU_CONFIG_FILE):
-            with open(IYUU_CONFIG_FILE, 'r', encoding='utf-8') as f:
+            with open(IYUU_CONFIG_FILE, "r", encoding="utf-8") as f:
                 loaded_config = json.load(f)
                 iyuu_config.update(loaded_config)
     except Exception as e:
@@ -1795,62 +2195,224 @@ def load_iyuu_config():
         # 确保写入默认配置
         save_iyuu_config()
 
+
 def save_iyuu_config():
     """保存IYUU配置"""
     try:
-        with open(IYUU_CONFIG_FILE, 'w', encoding='utf-8') as f:
+        with open(IYUU_CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(iyuu_config, f, ensure_ascii=False, indent=4)
         return True
     except Exception as e:
         print(f"保存IYUU配置失败: {e}")
         return False
 
+
+class ServiceGroupManager:
+    @staticmethod
+    def load_service_groups():
+        """加载服务组配置"""
+        global service_groups
+        if not os.path.exists(SERVICE_GROUPS_FILE):
+            # 创建默认配置
+            service_groups = {"groups": {}, "default_group": None}
+            ServiceGroupManager.save_service_groups()
+            return service_groups
+
+        try:
+            with open(SERVICE_GROUPS_FILE, "r", encoding="utf-8") as f:
+                service_groups = json.load(f)
+            return service_groups
+        except Exception as e:
+            print(f"加载服务组配置出错: {e}")
+            service_groups = {"groups": {}, "default_group": None}
+            return service_groups
+
+    @staticmethod
+    def save_service_groups():
+        """保存服务组配置"""
+        try:
+            with open(SERVICE_GROUPS_FILE, "w", encoding="utf-8") as f:
+                json.dump(service_groups, f, indent=2, ensure_ascii=False)
+            return True
+        except Exception as e:
+            print(f"保存服务组配置出错: {e}")
+            return False
+
+    @staticmethod
+    def create_group(name, password, description=""):
+        """创建新服务组"""
+        group_id = generate_service_id()
+        service_groups["groups"][group_id] = {
+            "id": group_id,
+            "name": name,
+            "password": password,
+            "description": description,
+            "services": [],  # 包含的服务ID列表
+            "created_at": time.time(),
+        }
+
+        # 如果是第一个组，设为默认组
+        if not service_groups["default_group"]:
+            service_groups["default_group"] = group_id
+
+        ServiceGroupManager.save_service_groups()
+        return group_id
+
+    @staticmethod
+    def update_group(group_id, name=None, password=None, description=None):
+        """更新服务组"""
+        if group_id not in service_groups["groups"]:
+            return False
+
+        group = service_groups["groups"][group_id]
+        if name is not None:
+            group["name"] = name
+        if password is not None:
+            group["password"] = password
+        if description is not None:
+            group["description"] = description
+
+        ServiceGroupManager.save_service_groups()
+        return True
+
+    @staticmethod
+    def delete_group(group_id):
+        """删除服务组"""
+        if group_id not in service_groups["groups"]:
+            return False
+
+        # 如果删除的是默认组，需要设置新的默认组
+        if service_groups["default_group"] == group_id:
+            remaining_groups = [
+                gid for gid in service_groups["groups"].keys() if gid != group_id
+            ]
+            service_groups["default_group"] = (
+                remaining_groups[0] if remaining_groups else None
+            )
+
+        del service_groups["groups"][group_id]
+        ServiceGroupManager.save_service_groups()
+        return True
+
+    @staticmethod
+    def add_service_to_group(group_id, service_id):
+        """将服务添加到组"""
+        if group_id not in service_groups["groups"]:
+            return False
+
+        group = service_groups["groups"][group_id]
+        if service_id not in group["services"]:
+            group["services"].append(service_id)
+            ServiceGroupManager.save_service_groups()
+        return True
+
+    @staticmethod
+    def remove_service_from_group(group_id, service_id):
+        """从组中移除服务"""
+        if group_id not in service_groups["groups"]:
+            return False
+
+        group = service_groups["groups"][group_id]
+        if service_id in group["services"]:
+            group["services"].remove(service_id)
+            ServiceGroupManager.save_service_groups()
+        return True
+
+    @staticmethod
+    def get_group_by_password(password):
+        """根据密码获取访客组"""
+        groups = ServiceGroupManager.load_groups()
+        for group_id, group_data in groups.items():
+            if group_data.get("password") == password:
+                return group_id, group_data
+        return None, None
+
+    @staticmethod
+    def get_services_by_group(group_id):
+        """获取指定组的服务列表"""
+        if group_id not in service_groups["groups"]:
+            return []
+
+        group = service_groups["groups"][group_id]
+        services = []
+        for service_id in group["services"]:
+            if service_id in running_services:
+                service_info = running_services[service_id].get_info()
+                # 只返回访客需要的基本信息
+                guest_service_info = {
+                    "id": service_info["id"],
+                    "remark": service_info.get("remark", ""),
+                    "status": service_info["status"],
+                    "target_port": service_info.get("target_port", ""),
+                    "target_ip": service_info.get("target_ip", "127.0.0.1"),
+                    "mapped_address": service_info.get("mapped_address", ""),
+                    "start_time": service_info.get("start_time", 0),
+                    "lan_status": service_info.get("lan_status", ""),
+                    "wan_status": service_info.get("wan_status", ""),
+                    "nat_type": service_info.get("nat_type", ""),
+                }
+                services.append(guest_service_info)
+        return services
+
+    @staticmethod
+    def list_groups():
+        """列出所有服务组"""
+        groups = []
+        for group_id, group in service_groups["groups"].items():
+            group_info = {
+                "id": group_id,
+                "name": group["name"],
+                "description": group.get("description", ""),
+                "service_count": len(group["services"]),
+                "created_at": group.get("created_at", 0),
+                "is_default": group_id == service_groups["default_group"],
+            }
+            groups.append(group_info)
+        return groups
+
+
 if __name__ == "__main__":
     # 注册清理函数
     signal.signal(signal.SIGINT, lambda sig, frame: (cleanup(), sys.exit(0)))
 
     # 显示系统信息
+    print(f"Natter Web管理工具 v{VERSION} 正在启动...")
     print(f"Python版本: {sys.version}")
-    print(f"操作系统: {os.name}, {sys.platform}")
+    print(f"Natter路径: {NATTER_PATH}")
+    print(f"数据目录: {DATA_DIR}")
 
-    # 检查natter.py是否存在
-    if not os.path.exists(NATTER_PATH):
-        print(f"错误: 找不到Natter程序 '{NATTER_PATH}'")
-        print(f"当前工作目录: {os.getcwd()}")
-        print(f"目录内容:")
-        for path, dirs, files in os.walk("..", topdown=False):
-            for name in files:
-                if "natter.py" in name:
-                    print(os.path.join(path, name))
-        sys.exit(1)
-    else:
-        print(f"找到Natter程序: {NATTER_PATH}")
+    # 加载IYUU配置
+    load_iyuu_config()
 
-    # 检查数据目录
-    if not os.path.exists(DATA_DIR):
-        print(f"注意: 数据目录 '{DATA_DIR}' 不存在，将创建")
-        try:
-            os.makedirs(DATA_DIR, exist_ok=True)
-            print(f"数据目录已创建: {DATA_DIR}")
-        except Exception as e:
-            print(f"创建数据目录时发生错误: {e}")
-            sys.exit(1)
+    # 加载服务组配置
+    ServiceGroupManager.load_service_groups()
 
-    # 默认使用8080端口，可通过命令行参数修改
-    port = 8080
-    password = None
+    # 启动定时推送检查
+    if iyuu_config.get("enabled", True) and iyuu_config.get("schedule", {}).get(
+        "enabled", False
+    ):
+        schedule_daily_notification()
 
     # 处理命令行参数
+    port = 8080
+
     if len(sys.argv) > 1:
         try:
             port = int(sys.argv[1])
         except ValueError:
-            print(f"警告: 无效的端口号 '{sys.argv[1]}'，使用默认端口 8080")
+            print("端口号必须是数字")
+            sys.exit(1)
 
-    # 获取密码
-    if len(sys.argv) > 2:
-        password = sys.argv[2]
-        print("已设置访问密码")
+    # 从环境变量读取Web端口
+    web_port = os.environ.get("WEB_PORT")
+    if web_port:
+        try:
+            port = int(web_port)
+        except ValueError:
+            print(f"环境变量WEB_PORT的值无效: {web_port}")
 
-    print(f"尝试在端口 {port} 启动Web服务器...")
-    run_server(port, password)
+    # 恢复之前运行的服务
+    NatterManager.load_services()
+
+    # 启动Web服务器
+    run_server(port)
