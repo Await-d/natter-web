@@ -2811,9 +2811,15 @@ function isValidMappedAddress(address) {
         return false;
     }
 
+    // 移除协议前缀（如tcp://、udp://）
+    let cleanAddress = address;
+    if (address.includes('://')) {
+        cleanAddress = address.split('://')[1];
+    }
+
     // 检查是否包含端口号的地址格式
     const addressPattern = /^([a-zA-Z0-9.-]+):(\d+)$/;
-    return addressPattern.test(address);
+    return addressPattern.test(cleanAddress);
 }
 
 // 辅助函数：打开映射地址
@@ -2823,24 +2829,30 @@ function openMappedAddress(address) {
         return;
     }
 
+    // 移除协议前缀，只保留IP:PORT格式
+    let cleanAddress = address;
+    if (address.includes('://')) {
+        cleanAddress = address.split('://')[1];
+    }
+
     // 尝试智能判断协议
-    let url = address;
+    let url = cleanAddress;
 
     // 如果地址中包含常见的HTTP端口，使用HTTP协议
     const httpPorts = ['80', '8080', '3000', '8000', '8888', '9000'];
     const httpsPorts = ['443', '8443', '9443'];
 
-    const parts = address.split(':');
+    const parts = cleanAddress.split(':');
     if (parts.length === 2) {
         const port = parts[1];
 
         if (httpPorts.includes(port)) {
-            url = `http://${address}`;
+            url = `http://${cleanAddress}`;
         } else if (httpsPorts.includes(port)) {
-            url = `https://${address}`;
+            url = `https://${cleanAddress}`;
         } else {
             // 对于其他端口，默认尝试HTTP
-            url = `http://${address}`;
+            url = `http://${cleanAddress}`;
         }
     }
 
@@ -2871,22 +2883,28 @@ function copyMappedAddressAsUrl(address, button) {
         return;
     }
 
+    // 移除协议前缀，只保留IP:PORT格式
+    let cleanAddress = address;
+    if (address.includes('://')) {
+        cleanAddress = address.split('://')[1];
+    }
+
     // 生成完整的URL
     const httpPorts = ['80', '8080', '3000', '8000', '8888', '9000'];
     const httpsPorts = ['443', '8443', '9443'];
 
-    const parts = address.split(':');
-    let url = address;
+    const parts = cleanAddress.split(':');
+    let url = cleanAddress;
 
     if (parts.length === 2) {
         const port = parts[1];
 
         if (httpPorts.includes(port)) {
-            url = `http://${address}`;
+            url = `http://${cleanAddress}`;
         } else if (httpsPorts.includes(port)) {
-            url = `https://${address}`;
+            url = `https://${cleanAddress}`;
         } else {
-            url = `http://${address}`;
+            url = `http://${cleanAddress}`;
         }
     }
 

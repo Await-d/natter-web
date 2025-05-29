@@ -31,7 +31,9 @@ RUN apt-get update && \
 RUN pip install --no-cache-dir psutil requests
 
 # 拷贝web目录内容
-COPY . /app/web/
+COPY *.py *.html *.css *.js *.svg *.md *.sh *.yml /app/web/
+COPY data/ /app/web/data/
+COPY images/ /app/web/images/
 
 # 获取natter
 RUN mkdir -p /app/natter && \
