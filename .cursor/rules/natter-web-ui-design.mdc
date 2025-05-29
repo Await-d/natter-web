@@ -1,0 +1,158 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Natter Web 酷炫UI设计规则
+
+## 项目概览
+这是一个Natter网络穿透工具的Web管理界面项目，主要文件包括：
+- 主界面：[index.html](mdc:web/index.html)
+# Natter Web UI 设计规则
+
+## 项目概述
+Natter Web 是一个现代化的网络穿透工具Web管理界面，提供直观的图形化界面来管理多个Natter服务实例。
+
+## 核心文件结构
+
+### 前端界面文件
+- [index.html](mdc:web/index.html) - 主界面HTML结构，包含服务管理面板和配置界面
+- [style.css](mdc:web/style.css) - 酷炫现代化样式表，使用渐变、阴影和动画效果
+- [script.js](mdc:web/script.js) - 前端交互逻辑，AJAX通信和动态UI更新
+- [service-details-panel.html](mdc:web/service-details-panel.html) - 服务详情面板组件
+
+### 后端服务文件
+- [server.py](mdc:web/server.py) - Flask Web服务器，API接口和服务管理逻辑
+- [natter.py](mdc:natter/natter.py) - 核心Natter网络穿透工具
+
+### 静态资源
+- [await-logo.svg](mdc:web/await-logo.svg) - 项目Logo SVG
+- [favicon.svg](mdc:web/favicon.svg) - 网站图标
+- [images/](mdc:web/images) - 界面截图和说明图片
+
+## UI 设计原则
+
+### 🎨 视觉设计
+- **现代化暗色主题**: 使用深色背景配合亮色元素，减少眼疲劳
+- **渐变色彩**: 采用蓝紫色系渐变，营造科技感和未来感
+- **圆角设计**: 卡片、按钮使用圆角，增加亲和力
+- **阴影效果**: 使用box-shadow创建层次感和深度
+- **动画过渡**: hover效果和状态变化使用smooth transition
+
+### 🚀 交互体验
+- **实时状态更新**: 服务状态、日志输出实时刷新
+- **响应式设计**: 适配不同屏幕尺寸，移动端友好
+- **快捷操作**: 一键批量管理，快速配置模板
+- **直观反馈**: 状态指示器、加载动画、成功/错误提示
+
+### 🎯 功能布局
+- **左侧导航**: 主要功能模块切换
+- **中央工作区**: 服务列表、配置面板、日志查看
+- **右侧面板**: 服务详情、系统状态监控
+- **顶部工具栏**: 快捷操作按钮和状态指示
+
+## 代码规范
+
+### CSS 命名规范
+```css
+/* 使用BEM命名方式 */
+.service-card {}
+.service-card__header {}
+.service-card__status--active {}
+
+/* 状态类使用语义化命名 */
+.status-running { color: #28a745; }
+.status-stopped { color: #dc3545; }
+.status-error { color: #ffc107; }
+```
+
+### JavaScript 编码规范
+```javascript
+// 使用现代ES6+语法
+const serviceManager = {
+    // 使用箭头函数
+    updateServiceStatus: (serviceId) => {
+        // 使用模板字符串
+        const statusHtml = `<span class="status-${status}">${statusText}</span>`;
+    }
+};
+
+// 异步操作使用async/await
+async function fetchServiceData() {
+    try {
+        const response = await fetch('/api/services');
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error('获取服务数据失败:', error);
+    }
+}
+```
+
+### 响应式设计断点
+```css
+/* 移动端 */
+@media (max-width: 768px) {}
+
+/* 平板端 */
+@media (min-width: 769px) and (max-width: 1024px) {}
+
+/* 桌面端 */
+@media (min-width: 1025px) {}
+```
+
+## UI 组件规范
+
+### 服务卡片组件
+- 状态指示器（运行/停止/错误）
+- 服务信息显示（端口、协议、映射地址）
+- 操作按钮（启动/停止/查看详情）
+- 动画效果和hover状态
+
+### 配置面板组件
+- 基础模式和高级模式切换
+- 表单验证和错误提示
+- 配置模板保存/加载
+- 实时预览和帮助提示
+
+### 日志查看器
+- 语法高亮显示
+- 自动滚动到底部
+- 日志级别筛选
+- 搜索和过滤功能
+
+## 性能优化
+
+### 前端优化
+- 懒加载非关键CSS和JS
+- 图片优化和SVG使用
+- 防抖和节流处理用户输入
+- 虚拟滚动处理大量日志数据
+
+### 后端优化
+- API响应缓存
+- 异步处理长时间操作
+- WebSocket实时通信
+- 分页处理大数据集
+
+## 可访问性
+
+### 键盘导航
+- Tab顺序逻辑清晰
+- 快捷键支持主要操作
+- 焦点指示明显
+
+### 屏幕阅读器支持
+- 语义化HTML标签
+- ARIA标签和角色
+- 替代文本和描述
+
+### 色彩对比
+- 符合WCAG 2.1 AA标准
+- 支持高对比度模式
+- 色盲友好的色彩选择
+
+## 浏览器兼容性
+- 现代浏览器全面支持（Chrome 90+, Firefox 88+, Safari 14+）
+- 优雅降级处理老版本浏览器
+- 渐进式增强策略

@@ -682,12 +682,38 @@ function renderServicesList(services) {
         serviceCard.dataset.id = service.id;
         serviceCard.dataset.status = service.status === '运行中' ? 'running' : 'stopped';
 
-        // 填充数据
+        // 判断穿透状态
+        const isPenetrationSuccess = service.lan_status === 'OPEN' && service.wan_status === 'OPEN';
+        const isPenetrationFailed = service.lan_status === 'CLOSED' || service.wan_status === 'CLOSED';
+
+        if (isPenetrationSuccess) {
+            serviceCard.dataset.penetration = 'success';
+        } else if (isPenetrationFailed && service.status === '运行中') {
+            serviceCard.dataset.penetration = 'failed';
+        }
+
+        // 填充基本数据
         card.querySelector('.service-mapped-address').textContent = formatAddressShort(service.mapped_address || '未映射');
         card.querySelector('.service-status').textContent = service.status;
         card.querySelector('.service-status').className = `service-status service-status-${service.status === '运行中' ? 'running' : 'stopped'}`;
         card.querySelector('.service-address').textContent = service.mapped_address || '未映射';
         card.querySelector('.service-cmd-text').textContent = service.cmd_args.join(' ');
+
+        // 设置穿透状态信息
+        const lanStatusElement = card.querySelector('.service-lan-status');
+        const wanStatusElement = card.querySelector('.service-wan-status');
+        const natTypeElement = card.querySelector('.service-nat-type');
+
+        // 设置LAN状态
+        lanStatusElement.textContent = service.lan_status || '检测中';
+        setStatusColor(lanStatusElement, service.lan_status);
+
+        // 设置WAN状态
+        wanStatusElement.textContent = service.wan_status || '检测中';
+        setStatusColor(wanStatusElement, service.wan_status);
+
+        // 设置NAT类型
+        natTypeElement.textContent = service.nat_type || '检测中';
 
         // 设置备注
         const remarkText = card.querySelector('.service-remark-text');
@@ -924,6 +950,15 @@ function restartService(id) {
         return;
     }
 
+    // 显示重启中的状态
+    showNotification('正在重启服务，请稍候...', 'info', 3000);
+
+    // 禁用重启按钮防止重复点击
+    if (restartServiceBtn) {
+        restartServiceBtn.disabled = true;
+        restartServiceBtn.textContent = '重启中...';
+    }
+
     fetchWithAuth(API.restartService, {
             method: 'POST',
             headers: {
@@ -936,15 +971,26 @@ function restartService(id) {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                alert('服务已重启！');
-                loadServiceDetails(id);
+                showNotification('服务重启成功！', 'success');
+                // 等待一下再刷新详情，让重启过程有时间完成
+                setTimeout(() => {
+                    loadServiceDetails(id);
+                }, 2000);
             } else {
-                alert('重启服务失败：' + (data.error || '未知错误'));
+                showNotification('重启服务失败：' + (data.error || '未知错误'), 'error');
+                console.error('重启失败详情:', data);
             }
         })
         .catch(error => {
             console.error('重启服务出错:', error);
-            alert('重启服务时发生错误，请检查控制台查看详情。');
+            showNotification('重启服务时发生网络错误，请检查连接后重试', 'error');
+        })
+        .finally(() => {
+            // 恢复重启按钮状态
+            if (restartServiceBtn) {
+                restartServiceBtn.disabled = false;
+                restartServiceBtn.textContent = '重启服务';
+            }
         });
 }
 
@@ -1281,7 +1327,13 @@ function updateAllRemarkDisplays(serviceId, remarkValue) {
 
 // 设置状态显示的颜色
 function setStatusColor(element, status) {
-    element.className = 'status-value';
+    // 保留原有的类名，并清除之前的状态颜色类
+    element.className = element.className.replace(/\btext-(success|danger|warning)\b/g, '').trim();
+
+    // 确保有基础的status-value类
+    if (!element.classList.contains('status-value')) {
+        element.classList.add('status-value');
+    }
 
     if (status === 'OPEN') {
         element.classList.add('text-success');
@@ -1842,7 +1894,6 @@ function createLoginForm() {
 }
 
 // 检查是否需要认证
-// 检查是否需要认证
 function checkAuthRequired() {
     return fetchWithAuth(API.authCheck)
         .then(response => {
@@ -1875,26 +1926,95 @@ function checkAuthRequired() {
                     hideAllPanels();
                     loginPanel.style.display = 'block';
 
-                    // 隐藏登出按钮
+                    // 隐藏登出按钮和推送设置按钮
                     const logoutBtn = document.getElementById('logout-btn');
+                    const iyuuSettingsBtn = document.getElementById('iyuu-settings-btn');
+
                     if (logoutBtn) {
                         logoutBtn.style.display = 'none';
                     }
-                } else if (authToken) {
-                    // 已有token，尝试使用
-                    isAuthenticated = true;
-
-                    // 显示登出按钮
-                    const logoutBtn = document.getElementById('logout-btn');
-                    if (logoutBtn) {
-                        logoutBtn.style.display = 'block';
+                    if (iyuuSettingsBtn) {
+                        iyuuSettingsBtn.style.display = 'none';
                     }
+                } else if (authToken) {
+                    // 已有token，需要验证token有效性
+                    // 尝试访问一个需要认证的API来验证token
+                    return fetchWithAuth(API.services)
+                        .then(response => {
+                            if (response.ok) {
+                                // Token有效，设置认证状态
+                                isAuthenticated = true;
 
-                    showServicesList();
+                                // 显示登出按钮和推送设置按钮
+                                const logoutBtn = document.getElementById('logout-btn');
+                                const iyuuSettingsBtn = document.getElementById('iyuu-settings-btn');
+
+                                if (logoutBtn) {
+                                    logoutBtn.style.display = 'block';
+                                }
+                                if (iyuuSettingsBtn) {
+                                    iyuuSettingsBtn.style.display = 'block';
+                                }
+
+                                // 隐藏登录面板，显示服务列表
+                                loginPanel.style.display = 'none';
+                                showServicesList();
+                            } else {
+                                // Token无效，清除并显示登录表单
+                                authToken = null;
+                                isAuthenticated = false;
+                                localStorage.removeItem('natter_auth_token');
+
+                                createLoginForm();
+                                hideAllPanels();
+                                loginPanel.style.display = 'block';
+
+                                // 隐藏登出按钮和推送设置按钮
+                                const logoutBtn = document.getElementById('logout-btn');
+                                const iyuuSettingsBtn = document.getElementById('iyuu-settings-btn');
+
+                                if (logoutBtn) {
+                                    logoutBtn.style.display = 'none';
+                                }
+                                if (iyuuSettingsBtn) {
+                                    iyuuSettingsBtn.style.display = 'none';
+                                }
+                            }
+                            return authRequired;
+                        })
+                        .catch(error => {
+                            console.error('验证token时出错:', error);
+                            // Token验证失败，清除并显示登录表单
+                            authToken = null;
+                            isAuthenticated = false;
+                            localStorage.removeItem('natter_auth_token');
+
+                            createLoginForm();
+                            hideAllPanels();
+                            loginPanel.style.display = 'block';
+
+                            // 隐藏登出按钮和推送设置按钮
+                            const logoutBtn = document.getElementById('logout-btn');
+                            const iyuuSettingsBtn = document.getElementById('iyuu-settings-btn');
+
+                            if (logoutBtn) {
+                                logoutBtn.style.display = 'none';
+                            }
+                            if (iyuuSettingsBtn) {
+                                iyuuSettingsBtn.style.display = 'none';
+                            }
+
+                            return authRequired;
+                        });
                 }
             } else {
                 // 不需要认证
                 isAuthenticated = true;
+
+                // 隐藏登录面板（如果存在）
+                if (loginPanel && loginPanel.style.display === 'block') {
+                    loginPanel.style.display = 'none';
+                }
 
                 // 隐藏登出按钮，因为不需要认证
                 const logoutBtn = document.getElementById('logout-btn');
@@ -1902,6 +2022,13 @@ function checkAuthRequired() {
                     logoutBtn.style.display = 'none';
                 }
 
+                // 显示推送设置按钮
+                const iyuuSettingsBtn = document.getElementById('iyuu-settings-btn');
+                if (iyuuSettingsBtn) {
+                    iyuuSettingsBtn.style.display = 'block';
+                }
+
+                // 显示服务列表
                 showServicesList();
             }
             return authRequired;
@@ -1912,6 +2039,17 @@ function checkAuthRequired() {
             createLoginForm();
             hideAllPanels();
             loginPanel.style.display = 'block';
+
+            // 隐藏登出按钮和推送设置按钮
+            const logoutBtn = document.getElementById('logout-btn');
+            const iyuuSettingsBtn = document.getElementById('iyuu-settings-btn');
+
+            if (logoutBtn) {
+                logoutBtn.style.display = 'none';
+            }
+            if (iyuuSettingsBtn) {
+                iyuuSettingsBtn.style.display = 'none';
+            }
 
             // 在登录面板上显示错误信息
             const loginErrorDiv = document.querySelector('#login-error');
@@ -1950,6 +2088,12 @@ function login(password) {
                 const logoutBtn = document.getElementById('logout-btn');
                 if (logoutBtn) {
                     logoutBtn.style.display = 'block';
+                }
+
+                // 显示推送设置按钮
+                const iyuuSettingsBtn = document.getElementById('iyuu-settings-btn');
+                if (iyuuSettingsBtn) {
+                    iyuuSettingsBtn.style.display = 'block';
                 }
 
                 // 隐藏登录面板
@@ -1997,10 +2141,15 @@ function logout() {
     isAuthenticated = false;
     localStorage.removeItem('natter_auth_token');
 
-    // 隐藏登出按钮
+    // 隐藏登出按钮和推送设置按钮
     const logoutBtn = document.getElementById('logout-btn');
+    const iyuuSettingsBtn = document.getElementById('iyuu-settings-btn');
+
     if (logoutBtn) {
         logoutBtn.style.display = 'none';
+    }
+    if (iyuuSettingsBtn) {
+        iyuuSettingsBtn.style.display = 'none';
     }
 
     createLoginForm();

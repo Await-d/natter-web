@@ -1,0 +1,279 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# 🌟 Natter Web Cursor 开发规则
+
+欢迎来到 Natter Web 项目！这是一个现代化的网络穿透工具Web管理界面。
+
+## 📚 规则文档导航
+
+### 🎨 [UI设计规则](mdc:natter-web-ui-design.mdc)
+- 酷炫暗色主题设计指南
+- 现代化UI组件规范  
+- 响应式设计和动画效果
+- 可访问性和浏览器兼容性
+
+### 🏗️ [项目架构规则](mdc:project-architecture.mdc)  
+- 前后端分离架构设计
+- 模块化代码组织
+- API接口和数据流设计
+- 安全性和性能优化
+
+### 🔄 [开发工作流规则](mdc:development-workflow.mdc)
+- Git分支策略和提交规范
+- 测试和代码审查流程
+- 构建部署和调试技巧  
+- 发布管理和回滚策略
+
+## 🚀 快速开始
+
+### 项目结构
+```
+natteer-web/
+├── 📁 natter/           # 核心网络穿透工具
+├── 📁 web/              # Web管理界面
+│   ├── 📄 index.html    # 主界面
+│   ├── 📄 style.css     # 酷炫样式表
+│   ├── 📄 script.js     # 前端交互逻辑
+│   └── 📄 server.py     # Flask后端服务
+└── 📁 .cursor/rules/    # Cursor开发规则
+```
+
+### 核心技术栈
+- **前端**: HTML5 + CSS3 + Vanilla JavaScript  
+- **后端**: Python 3.8+ + Flask + psutil
+- **容器**: Docker + docker-compose
+- **风格**: 现代暗色主题 + 渐变色彩
+
+## 🎯 开发原则
+
+### 1. 🎨 酷炫UI优先
+```css
+/* 使用现代设计语言 */
+:root {
+    --primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --glass-bg: rgba(255, 255, 255, 0.1);
+    --shadow-glow: 0 8px 32px rgba(102, 126, 234, 0.3);
+}
+
+.service-card {
+    background: var(--glass-bg);
+    backdrop-filter: blur(10px);
+    box-shadow: var(--shadow-glow);
+    transition: all 0.3s ease;
+}
+```
+
+### 2. 🚀 性能和用户体验
+```javascript
+// 使用现代JavaScript
+const serviceManager = {
+    async updateStatus(serviceId) {
+        try {
+            const response = await fetch(`/api/services/${serviceId}`);
+            const data = await response.json();
+            this.updateUI(data);
+        } catch (error) {
+            this.showErrorToast('更新失败');
+        }
+    }
+};
+```
+
+### 3. 🔧 代码质量保证
+```python
+# Python后端规范
+from typing import Dict, List, Optional
+import logging
+
+class ServiceManager:
+    """服务管理器 - 负责Natter服务生命周期"""
+    
+    def __init__(self):
+        self.services: Dict[str, Service] = {}
+        self.logger = logging.getLogger(__name__)
+    
+    async def create_service(self, config: Dict) -> Optional[str]:
+        """创建新服务实例"""
+        try:
+            # 业务逻辑
+            return service_id
+        except Exception as e:
+            self.logger.error(f"创建服务失败: {e}")
+            return None
+```
+
+## 🔄 开发工作流
+
+### Git 提交规范
+```bash
+feat: 添加酷炫的服务卡片动画效果
+fix: 修复服务状态更新的性能问题  
+style: 优化暗色主题的颜色搭配
+docs: 更新API接口文档
+```
+
+### 代码审查要点
+- ✅ UI是否符合酷炫设计规范
+- ✅ 交互动画是否流畅自然
+- ✅ 响应式设计是否正确适配
+- ✅ 代码逻辑是否清晰易懂
+- ✅ 错误处理是否完善
+
+## 🎨 UI组件开发规范
+
+### 服务卡片组件
+```html
+<!-- 结构语义化 -->
+<article class="service-card" data-service-id="{{id}}">
+    <header class="service-card__header">
+        <h3 class="service-card__title">{{name}}</h3>
+        <span class="service-card__status service-card__status--{{status}}">
+            {{statusText}}
+        </span>
+    </header>
+    <div class="service-card__content">
+        <!-- 服务详情 -->
+    </div>
+    <footer class="service-card__actions">
+        <!-- 操作按钮 -->
+    </footer>
+</article>
+```
+
+### 动画效果标准
+```css
+/* 微交互动画 */
+.service-card {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.service-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(102, 126, 234, 0.4);
+}
+
+/* 状态变化动画 */
+.status-indicator {
+    animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+```
+
+## 🛠️ 开发工具配置
+
+### VS Code / Cursor 推荐插件
+```json
+{
+    "recommendations": [
+        "ms-python.python",
+        "bradlc.vscode-tailwindcss", 
+        "esbenp.prettier-vscode",
+        "ms-vscode.vscode-json",
+        "redhat.vscode-yaml"
+    ]
+}
+```
+
+### Prettier 配置
+```json
+{
+    "semi": true,
+    "trailingComma": "es5",
+    "singleQuote": true,
+    "printWidth": 80,
+    "tabWidth": 4
+}
+```
+
+## 🎯 质量目标
+
+### 性能指标
+- ⚡ 首屏加载时间 < 2秒
+- 🎨 动画帧率 > 60fps  
+- 📱 移动端体验得分 > 90
+- ♿ 可访问性得分 > 95
+
+### 代码质量
+- 🧪 测试覆盖率 > 80%
+- 📊 代码复杂度 < 10
+- 🔍 零ESLint错误
+- 📝 文档覆盖率 > 90%
+
+## 🎨 设计系统
+
+### 颜色系统
+```css
+:root {
+    /* 主色调 - 科技感渐变 */
+    --primary-50: #eef2ff;
+    --primary-500: #667eea;
+    --primary-900: #312e81;
+    
+    /* 功能色彩 */
+    --success: #10b981;
+    --warning: #f59e0b; 
+    --error: #ef4444;
+    --info: #3b82f6;
+    
+    /* 中性色 - 暗色主题 */
+    --gray-50: #f9fafb;
+    --gray-900: #111827;
+    --bg-primary: #0f0f23;
+    --bg-secondary: #1a1a2e;
+}
+```
+
+### 字体系统
+```css
+:root {
+    --font-family-base: 'Inter', system-ui, sans-serif;
+    --font-family-mono: 'JetBrains Mono', monospace;
+    
+    --text-xs: 0.75rem;
+    --text-sm: 0.875rem;
+    --text-base: 1rem;
+    --text-lg: 1.125rem;
+    --text-xl: 1.25rem;
+}
+```
+
+### 间距系统
+```css
+:root {
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-4: 1rem;
+    --space-6: 1.5rem;
+    --space-8: 2rem;
+    --space-12: 3rem;
+}
+```
+
+## 🏆 最佳实践
+
+### ✅ 推荐做法
+- 使用语义化HTML标签
+- 优先考虑用户体验
+- 保持代码简洁可读
+- 编写有意义的注释
+- 遵循无障碍设计原则
+
+### ❌ 避免做法  
+- 硬编码颜色和尺寸
+- 忽略错误处理
+- 过度复杂的动画
+- 缺乏移动端适配
+- 忽略性能优化
+
+---
+
+**记住**: 我们的目标是创建一个既酷炫又实用的网络管理工具！优秀的用户体验来自于对细节的极致追求。💫
+
+开始编码前，请务必阅读相关的规则文档。Happy Coding! 🚀

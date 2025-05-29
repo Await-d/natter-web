@@ -1461,3 +1461,115 @@ input:checked + .slider:before {
 .push-now-service-btn:hover {
     background-color: #218838;
 }
+
+/* 穿透状态显示样式 */
+.penetration-status {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 12px;
+    font-size: 0.9em;
+}
+
+.status-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.status-row:last-child {
+    margin-bottom: 0;
+}
+
+.status-label {
+    font-weight: 500;
+    color: #495057;
+    min-width: 60px;
+    font-size: 0.85em;
+}
+
+.service-lan-status.status-value,
+.service-wan-status.status-value {
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.8em;
+    font-weight: 600;
+    text-transform: uppercase;
+    min-width: 50px;
+    text-align: center;
+    color: white;
+    background: #6c757d;
+    transition: all 0.3s ease;
+}
+
+/* LAN/WAN状态颜色 */
+.service-lan-status.text-success,
+.service-wan-status.text-success {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    color: white;
+    box-shadow: 0 2px 4px rgba(40, 167, 69, 0.3);
+}
+
+.service-lan-status.text-danger,
+.service-wan-status.text-danger {
+    background: linear-gradient(135deg, #dc3545, #e74c3c);
+    color: white;
+    box-shadow: 0 2px 4px rgba(220, 53, 69, 0.3);
+}
+
+.service-lan-status.text-warning,
+.service-wan-status.text-warning {
+    background: linear-gradient(135deg, #ffc107, #fd7e14);
+    color: #212529;
+    box-shadow: 0 2px 4px rgba(255, 193, 7, 0.3);
+}
+
+.service-nat-type {
+    color: #495057;
+    font-weight: 500;
+    padding: 2px 8px;
+    background: #e9ecef;
+    border-radius: 12px;
+    font-size: 0.8em;
+}
+
+/* 穿透成功时的特殊样式 */
+.service-card[data-penetration="success"] .penetration-status {
+    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+    border-color: #28a745;
+    border-left: 4px solid #28a745;
+}
+
+/* 穿透失败时的特殊样式 */
+.service-card[data-penetration="failed"] .penetration-status {
+    background: linear-gradient(135deg, #f8d7da 0%, #f1c2c7 100%);
+    border-color: #dc3545;
+    border-left: 4px solid #dc3545;
+}
+
+/* 响应式设计 */
+@media (max-width: 480px) {
+    .penetration-status {
+        padding: 8px;
+        font-size: 0.85em;
+    }
+    
+    .status-row {
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+    
+    .status-label {
+        min-width: 50px;
+        font-size: 0.8em;
+    }
+    
+    .service-lan-status.status-value,
+    .service-wan-status.status-value,
+    .service-nat-type {
+        font-size: 0.75em;
+        padding: 1px 6px;
+    }
+}

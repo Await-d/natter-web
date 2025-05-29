@@ -1,0 +1,434 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Natter Web 开发工作流规则
+
+## 🚀 开发环境设置
+
+### 前置要求
+```bash
+# Python 环境
+Python 3.8+
+pip install psutil flask
+
+# Node.js 环境 (可选，用于前端工具)
+Node.js 16+
+npm install -g live-server  # 本地开发服务器
+
+# Git 配置
+git config --global user.name "Your Name"
+git config --global user.email "your.email@example.com"
+```
+
+### 项目初始化
+```bash
+# 克隆项目
+git clone https://github.com/Await-d/natter-web.git
+cd natter-web
+
+# 创建虚拟环境 (推荐)
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+# 或 venv\Scripts\activate  # Windows
+
+# 安装依赖
+pip install -r requirements.txt
+```
+
+## 🔄 开发流程
+
+### 1. 功能开发流程
+```mermaid
+graph LR
+    A[创建Feature分支] --> B[编写代码]
+    B --> C[本地测试]
+    C --> D[提交代码]
+    D --> E[推送分支]
+    E --> F[创建PR]
+    F --> G[代码审查]
+    G --> H[合并主分支]
+```
+
+### 2. Git 分支策略
+```bash
+# 主分支
+main/master     # 生产环境代码
+develop         # 开发环境代码
+
+# 功能分支
+feature/ui-redesign
+feature/iyuu-notification
+feature/service-templates
+
+# 修复分支
+hotfix/critical-bug-fix
+bugfix/minor-issue-fix
+
+# 发布分支
+release/v1.0.5
+```
+
+### 3. 提交信息规范
+```bash
+# 提交类型
+feat:     新功能
+fix:      bug修复
+docs:     文档更新
+style:    代码格式化
+refactor: 代码重构
+test:     测试相关
+chore:    构建工具等
+
+# 示例
+git commit -m "feat: 添加服务模板保存功能"
+git commit -m "fix: 修复服务状态更新bug"
+git commit -m "docs: 更新API文档"
+git commit -m "style: 优化UI布局和动画效果"
+```
+
+## 🧪 测试规范
+
+### 单元测试
+```python
+# 测试文件命名: test_*.py
+# 位置: tests/ 目录
+
+import unittest
+from web.server import NatterWebServer
+
+class TestServiceManager(unittest.TestCase):
+    def setUp(self):
+        """测试前置设置"""
+        self.server = NatterWebServer()
+        self.server.config['TESTING'] = True
+        self.client = self.server.app.test_client()
+    
+    def test_create_service(self):
+        """测试创建服务"""
+        response = self.client.post('/api/services', 
+                                  json={'target_port': 8080})
+        self.assertEqual(response.status_code, 201)
+    
+    def tearDown(self):
+        """测试后清理"""
+        # 清理测试数据
+        pass
+
+# 运行测试
+python -m pytest tests/ -v
+```
+
+### 前端测试
+```javascript
+// 使用 Jest 进行前端测试
+describe('ServiceCard Component', () => {
+    beforeEach(() => {
+        // 设置测试环境
+        document.body.innerHTML = '<div id="app"></div>';
+    });
+    
+    test('应该正确渲染服务信息', () => {
+        const serviceData = {
+            id: 'test-service',
+            name: 'Test Service',
+            status: 'running'
+        };
+        
+        const card = new ServiceCard(serviceData);
+        expect(card.element.textContent).toContain('Test Service');
+    });
+    
+    afterEach(() => {
+        // 清理DOM
+        document.body.innerHTML = '';
+    });
+});
+```
+
+### 集成测试
+```python
+# API集成测试
+def test_service_lifecycle():
+    """测试服务完整生命周期"""
+    # 1. 创建服务
+    create_response = client.post('/api/services', json=test_config)
+    service_id = create_response.json['id']
+    
+    # 2. 获取服务状态
+    status_response = client.get(f'/api/services/{service_id}')
+    assert status_response.status_code == 200
+    
+    # 3. 删除服务
+    delete_response = client.delete(f'/api/services/{service_id}')
+    assert delete_response.status_code == 204
+```
+
+## 🎨 UI/UX 开发流程
+
+### 设计规范检查清单
+- [ ] 符合暗色主题设计
+- [ ] 使用统一的颜色变量
+- [ ] 响应式设计适配
+- [ ] 动画效果流畅
+- [ ] 可访问性支持
+- [ ] 浏览器兼容性测试
+
+### CSS 开发规范
+```css
+/* 1. 使用CSS变量 */
+:root {
+    --primary-color: #667eea;
+    --secondary-color: #764ba2;
+}
+
+/* 2. BEM命名规范 */
+.service-card__header--active {}
+
+/* 3. 移动优先响应式设计 */
+.container {
+    /* 移动端样式 */
+}
+
+@media (min-width: 768px) {
+    .container {
+        /* 桌面端样式 */
+    }
+}
+
+/* 4. 使用逻辑属性 */
+margin-inline-start: 1rem;  /* 替代 margin-left */
+```
+
+### JavaScript 开发规范
+```javascript
+// 1. 使用现代ES6+语法
+const { serviceManager } = await import('./modules/service-manager.js');
+
+// 2. 异步操作使用async/await
+async function updateServiceStatus(serviceId) {
+    try {
+        const response = await fetch(`/api/services/${serviceId}`);
+        if (!response.ok) throw new Error('请求失败');
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error('更新服务状态失败:', error);
+        throw error;
+    }
+}
+
+// 3. 使用事件委托
+document.addEventListener('click', (event) => {
+    if (event.target.matches('.service-card__action-btn')) {
+        handleServiceAction(event);
+    }
+});
+
+// 4. 防抖和节流
+const debouncedSearch = debounce((query) => {
+    performSearch(query);
+}, 300);
+```
+
+## 🔍 代码审查规范
+
+### 审查检查清单
+
+#### 功能性
+- [ ] 功能是否按预期工作
+- [ ] 边界条件处理是否正确
+- [ ] 错误处理是否完善
+- [ ] 性能是否可接受
+
+#### 代码质量
+- [ ] 代码逻辑清晰易懂
+- [ ] 命名规范一致
+- [ ] 注释充分且准确
+- [ ] 没有重复代码
+
+#### 安全性
+- [ ] 输入验证是否充分
+- [ ] 没有XSS/CSRF漏洞
+- [ ] API权限控制正确
+- [ ] 敏感信息没有泄露
+
+#### UI/UX
+- [ ] 界面美观一致
+- [ ] 交互逻辑合理
+- [ ] 响应式设计正确
+- [ ] 可访问性支持
+
+### 审查评论示例
+```markdown
+# 好的评论
+✅ 建议：这里可以使用CSS Grid来简化布局代码
+✅ 安全：建议对用户输入进行XSS过滤
+✅ 性能：这个循环可以优化，建议使用Map代替多次查找
+
+# 避免的评论
+❌ 这段代码不好
+❌ 改一下
+❌ 有问题
+```
+
+## 📦 构建和部署
+
+### 本地开发
+```bash
+# 启动开发服务器
+cd web
+python server.py 8080
+
+# 或使用Docker
+docker-compose up -d
+
+# 前端热重载 (可选)
+npx live-server web/ --port=3000
+```
+
+### 生产构建
+```bash
+# 优化CSS
+npm run build:css
+
+# 压缩JavaScript
+npm run build:js
+
+# 构建Docker镜像
+docker build -t natter-web:latest .
+
+# 推送到仓库
+docker push your-registry/natter-web:latest
+```
+
+### CI/CD 流水线
+```yaml
+# .drone.yml
+kind: pipeline
+type: docker
+name: default
+
+steps:
+- name: test
+  image: python:3.9
+  commands:
+  - pip install -r requirements.txt
+  - python -m pytest
+
+- name: build
+  image: plugins/docker
+  settings:
+    repo: your-registry/natter-web
+    tags: [ latest, "${DRONE_TAG}" ]
+
+trigger:
+  branch:
+  - main
+  - develop
+```
+
+## 🐛 调试技巧
+
+### 后端调试
+```python
+# 使用内置调试器
+import pdb; pdb.set_trace()
+
+# 使用日志调试
+import logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+logger.debug(f"服务状态: {service.status}")
+
+# Flask调试模式
+app.run(debug=True)
+```
+
+### 前端调试
+```javascript
+// 使用console调试
+console.log('服务数据:', serviceData);
+console.table(services);  // 表格形式显示数组
+
+// 使用断点
+debugger;
+
+// 性能分析
+console.time('服务列表渲染');
+renderServiceList();
+console.timeEnd('服务列表渲染');
+
+// 网络请求监控
+fetch('/api/services')
+    .then(response => {
+        console.log('响应状态:', response.status);
+        return response.json();
+    });
+```
+
+### Docker 调试
+```bash
+# 查看容器日志
+docker logs natter-web
+
+# 进入容器调试
+docker exec -it natter-web bash
+
+# 容器资源监控
+docker stats natter-web
+```
+
+## 📋 发布清单
+
+### 发布前检查
+- [ ] 所有测试通过
+- [ ] 代码审查完成
+- [ ] 文档更新
+- [ ] 版本号更新
+- [ ] 变更日志记录
+- [ ] 安全检查通过
+- [ ] 性能测试通过
+- [ ] 浏览器兼容性测试
+
+### 发布步骤
+```bash
+# 1. 创建发布分支
+git checkout -b release/v1.0.5
+
+# 2. 更新版本信息
+echo "v1.0.5" > VERSION
+
+# 3. 生成变更日志
+git log --oneline v1.0.4..HEAD > CHANGELOG.md
+
+# 4. 提交发布
+git add .
+git commit -m "release: v1.0.5"
+
+# 5. 合并到主分支
+git checkout main
+git merge release/v1.0.5
+
+# 6. 创建标签
+git tag -a v1.0.5 -m "Release v1.0.5"
+
+# 7. 推送到远程
+git push origin main --tags
+```
+
+### 回滚策略
+```bash
+# 快速回滚到上一个版本
+git checkout v1.0.4
+docker pull your-registry/natter-web:v1.0.4
+docker-compose up -d
+
+# 热修复
+git checkout -b hotfix/critical-fix main
+# 修复代码...
+git merge hotfix/critical-fix
+```
+
+记住：**质量优于速度，稳定优于功能！** 始终优先保证代码质量和用户体验。

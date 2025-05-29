@@ -12,14 +12,16 @@
 <body>
     <!-- Await科技感LOGO展示区 -->
     <div style="width:100%;text-align:center;margin:32px 0 8px 0;">
-      <img src="await-logo.svg" alt="Await Logo" style="height:56px;max-width:90vw;filter:drop-shadow(0 2px 8px #00e6c355);">
+        <img src="await-logo.svg" alt="Await Logo"
+            style="height:56px;max-width:90vw;filter:drop-shadow(0 2px 8px #00e6c355);">
     </div>
     <div class="container">
         <header>
             <h1>Natter 管理界面</h1>
             <p>管理您的Natter服务</p>
             <div class="header-actions" style="display: flex; justify-content: flex-end; margin-top: 10px;">
-                <button id="iyuu-settings-btn" class="settings-btn" title="IYUU推送设置" style="display: none;"><i class="fas fa-bell"></i>
+                <button id="iyuu-settings-btn" class="settings-btn" title="IYUU推送设置" style="display: none;"><i
+                        class="fas fa-bell"></i>
                     推送设置</button>
                 <button id="logout-btn" class="logout-btn" style="display: none;">退出登录</button>
             </div>
@@ -439,9 +441,11 @@
             <p>Natter Web管理界面 v<span id="version">加载中...</span> &copy; 2025</p>
             <div style="margin-top:8px;font-size:15px;">
                 项目地址：
-                <a href="https://gitee.com/await29/natter-web" target="_blank" style="margin:0 8px;color:#00b3ff;text-decoration:none;font-weight:bold;">Gitee</a>
+                <a href="https://gitee.com/await29/natter-web" target="_blank"
+                    style="margin:0 8px;color:#00b3ff;text-decoration:none;font-weight:bold;">Gitee</a>
                 |
-                <a href="https://github.com/Await-d/natter-web" target="_blank" style="margin:0 8px;color:#222;text-decoration:none;font-weight:bold;">GitHub</a>
+                <a href="https://github.com/Await-d/natter-web" target="_blank"
+                    style="margin:0 8px;color:#222;text-decoration:none;font-weight:bold;">GitHub</a>
             </div>
         </footer>
     </div>
@@ -454,6 +458,20 @@
                 <span class="service-status">未知</span>
             </div>
             <div class="service-card-body">
+                <!-- 穿透状态显示区域 -->
+                <div class="penetration-status">
+                    <div class="status-row">
+                        <span class="status-label">LAN状态：</span>
+                        <span class="service-lan-status status-value">检测中</span>
+                        <span class="status-label">WAN状态：</span>
+                        <span class="service-wan-status status-value">检测中</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="status-label">NAT类型：</span>
+                        <span class="service-nat-type">检测中</span>
+                    </div>
+                </div>
+
                 <div class="service-address-container">
                     <span class="service-address-label">映射地址：</span>
                     <span class="service-address">未映射</span>

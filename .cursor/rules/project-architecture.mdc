@@ -1,0 +1,395 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Natter Web 项目架构规则
+
+## 📁 项目结构概览
+
+```
+natteer-web/
+├── 📄 [README.md](mdc:README.md)           # 项目主文档
+├── 📄 [.drone.yml](mdc:.drone.yml)        # CI/CD 配置
+├── 📁 natter/                              # 核心Natter工具
+│   ├── 📄 [natter.py](mdc:natter/natter.py) # 网络穿透核心逻辑
+│   ├── 📄 [README.md](mdc:natter/README.md) # Natter工具说明
+│   ├── 📁 docs/                            # 文档目录
+│   ├── 📁 natter-check/                    # 检查工具
+│   └── 📁 natter-docker/                   # Docker配置
+└── 📁 web/                                 # Web管理界面
+    ├── 📄 [index.html](mdc:web/index.html)     # 主界面
+    ├── 📄 [style.css](mdc:web/style.css)       # 样式表
+    ├── 📄 [script.js](mdc:web/script.js)       # 前端逻辑
+    ├── 📄 [server.py](mdc:web/server.py)       # Flask后端服务
+    ├── 📄 [service-details-panel.html](mdc:web/service-details-panel.html) # 服务详情组件
+    ├── 📄 [Dockerfile](mdc:web/Dockerfile)     # Docker镜像构建
+    ├── 📄 [docker-compose.yml](mdc:web/docker-compose.yml) # 容器编排
+    ├── 📄 [start.sh](mdc:web/start.sh)         # 启动脚本
+    └── 📁 images/                              # 静态图片资源
+```
+
+## 🏗️ 架构设计模式
+
+### 前后端分离架构
+- **前端**: 纯HTML+CSS+JavaScript，无框架依赖
+- **后端**: Python Flask提供RESTful API
+- **通信**: AJAX + JSON数据交换
+- **实时更新**: 定时轮询 + WebSocket（可选）
+
+### 核心模块划分
+
+#### 🎨 前端模块 (web/)
+```javascript
+// 模块化JavaScript结构
+const NatterWeb = {
+    // 服务管理模块
+    ServiceManager: {
+        createService(),
+        deleteService(),
+        getServiceList(),
+        getServiceDetails()
+    },
+    
+    // UI界面模块
+    UIManager: {
+        updateServiceList(),
+        showServiceDetails(),
+        toggleMode()
+    },
+    
+    // 配置管理模块
+    ConfigManager: {
+        saveTemplate(),
+        loadTemplate(),
+        validateConfig()
+    },
+    
+    // 通知模块
+    NotificationManager: {
+        showToast(),
+        sendIYUUMessage()
+    }
+};
+```
+
+#### 🖥️ 后端模块 (web/server.py)
+```python
+# Flask应用结构
+class NatterWebServer:
+    def __init__(self):
+        self.service_manager = ServiceManager()
+        self.config_manager = ConfigManager()
+        self.notification_manager = NotificationManager()
+    
+    # API路由
+    @app.route('/api/services', methods=['GET', 'POST'])
+    @app.route('/api/services/<service_id>', methods=['GET', 'DELETE'])
+    @app.route('/api/templates', methods=['GET', 'POST'])
+    @app.route('/api/settings', methods=['GET', 'POST'])
+```
+
+## 🔧 开发规范
+
+### Python 代码规范
+```python
+# 遵循PEP 8规范
+import os
+import json
+import logging
+from typing import Dict, List, Optional
+
+class ServiceManager:
+    """服务管理器 - 负责Natter服务的生命周期管理"""
+    
+    def __init__(self):
+        self.services: Dict[str, Service] = {}
+        self.logger = logging.getLogger(__name__)
+    
+    def create_service(self, config: Dict) -> Optional[str]:
+        """创建新的Natter服务实例
+        
+        Args:
+            config: 服务配置字典
+            
+        Returns:
+            服务ID，失败时返回None
+        """
+        try:
+            # 实现逻辑
+            pass
+        except Exception as e:
+            self.logger.error(f"创建服务失败: {e}")
+            return None
+```
+
+### JavaScript 代码规范
+```javascript
+// 使用ES6+现代语法
+class ServiceCard {
+    constructor(serviceData) {
+        this.data = serviceData;
+        this.element = this.createElement();
+        this.bindEvents();
+    }
+    
+    createElement() {
+        // 使用模板字符串构建DOM
+        const template = `
+            <div class="service-card" data-service-id="${this.data.id}">
+                <div class="service-card__header">
+                    <span class="service-card__title">${this.data.name}</span>
+                    <span class="service-card__status service-card__status--${this.data.status}">
+                        ${this.data.status}
+                    </span>
+                </div>
+                <div class="service-card__content">
+                    <!-- 内容区域 -->
+                </div>
+            </div>
+        `;
+        
+        const div = document.createElement('div');
+        div.innerHTML = template;
+        return div.firstElementChild;
+    }
+    
+    bindEvents() {
+        // 事件绑定
+        this.element.addEventListener('click', this.handleClick.bind(this));
+    }
+    
+    async handleClick(event) {
+        // 异步事件处理
+        try {
+            const response = await fetch(`/api/services/${this.data.id}`);
+            const data = await response.json();
+            // 处理响应
+        } catch (error) {
+            console.error('获取服务详情失败:', error);
+        }
+    }
+}
+```
+
+### CSS 组织规范
+```css
+/* 使用CSS自定义属性管理主题 */
+:root {
+    /* 颜色系统 */
+    --color-primary: #667eea;
+    --color-secondary: #764ba2;
+    --color-success: #28a745;
+    --color-warning: #ffc107;
+    --color-error: #dc3545;
+    
+    /* 间距系统 */
+    --spacing-xs: 0.25rem;
+    --spacing-sm: 0.5rem;
+    --spacing-md: 1rem;
+    --spacing-lg: 1.5rem;
+    --spacing-xl: 2rem;
+    
+    /* 字体系统 */
+    --font-family-base: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-size-sm: 0.875rem;
+    --font-size-base: 1rem;
+    --font-size-lg: 1.125rem;
+    
+    /* 阴影系统 */
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.15);
+}
+
+/* BEM命名规范 */
+.service-card {
+    /* 块级组件样式 */
+}
+
+.service-card__header {
+    /* 元素样式 */
+}
+
+.service-card__status--active {
+    /* 修饰符样式 */
+    color: var(--color-success);
+}
+```
+
+## 🔄 数据流设计
+
+### API 接口规范
+```http
+# 服务管理API
+GET    /api/services           # 获取服务列表
+POST   /api/services           # 创建新服务
+GET    /api/services/{id}      # 获取服务详情
+DELETE /api/services/{id}      # 删除服务
+PUT    /api/services/{id}      # 更新服务配置
+
+# 模板管理API
+GET    /api/templates          # 获取配置模板列表
+POST   /api/templates          # 保存新模板
+DELETE /api/templates/{id}     # 删除模板
+
+# 系统设置API
+GET    /api/settings           # 获取系统设置
+POST   /api/settings           # 更新系统设置
+
+# 实时状态API
+GET    /api/status             # 获取系统状态
+GET    /api/services/{id}/logs # 获取服务日志
+```
+
+### 状态管理
+```javascript
+// 前端状态管理
+const AppState = {
+    services: new Map(),
+    templates: [],
+    settings: {},
+    currentView: 'dashboard',
+    
+    // 状态更新方法
+    updateService(serviceId, newData) {
+        const service = this.services.get(serviceId);
+        if (service) {
+            Object.assign(service, newData);
+            this.notifyObservers('service-updated', serviceId);
+        }
+    },
+    
+    // 观察者模式
+    observers: new Set(),
+    addObserver(callback) {
+        this.observers.add(callback);
+    },
+    notifyObservers(event, data) {
+        this.observers.forEach(callback => callback(event, data));
+    }
+};
+```
+
+## 🧪 测试策略
+
+### 单元测试
+```python
+# Python后端测试 (pytest)
+def test_service_creation():
+    """测试服务创建功能"""
+    manager = ServiceManager()
+    config = {
+        'target_port': 8080,
+        'protocol': 'tcp',
+        'bind_port': 0
+    }
+    service_id = manager.create_service(config)
+    assert service_id is not None
+    assert service_id in manager.services
+```
+
+### 集成测试
+```javascript
+// JavaScript前端测试 (Jest)
+describe('ServiceCard Component', () => {
+    test('should render service information correctly', () => {
+        const mockData = {
+            id: 'test-service',
+            name: 'Test Service',
+            status: 'running'
+        };
+        
+        const card = new ServiceCard(mockData);
+        expect(card.element.querySelector('.service-card__title').textContent)
+            .toBe('Test Service');
+    });
+});
+```
+
+## 🚀 部署策略
+
+### Docker 部署
+```dockerfile
+# 多阶段构建优化镜像大小
+FROM python:3.9-slim as builder
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --user -r requirements.txt
+
+FROM python:3.9-slim
+WORKDIR /app
+COPY --from=builder /root/.local /root/.local
+COPY . .
+EXPOSE 8080
+CMD ["python", "server.py"]
+```
+
+### 环境配置
+```bash
+# 环境变量配置
+export NATTER_WEB_PORT=8080
+export NATTER_WEB_HOST=0.0.0.0
+export NATTER_WEB_DEBUG=false
+export NATTER_DATA_DIR=/app/data
+```
+
+## 🔒 安全考虑
+
+### 输入验证
+```python
+from marshmallow import Schema, fields, validate
+
+class ServiceConfigSchema(Schema):
+    target_port = fields.Integer(required=True, validate=validate.Range(min=1, max=65535))
+    protocol = fields.String(required=True, validate=validate.OneOf(['tcp', 'udp']))
+    bind_port = fields.Integer(validate=validate.Range(min=0, max=65535))
+```
+
+### 访问控制
+```python
+# API访问限制
+from functools import wraps
+
+def require_auth(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # 验证访问权限
+        if not validate_access():
+            return jsonify({'error': 'Unauthorized'}), 401
+        return f(*args, **kwargs)
+    return decorated_function
+```
+
+## 📊 监控和日志
+
+### 日志配置
+```python
+import logging
+
+# 配置日志格式
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('natter-web.log'),
+        logging.StreamHandler()
+    ]
+)
+```
+
+### 性能监控
+```javascript
+// 前端性能监控
+const performanceObserver = new PerformanceObserver((list) => {
+    list.getEntries().forEach((entry) => {
+        if (entry.entryType === 'navigation') {
+            console.log('页面加载时间:', entry.loadEventEnd - entry.fetchStart);
+        }
+    });
+});
+
+performanceObserver.observe({ entryTypes: ['navigation'] });
+```
+
+记住：好的架构是演进出来的，不是一开始就设计完美的。保持代码简洁、可测试、可维护！

@@ -59,6 +59,9 @@ NAT_TYPE_PATTERN = re.compile(r"NAT type: ([^\n]+)")
 LAN_STATUS_PATTERN = re.compile(r"LAN > ([^\[]+)\[ ([^\]]+) \]")
 WAN_STATUS_PATTERN = re.compile(r"WAN > ([^\[]+)\[ ([^\]]+) \]")
 
+# 新增：映射地址检测正则表达式
+MAPPED_ADDRESS_PATTERN = re.compile(r"tcp://([^:]+):(\d+)")
+
 # 默认密码为None，表示不启用验证
 PASSWORD = None
 
@@ -152,185 +155,10 @@ def send_batch_messages():
 
         # 构建整合后的消息内容
         total_unique_messages = sum(len(msgs) for msgs in categories.values())
-        message_title = f"Natter服务状态更新 [{total_unique_messages}条]"
-        message_content = f"## 📣 服务状态整合通知 ##\n\n"
-        message_content += f"⏰ 时间: {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
-        message_content += f"━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-
-        # 服务状态汇总部分 - 新增服务整体状态小结
-        running_services = []
-        services_with_mappings = {}
-
-        # 收集所有服务信息和映射地址
-        for cat, messages in categories.items():
-            for msg in messages:
-                # 尝试从消息内容中提取服务ID和映射地址
-                content = msg["content"]
-                service_name = msg["title"].split(']')[-1].strip() if ']' in msg["title"] else msg["title"]
-
-                # 提取服务的运行状态
-                if cat == "启动":
-                    running_services.append(service_name)
-
-                # 提取映射地址
-                mapping_match = re.search(r"映射地址[：:]\s*([^\n]+)", content)
-                if mapping_match:
-                    mapping = mapping_match.group(1).strip()
-                    if mapping and mapping != "无" and mapping != "无映射":
-                        services_with_mappings[service_name] = mapping
-
-                # 也从消息标题中提取服务名称（针对地址变更消息）
-                if cat == "地址变更" or cat == "地址分配":
-                    # 提取新地址
-                    new_addr_match = re.search(r"新地址[：:]\s*([^\n]+)", content)
-                    if new_addr_match:
-                        new_addr = new_addr_match.group(1).strip()
-                        if new_addr and new_addr != "无" and new_addr != "无映射":
-                            services_with_mappings[service_name] = new_addr
-
-        # 添加服务映射地址汇总部分（如果有）
-        if services_with_mappings:
-            message_content += "📌 **服务映射地址汇总**\n"
-            for service_name, mapping in services_with_mappings.items():
-                running_status = "🟢" if service_name in running_services else "⚪"
-                message_content += f"{running_status} **{service_name}**: `{mapping}`\n"
-            message_content += "\n"
-
-        # 优先处理错误和重要类别
-        priority_cats = ["错误", "服务状态", "定时报告"]
-        sorted_cats = sorted(categories.keys(),
-                           key=lambda x: (0 if x in priority_cats else 1, x))
-
-        # 按类别添加消息
-        for cat in sorted_cats:
-            messages = categories[cat]
-            # 添加类别图标
-            cat_icon = "⚠️" if cat == "错误" else "📊" if cat == "定时报告" else "🔄" if cat == "地址变更" else "▶️" if cat == "启动" else "⏹️" if cat == "停止" else "📋"
-            message_content += f"📌 **{cat_icon} {cat} ({len(messages)}条)**\n"
-            message_content += f"┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n"
-
-            # 对错误和重要消息，提供更详细的信息
-            if cat in ["错误", "服务状态"]:
-                for msg in messages:
-                    # 提取消息标题中服务名称部分
-                    service_name = msg["title"].split(']')[-1].strip() if ']' in msg["title"] else msg["title"]
-                    # 使用完整内容，但进行格式优化
-                    formatted_content = msg['content'].replace('\n', '\n  ')
-                    message_content += f"➤ **{service_name}**:\n  {formatted_content}\n\n"
-            # 定时报告特殊处理，提取并高亮显示服务状态
-            elif cat == "定时报告":
-                # 只显示一次定时报告的整体摘要，避免冗余
-                if messages:
-                    # 使用第一条消息作为代表
-                    msg = messages[0]
-                    content = msg["content"]
-                    
-                    # 提取服务总数等信息的更好方法
-                    summary_sections = re.findall(r"总服务数.*?运行中.*?已停止.*?", content, re.DOTALL)
-                    if summary_sections:
-                        summary = summary_sections[0].strip()
-                        # 美化格式
-                        summary = summary.replace("总服务数", "总服务数").replace("运行中", "🟢 运行中").replace("已停止", "⚪ 已停止")
-                        message_content += f"➤ **服务概况**:\n  {summary}\n\n"
-                    
-                    # 提取服务列表并美化展示
-                    message_content += f"➤ **服务详情**:\n"
-                    
-                    # 使用正则表达式提取服务信息，支持树形格式的匹配
-                    services_section = re.search(r"服务详情\*\*\n(.*?)(?=\n\s*━━━|\Z)", content, re.DOTALL)
-                    if services_section:
-                        services_text = services_section.group(1)
-                        # 按服务分块提取
-                        service_blocks = re.findall(r"([🟢⚪].*?\n(?:.*?─.*?\n)*)", services_text, re.DOTALL)
-                        for block in service_blocks:
-                            service_lines = block.strip().split('\n')
-                            if service_lines:
-                                # 提取服务名称和状态
-                                service_info = service_lines[0]  # 第一行包含服务名和状态emoji
-                                # 提取映射地址
-                                mapping_line = next((line for line in service_lines if "映射" in line), None)
-                                if mapping_line:
-                                    mapping_address = re.search(r"`(.*?)`", mapping_line)
-                                    if mapping_address:
-                                        # 重构服务显示行，保持简洁
-                                        emoji = "🟢" if "🟢" in service_info else "⚪"
-                                        name = re.search(r"\*\*(.*?)\*\*", service_info)
-                                        if name:
-                                            message_content += f"  {emoji} **{name.group(1)}**: `{mapping_address.group(1)}`\n"
-                    else:
-                        # 尝试备用方法提取服务信息 - 兼容旧格式
-                        services_details = re.findall(r"\[(运行中|已停止)\](.*?)-(.*?)(?=\n\[|\n\n|\Z)", content, re.DOTALL)
-                        for status, name, address in services_details:
-                            status_emoji = "🟢" if status == "运行中" else "⚪"
-                            message_content += f"  {status_emoji} **{name.strip()}**: `{address.strip()}`\n"
-                    
-                    message_content += "\n"
-            # 普通消息类别
-            else:
-                for msg in messages:
-                    service_name = msg["title"].split(']')[-1].strip() if ']' in msg["title"] else msg["title"]
-                    content = msg["content"]
-
-                    # 尝试提取并突出显示映射地址（如果有）
-                    mapping_info = ""
-                    mapping_match = re.search(r"映射地址[：:]\s*([^\n]+)", content)
-                    if mapping_match:
-                        mapping = mapping_match.group(1).strip()
-                        if mapping and mapping != "无" and mapping != "无映射":
-                            mapping_info = f" | 映射: `{mapping}`"
-
-                    # 提取服务ID和本地端口（如果有）
-                    service_id_match = re.search(r"服务ID[：:]\s*([^\n]+)", content)
-                    local_port_match = re.search(r"本地端口[：:]\s*([^\n]+)", content)
-
-                    service_info = ""
-                    if service_id_match:
-                        service_id = service_id_match.group(1).strip()
-                        service_info += f"ID: {service_id}"
-
-                    if local_port_match:
-                        local_port = local_port_match.group(1).strip()
-                        if service_info:
-                            service_info += f" | "
-                        service_info += f"端口: {local_port}"
-
-                    if service_info:
-                        service_info = f" ({service_info})"
-
-                    # 美化消息显示
-                    message_content += f"➤ **{service_name}**{service_info}:\n"
-
-                    # 提取重要信息并格式化展示
-                    important_items = []
-                    if "服务已成功启动" in content:
-                        important_items.append("✅ 服务已成功启动")
-                    elif "服务已停止" in content:
-                        important_items.append("⏹️ 服务已停止运行")
-                    elif "服务已被手动停止" in content:
-                        important_items.append("⏹️ 服务已被手动停止")
-                    elif "映射地址已变更" in content:
-                        old_addr_match = re.search(r"旧地址[：:]\s*([^\n]+)", content)
-                        new_addr_match = re.search(r"新地址[：:]\s*([^\n]+)", content)
-                        if old_addr_match and new_addr_match:
-                            old_addr = old_addr_match.group(1).strip()
-                            new_addr = new_addr_match.group(1).strip()
-                            important_items.append(f"🔄 映射地址变更: `{old_addr}` → `{new_addr}`")
-                    elif "服务获取到映射地址" in content:
-                        important_items.append(f"🆕 获取新映射地址{mapping_info}")
-
-                    # 如果没有提取到特定信息，展示第一行
-                    if not important_items:
-                        first_line = content.split('\n', 1)[0] if '\n' in content else content
-                        important_items.append(first_line)
-
-                    # 显示提取的重要信息
-                    for item in important_items:
-                        message_content += f"  {item}\n"
-
-                    message_content += "\n"
-
-        message_content += f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        message_content += f"💡 通过Natter管理界面可以管理服务"
+        message_title = f"🔔 Natter服务通知 ({total_unique_messages}条)"
+        
+        # 使用全新的美观布局
+        message_content = create_beautiful_notification_layout(categories, total_unique_messages)
 
         # 直接发送整合后的消息
         _send_iyuu_message_direct(message_title, message_content)
@@ -339,6 +167,284 @@ def send_batch_messages():
         queue_len = len(message_queue)
         message_queue.clear()
         print(f"已整合发送 {queue_len} 条服务状态消息")
+
+def create_beautiful_notification_layout(categories, total_messages):
+    """创建美观的通知布局"""
+    current_time = time.strftime('%Y-%m-%d %H:%M:%S')
+    
+    # 消息头部 - 使用视觉分隔符
+    content = f"""╭─────────── 🔔 Natter 服务通知 ───────────╮
+│                                          │
+│  📅 时间：{current_time}      │
+│  📊 消息：{total_messages} 条更新                        │
+│                                          │
+╰──────────────────────────────────────────╯
+
+"""
+
+    # 服务状态汇总部分 - 收集所有服务信息
+    services_summary = collect_services_summary(categories)
+    
+    if services_summary["mappings"]:
+        content += """🎯 **服务映射概览**
+┌─────────────────────────────────────────┐
+"""
+        for service_name, mapping in services_summary["mappings"].items():
+            status_icon = "🟢" if service_name in services_summary["running"] else "🔴"
+            content += f"│ {status_icon} **{service_name}**\n"
+            content += f"│   🔗 `{mapping}`\n"
+            content += f"│\n"
+        
+        content += "└─────────────────────────────────────────┘\n\n"
+
+    # 按优先级处理消息类别
+    priority_cats = ["错误", "服务状态", "定时报告"]
+    other_cats = [cat for cat in categories.keys() if cat not in priority_cats]
+    sorted_cats = [cat for cat in priority_cats if cat in categories] + sorted(other_cats)
+
+    # 处理每个类别的消息
+    for cat in sorted_cats:
+        messages = categories[cat]
+        
+        # 获取类别图标和样式
+        cat_info = get_category_style(cat)
+        
+        content += f"""🔸 **{cat_info['icon']} {cat}** ({len(messages)}条)
+{cat_info['separator']}
+"""
+        
+        # 根据类别使用不同的格式化方法
+        if cat == "定时报告":
+            content += format_scheduled_report(messages)
+        elif cat in ["错误", "服务状态"]:
+            content += format_important_messages(messages)
+        else:
+            content += format_regular_messages(messages)
+        
+        content += "\n"
+
+    # 消息尾部
+    content += """┌─────────────────────────────────────────┐
+│  💡 通过 Natter 管理界面可以管理服务    │
+│  🌐 访问地址：http://localhost:8080     │
+└─────────────────────────────────────────┘"""
+
+    return content
+
+def collect_services_summary(categories):
+    """收集服务摘要信息"""
+    running_services = []
+    services_with_mappings = {}
+
+    for cat, messages in categories.items():
+        for msg in messages:
+            content = msg["content"]
+            service_name = extract_service_name(msg["title"])
+
+            # 提取服务的运行状态
+            if cat == "启动" or "启动" in msg["title"]:
+                running_services.append(service_name)
+
+            # 提取映射地址
+            mapping = extract_mapping_address(content)
+            if mapping:
+                services_with_mappings[service_name] = mapping
+
+    return {
+        "running": running_services,
+        "mappings": services_with_mappings
+    }
+
+def extract_service_name(title):
+    """从消息标题中提取服务名称"""
+    if ']' in title:
+        return title.split(']')[-1].strip()
+    return title
+
+def extract_mapping_address(content):
+    """从消息内容中提取映射地址"""
+    # 尝试多种模式匹配映射地址
+    patterns = [
+        r"映射地址[：:]\s*([^\n]+)",
+        r"新地址[：:]\s*([^\n]+)",
+        r"映射[：:]\s*`([^`]+)`"
+    ]
+    
+    for pattern in patterns:
+        match = re.search(pattern, content)
+        if match:
+            mapping = match.group(1).strip()
+            if mapping and mapping not in ["无", "无映射", "等待映射..."]:
+                return mapping
+    return None
+
+def get_category_style(category):
+    """获取类别的样式信息"""
+    styles = {
+        "错误": {
+            "icon": "⚠️",
+            "separator": "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        },
+        "启动": {
+            "icon": "🚀",
+            "separator": "▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓"
+        },
+        "停止": {
+            "icon": "⏹️",
+            "separator": "▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒"
+        },
+        "地址变更": {
+            "icon": "🔄",
+            "separator": "░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░"
+        },
+        "地址分配": {
+            "icon": "🆕",
+            "separator": "░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░"
+        },
+        "定时报告": {
+            "icon": "📊",
+            "separator": "═══════════════════════════════════════════"
+        },
+        "服务状态": {
+            "icon": "📋",
+            "separator": "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        }
+    }
+    
+    return styles.get(category, {
+        "icon": "📌", 
+        "separator": "─────────────────────────────────────────"
+    })
+
+def format_scheduled_report(messages):
+    """格式化定时报告消息"""
+    if not messages:
+        return ""
+    
+    msg = messages[0]  # 使用第一条消息作为代表
+    content = msg["content"]
+    
+    result = ""
+    
+    # 提取服务概况
+    summary_match = re.search(r"总服务数.*?运行中.*?已停止.*?", content, re.DOTALL)
+    if summary_match:
+        summary = summary_match.group(0).strip()
+        result += f"""┌─ 📈 服务概况 ─┐
+│ {summary.replace('总服务数', '📦 总数').replace('运行中', '🟢 运行').replace('已停止', '🔴 停止')} │
+└─────────────────┘
+
+"""
+    
+    # 提取并美化服务详情
+    services_section = re.search(r"服务详情\*\*\n(.*?)(?=\n\s*━━━|\Z)", content, re.DOTALL)
+    if services_section:
+        services_text = services_section.group(1)
+        service_blocks = re.findall(r"([🟢⚪].*?\n(?:.*?─.*?\n)*)", services_text, re.DOTALL)
+        
+        if service_blocks:
+            result += "🎯 **服务详情列表**\n"
+            for i, block in enumerate(service_blocks, 1):
+                lines = block.strip().split('\n')
+                if lines:
+                    # 提取服务名称和状态
+                    service_line = lines[0]
+                    status_emoji = "🟢" if "🟢" in service_line else "🔴"
+                    
+                    # 提取服务名称
+                    name_match = re.search(r'\*\*(.*?)\*\*', service_line)
+                    service_name = name_match.group(1) if name_match else f"服务 {i}"
+                    
+                    # 提取映射地址
+                    mapping_line = next((line for line in lines if "映射" in line), None)
+                    mapping = "无映射"
+                    if mapping_line:
+                        mapping_match = re.search(r'`(.*?)`', mapping_line)
+                        if mapping_match:
+                            mapping = mapping_match.group(1)
+                    
+                    result += f"""
+  {status_emoji} **{service_name}**
+     🔗 {mapping}
+"""
+    
+    return result
+
+def format_important_messages(messages):
+    """格式化重要消息（错误、服务状态）"""
+    result = ""
+    
+    for i, msg in enumerate(messages, 1):
+        service_name = extract_service_name(msg["title"])
+        content = msg["content"]
+        
+        result += f"""
+🔹 **任务 {i}：{service_name}**
+```
+{format_content_as_code_block(content)}
+```
+"""
+    
+    return result
+
+def format_regular_messages(messages):
+    """格式化常规消息"""
+    result = ""
+    
+    for i, msg in enumerate(messages, 1):
+        service_name = extract_service_name(msg["title"])
+        content = msg["content"]
+        
+        # 提取关键信息
+        key_info = extract_key_info_from_content(content)
+        
+        result += f"""
+🔸 **{service_name}**
+   {key_info}
+"""
+    
+    return result
+
+def extract_key_info_from_content(content):
+    """从消息内容中提取关键信息"""
+    # 检查消息类型并提取相应信息
+    if "服务已成功启动" in content:
+        return "✅ 服务已成功启动"
+    elif "服务已停止" in content:
+        return "⏹️ 服务已停止运行"
+    elif "映射地址已变更" in content:
+        old_addr = re.search(r"旧地址[：:]\s*([^\n]+)", content)
+        new_addr = re.search(r"新地址[：:]\s*([^\n]+)", content)
+        if old_addr and new_addr:
+            return f"🔄 地址变更：`{old_addr.group(1)}` → `{new_addr.group(1)}`"
+        return "🔄 映射地址已变更"
+    elif "服务获取到映射地址" in content:
+        mapping = extract_mapping_address(content)
+        if mapping:
+            return f"🆕 获取新地址：`{mapping}`"
+        return "🆕 获取到映射地址"
+    else:
+        # 返回第一行作为摘要
+        first_line = content.split('\n', 1)[0] if '\n' in content else content
+        return first_line[:50] + ("..." if len(first_line) > 50 else "")
+
+def format_content_as_code_block(content):
+    """将内容格式化为代码块内容"""
+    # 简化内容，只保留关键信息
+    lines = content.split('\n')
+    formatted_lines = []
+    
+    for line in lines:
+        line = line.strip()
+        if line and not line.startswith("━"):
+            # 替换一些标识符使其更简洁
+            line = line.replace("服务ID:", "ID:")
+            line = line.replace("服务备注:", "备注:")
+            line = line.replace("本地端口:", "端口:")
+            line = line.replace("映射地址:", "映射:")
+            formatted_lines.append(line)
+    
+    return '\n'.join(formatted_lines[:5])  # 最多显示5行
 
 # 修改直接发送IYUU消息的内部函数
 def _send_iyuu_message_direct(text, desp):
@@ -461,40 +567,8 @@ def schedule_daily_notification():
                 running_count = sum(1 for s in services_info if s.get("status") == "运行中")
                 stopped_count = sum(1 for s in services_info if s.get("status") == "已停止")
 
-                message = iyuu_config.get("schedule", {}).get("message", "Natter服务状态日报")
-                detail = f"## 📊 Natter服务状态日报 ##\n\n"
-                detail += f"⏰ 报告时间: {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
-                detail += f"━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-                detail += f"📌 **服务概况**\n"
-                detail += f"➤ 总服务数: {len(services_info)}\n"
-                detail += f"➤ 🟢 运行中: {running_count}\n"
-                detail += f"➤ ⚪ 已停止: {stopped_count}\n\n"
-
-                if services_info:
-                    detail += f"📌 **服务详情**\n"
-                    for service in services_info:
-                        service_id = service.get("id", "未知")
-                        remark = service.get("remark") or f"服务 {service_id}"
-                        status = service.get("status", "未知")
-                        mapped_address = service.get("mapped_address", "无映射")
-                        lan_status = service.get("lan_status", "未知")
-                        wan_status = service.get("wan_status", "未知")
-                        nat_type = service.get("nat_type", "未知")
-
-                        # 根据状态添加emoji
-                        status_emoji = "🟢" if status == "运行中" else "⚪"
-
-                        detail += f"{status_emoji} **{remark}**\n"
-                        detail += f"  ├─ 状态: {status}\n"
-                        detail += f"  ├─ 映射: `{mapped_address}`\n"
-                        detail += f"  ├─ LAN状态: {lan_status}\n"
-                        detail += f"  ├─ WAN状态: {wan_status}\n"
-                        detail += f"  └─ NAT类型: {nat_type}\n\n"
-                else:
-                    detail += "❗ 当前无服务运行\n\n"
-
-                detail += f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                detail += f"💡 通过Natter管理界面可以管理服务"
+                message = f"📊 Natter服务日报 ({len(services_info)}个服务)"
+                detail = create_daily_report_layout(services_info, running_count, stopped_count)
 
                 # 使用消息队列处理定时推送，标记为重要消息
                 send_iyuu_message(message, detail)
@@ -512,6 +586,232 @@ def schedule_daily_notification():
 
     notification_thread = threading.Thread(target=check_and_send_notification, daemon=True)
     notification_thread.start()
+
+def create_daily_report_layout(services_info, running_count, stopped_count):
+    """创建美观的日报布局"""
+    current_time = time.strftime('%Y-%m-%d %H:%M:%S')
+    report_date = time.strftime('%Y年%m月%d日')
+    
+    content = f"""╭─────────── 📊 Natter 服务日报 ───────────╮
+│                                          │
+│  📅 日期：{report_date}            │
+│  ⏰ 时间：{current_time}      │
+│                                          │
+╰──────────────────────────────────────────╯
+
+🎯 **服务概览** 
+┌─────────────────────────────────────────┐
+│  📦 总服务数：{len(services_info):>2} 个                        │
+│  🟢 运行中　：{running_count:>2} 个                        │
+│  🔴 已停止　：{stopped_count:>2} 个                        │
+└─────────────────────────────────────────┘
+
+"""
+
+    if services_info:
+        content += """🔸 **服务详情**
+═══════════════════════════════════════════
+"""
+        for i, service in enumerate(services_info, 1):
+            service_id = service.get("id", "未知")
+            remark = service.get("remark") or f"服务 {service_id}"
+            status = service.get("status", "未知")
+            mapped_address = service.get("mapped_address", "无映射")
+            lan_status = service.get("lan_status", "未知")
+            wan_status = service.get("wan_status", "未知")
+            nat_type = service.get("nat_type", "未知")
+
+            # 根据状态选择图标
+            status_emoji = "🟢" if status == "运行中" else "🔴"
+            
+            content += f"""
+🔹 **{i:02d}. {remark}**
+   ├─ 状态：{status_emoji} {status}
+   ├─ 映射：🔗 `{mapped_address}`
+   ├─ LAN： {"🟢" if lan_status == "OPEN" else "🔴"} {lan_status}
+   ├─ WAN： {"🟢" if wan_status == "OPEN" else "🔴"} {wan_status}
+   └─ NAT： 🔍 {nat_type}
+"""
+    else:
+        content += """❗ **暂无服务运行**
+───────────────────────────────────────────
+   目前没有配置任何 Natter 服务
+   
+"""
+
+    content += f"""┌─────────────────────────────────────────┐
+│  💡 访问管理界面：http://localhost:8080  │
+│  📱 通过界面可以实时管理所有服务        │
+└─────────────────────────────────────────┘"""
+
+    return content
+
+def create_test_message_layout():
+    """创建美观的测试消息布局"""
+    current_time = time.strftime('%Y-%m-%d %H:%M:%S')
+    
+    # 获取所有服务数量
+    services_info = NatterManager.list_services()
+    running_count = sum(1 for s in services_info if s.get("status") == "运行中")
+    stopped_count = sum(1 for s in services_info if s.get("status") == "已停止")
+    
+    content = f"""╭─────────── 🔔 Natter 测试通知 ───────────╮
+│                                          │
+│  ✅ IYUU 推送功能测试                   │
+│  ⏰ 测试时间：{current_time}      │
+│                                          │
+╰──────────────────────────────────────────╯
+
+🎯 **系统状态检查**
+┌─────────────────────────────────────────┐
+│  🖥️  运行环境：{'🐳 Docker容器' if os.path.exists('/.dockerenv') else '💻 主机系统'}              │
+│  🐍 Python版本：{sys.version.split()[0]}                 │
+│  💿 操作系统　：{sys.platform}                      │
+└─────────────────────────────────────────┘
+
+🔸 **服务概况**
+═══════════════════════════════════════════
+   📦 总服务数：{len(services_info):>2} 个
+   🟢 运行中　：{running_count:>2} 个  
+   🔴 已停止　：{stopped_count:>2} 个
+
+┌─────────────────────────────────────────┐
+│  ✨ 推送功能正常运行！                  │
+│  💌 您已成功接收到此测试通知            │
+│  🔧 可以通过管理界面配置更多服务        │
+└─────────────────────────────────────────┘"""
+
+    return content
+
+def create_startup_notification_layout(port, services, services_count):
+    """创建美观的启动通知布局"""
+    current_time = time.strftime('%Y-%m-%d %H:%M:%S')
+    
+    content = f"""╭─────────── 🚀 Natter 管理服务 ───────────╮
+│                                          │
+│  ✅ 服务启动成功                        │
+│  ⏰ 启动时间：{current_time}      │
+│                                          │
+╰──────────────────────────────────────────╯
+
+🔧 **服务配置**
+┌─────────────────────────────────────────┐
+│  🌐 访问地址：http://0.0.0.0:{port}           │
+│  📨 IYUU推送：{'✅ 已启用' if iyuu_config.get('enabled', True) else '❌ 已禁用'}              │
+│  ⏰ 定时推送：{'✅ 已启用' if iyuu_config.get('schedule', {}).get('enabled', False) else '❌ 已禁用'}              │
+└─────────────────────────────────────────┘
+
+"""
+
+    if services_count > 0:
+        running_count = sum(1 for s in services if s.get("running", False))
+        
+        content += f"""🎯 **已加载服务映射** ({services_count}个服务)
+═══════════════════════════════════════════
+   📦 总数：{services_count} 个
+   🟢 运行：{running_count} 个
+   🔴 停止：{services_count - running_count} 个
+
+"""
+        
+        for i, service in enumerate(services, 1):
+            service_id = service.get("id", "未知")
+            remark = service.get("remark") or f"服务 {service_id}"
+            mapped_address = service.get("mapped_address", "无映射")
+            running = service.get("running", False)
+
+            # 服务状态图标
+            status_icon = "🟢" if running else "🔴"
+            
+            # 映射地址处理
+            if mapped_address and mapped_address not in ["无", "无映射", "等待映射..."]:
+                address_display = f"🔗 `{mapped_address}`"
+            else:
+                address_display = "⏳ 等待分配映射地址"
+
+            content += f"""🔹 **{i:02d}. {remark}**
+   └─ {status_icon} {address_display}
+
+"""
+    else:
+        content += """❗ **暂无加载的服务**
+═══════════════════════════════════════════
+   目前没有配置任何 Natter 服务
+   请通过管理界面添加新的服务
+
+"""
+
+    content += """┌─────────────────────────────────────────┐
+│  🎉 Natter 管理服务已就绪！            │
+│  📱 现在可以通过界面管理所有服务        │
+│  💡 支持实时状态监控和推送通知          │
+└─────────────────────────────────────────┘"""
+
+    return content
+
+def create_instant_push_layout(services_info, running_count, stopped_count, service_id=None):
+    """创建美观的即时推送布局"""
+    current_time = time.strftime('%Y-%m-%d %H:%M:%S')
+    
+    # 判断是单个服务还是全部服务
+    is_single_service = service_id is not None
+    title = "单服务状态" if is_single_service else "全部服务状态"
+    
+    content = f"""╭─────────── 📊 Natter {title} ───────────╮
+│                                          │
+│  📋 即时状态查询                        │
+│  ⏰ 查询时间：{current_time}      │
+│                                          │
+╰──────────────────────────────────────────╯
+
+🎯 **状态概览**
+┌─────────────────────────────────────────┐
+│  📦 查询服务：{len(services_info):>2} 个                        │
+│  🟢 运行中　：{running_count:>2} 个                        │
+│  🔴 已停止　：{stopped_count:>2} 个                        │
+└─────────────────────────────────────────┘
+
+"""
+
+    if services_info:
+        content += """🔸 **服务详情**
+═══════════════════════════════════════════
+"""
+        for i, service in enumerate(services_info, 1):
+            service_id = service.get("id", "未知")
+            remark = service.get("remark") or f"服务 {service_id}"
+            status = service.get("status", "未知")
+            mapped_address = service.get("mapped_address", "无映射")
+            lan_status = service.get("lan_status", "未知")
+            wan_status = service.get("wan_status", "未知")
+            nat_type = service.get("nat_type", "未知")
+
+            # 根据状态选择图标
+            status_emoji = "🟢" if status == "运行中" else "🔴"
+            lan_emoji = "🟢" if lan_status == "OPEN" else "🔴" if lan_status == "CLOSED" else "⚪"
+            wan_emoji = "🟢" if wan_status == "OPEN" else "🔴" if wan_status == "CLOSED" else "⚪"
+            
+            content += f"""
+🔹 **{i:02d}. {remark}**
+   ├─ 运行：{status_emoji} {status}
+   ├─ 映射：🔗 `{mapped_address}`
+   ├─ LAN ：{lan_emoji} {lan_status}
+   ├─ WAN ：{wan_emoji} {wan_status}
+   └─ NAT ：🔍 {nat_type}
+"""
+    else:
+        content += """❗ **查询结果为空**
+═══════════════════════════════════════════
+   没有找到符合条件的服务
+   
+"""
+
+    content += f"""┌─────────────────────────────────────────┐
+│  💡 通过管理界面可以实时查看服务状态    │
+│  🔄 状态信息每30秒自动更新              │
+└─────────────────────────────────────────┘"""
+
+    return content
 
 class NatterService:
     def __init__(self, service_id, cmd_args, remark=""):
@@ -557,8 +857,21 @@ class NatterService:
 
     def start(self):
         """启动Natter服务"""
+        # 检查服务是否已经在运行
         if self.process and self.process.poll() is None:
+            # 进程仍在运行，不能重复启动
             return False
+
+        # 如果进程已停止，清理process对象以允许重新启动
+        if self.process and self.process.poll() is not None:
+            self.process = None
+
+        # 重置服务状态
+        self.status = "启动中"
+        self.mapped_address = None
+        self.lan_status = "未知"
+        self.wan_status = "未知" 
+        self.nat_type = "未知"
 
         # 检查Docker环境下是否尝试使用nftables
         if os.path.exists('/.dockerenv') and any(arg == '-m' and i+1 < len(self.cmd_args) and self.cmd_args[i+1] == 'nftables' for i, arg in enumerate(self.cmd_args)):
@@ -646,6 +959,9 @@ class NatterService:
                         except Exception as e:
                             print(f"解析远程端口出错: {e}")
 
+                        # 触发NAT类型推断
+                        self._update_nat_type_inference()
+
                         # 发送映射地址变更推送 - 使用消息队列
                         service_name = self.remark or f"服务 {self.service_id}"
                         local_port = self.local_port or "未知"
@@ -701,12 +1017,22 @@ class NatterService:
             # 提取LAN状态
             lan_match = LAN_STATUS_PATTERN.search(line)
             if lan_match:
+                old_lan_status = self.lan_status
                 self.lan_status = lan_match.group(2).strip()
+                
+                # 如果LAN状态变化，更新NAT类型推断
+                if old_lan_status != self.lan_status:
+                    self._update_nat_type_inference()
 
             # 提取WAN状态
             wan_match = WAN_STATUS_PATTERN.search(line)
             if wan_match:
+                old_wan_status = self.wan_status
                 self.wan_status = wan_match.group(2).strip()
+                
+                # 如果WAN状态变化，更新NAT类型推断
+                if old_wan_status != self.wan_status:
+                    self._update_nat_type_inference()
 
         # 进程结束后更新状态
         self.status = "已停止"
@@ -737,13 +1063,42 @@ class NatterService:
         time.sleep(1)  # 等待一秒钟后重启
         self.start()
 
+    def _update_nat_type_inference(self):
+        """基于当前状态智能推断NAT类型"""
+        # 检查是否有映射地址且映射成功
+        has_mapping_success = bool(self.mapped_address and self.mapped_address != "等待映射...")
+        
+        # 使用智能推断函数
+        inferred_type = infer_nat_type_from_status(
+            self.lan_status, 
+            self.wan_status, 
+            self.mapped_address, 
+            has_mapping_success
+        )
+        
+        # 更新NAT类型
+        if inferred_type != self.nat_type:
+            old_nat_type = self.nat_type
+            self.nat_type = inferred_type
+            
+            # 记录NAT类型变化
+            if old_nat_type != "未知":
+                self.output_lines.append(f"🔍 NAT类型推断: {old_nat_type} → {self.nat_type}")
+            else:
+                self.output_lines.append(f"🔍 NAT类型推断: {self.nat_type}")
+
     def set_auto_restart(self, enabled):
         """设置是否自动重启"""
         self.auto_restart = enabled
 
     def stop(self):
         """停止Natter服务"""
-        if self.process and self.process.poll() is None:
+        # 如果没有进程或进程已经停止，更新状态并返回成功
+        if not self.process or self.process.poll() is not None:
+            self.status = "已停止"
+            return True
+            
+        try:
             # 禁用自动重启
             self.auto_restart = False
 
@@ -787,14 +1142,44 @@ class NatterService:
             )
 
             return True
-        return False
+            
+        except Exception as e:
+            print(f"停止服务 {self.service_id} 时发生错误: {e}")
+            # 即使出错，也将状态设置为已停止
+            self.status = "已停止"
+            return True
 
     def restart(self):
         """重启Natter服务"""
-        if self.stop():
-            time.sleep(1)  # 等待一秒再启动
-            return self.start()
-        return False
+        try:
+            # 记录重启尝试
+            self.output_lines.append(f"🔄 尝试重启服务 {self.service_id}...")
+            
+            # 如果服务正在运行，先停止它
+            if self.process and self.process.poll() is None:
+                if not self.stop():
+                    self.output_lines.append("❌ 停止服务失败，重启中止")
+                    return False
+                self.output_lines.append("✅ 服务已停止，准备重新启动")
+            else:
+                self.output_lines.append("ℹ️ 服务已停止，直接启动")
+            
+            # 等待进程完全结束
+            time.sleep(2)  # 增加等待时间，确保进程完全结束
+            
+            # 启动服务
+            if self.start():
+                self.output_lines.append("✅ 服务重启成功")
+                return True
+            else:
+                self.output_lines.append("❌ 服务启动失败")
+                return False
+                
+        except Exception as e:
+            error_msg = f"重启过程中发生错误: {str(e)}"
+            self.output_lines.append(f"❌ {error_msg}")
+            print(f"Service {self.service_id} restart error: {e}")
+            return False
 
     def clear_logs(self):
         """清空日志"""
@@ -1211,30 +1596,10 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
             elif path == "/api/iyuu/test":
                 # 测试IYUU推送
                 # 直接使用_send_iyuu_message_direct函数，跳过消息队列，立即发送
-                test_message = f"## 🔔 Natter测试消息 ##\n\n"
-                test_message += f"⏰ 发送时间: {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
-                test_message += f"━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-                test_message += f"✅ 通知测试成功\n\n"
-                test_message += f"📌 **系统信息**\n"
-                test_message += f"➤ 运行环境: {'Docker容器内' if os.path.exists('/.dockerenv') else '主机系统'}\n"
-                test_message += f"➤ Python版本: {sys.version.split()[0]}\n"
-                test_message += f"➤ 操作系统: {sys.platform}\n\n"
-
-                # 获取所有服务数量
-                services_info = NatterManager.list_services()
-                running_count = sum(1 for s in services_info if s.get("status") == "运行中")
-                stopped_count = sum(1 for s in services_info if s.get("status") == "已停止")
-
-                test_message += f"📌 **服务概况**\n"
-                test_message += f"➤ 总服务数: {len(services_info)}\n"
-                test_message += f"➤ 🟢 运行中: {running_count}\n"
-                test_message += f"➤ ⚪ 已停止: {stopped_count}\n\n"
-
-                test_message += f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                test_message += f"💡 IYUU推送功能正常"
+                test_message = create_test_message_layout()
 
                 success, errors = _send_iyuu_message_direct(
-                    "Natter测试消息",
+                    "🔔 Natter测试通知",
                     test_message
                 )
                 self._set_headers()
@@ -1542,40 +1907,8 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                 running_count = sum(1 for s in services_info if s.get("status") == "运行中")
                 stopped_count = sum(1 for s in services_info if s.get("status") == "已停止")
                 
-                message = "Natter服务状态即时报告"
-                detail = f"## 📊 Natter服务状态报告 ##\n\n"
-                detail += f"⏰ 报告时间: {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
-                detail += f"━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-                detail += f"📌 **服务概况**\n"
-                detail += f"➤ 总服务数: {len(services_info)}\n"
-                detail += f"➤ 🟢 运行中: {running_count}\n"
-                detail += f"➤ ⚪ 已停止: {stopped_count}\n\n"
-                
-                if services_info:
-                    detail += f"📌 **服务详情**\n"
-                    for service in services_info:
-                        service_id = service.get("id", "未知")
-                        remark = service.get("remark") or f"服务 {service_id}"
-                        status = service.get("status", "未知")
-                        mapped_address = service.get("mapped_address", "无映射")
-                        lan_status = service.get("lan_status", "未知")
-                        wan_status = service.get("wan_status", "未知")
-                        nat_type = service.get("nat_type", "未知")
-                        
-                        # 根据状态添加emoji
-                        status_emoji = "🟢" if status == "运行中" else "⚪"
-                        
-                        detail += f"{status_emoji} **{remark}**\n"
-                        detail += f"  ├─ 状态: {status}\n"
-                        detail += f"  ├─ 映射: `{mapped_address}`\n"
-                        detail += f"  ├─ LAN状态: {lan_status}\n"
-                        detail += f"  ├─ WAN状态: {wan_status}\n"
-                        detail += f"  └─ NAT类型: {nat_type}\n\n"
-                else:
-                    detail += "❗ 当前无服务运行\n\n"
-                
-                detail += f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                detail += f"💡 通过Natter管理界面可以管理服务"
+                message = f"📊 Natter即时状态 ({len(services_info)}个服务)"
+                detail = create_instant_push_layout(services_info, running_count, stopped_count, service_id)
                 
                 # 发送推送
                 success, errors = _send_iyuu_message_direct(message, detail)
@@ -1710,39 +2043,8 @@ def run_server(port=8080, password=None):
             services_count = len(services)
 
             # 构建启动消息
-            message_title = "Natter管理服务已启动"
-            message_content = f"【Natter管理服务启动通知】\n\n"
-            message_content += f"📅 启动时间: {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
-            message_content += f"🔗 服务地址: http://0.0.0.0:{port}\n"
-            message_content += f"📊 服务数量: {services_count}\n"
-            message_content += f"📨 IYUU推送: {'已启用' if iyuu_config.get('enabled', True) else '已禁用'}\n"
-            message_content += f"⏰ 定时推送: {'已启用' if iyuu_config.get('schedule', {}).get('enabled', False) else '已禁用'}\n\n"
-
-            # 添加服务映射地址部分
-            if services_count > 0:
-                message_content += "## 已加载服务映射地址\n"
-                running_count = 0
-                for service in services:
-                    service_id = service.get("id", "未知")
-                    remark = service.get("remark") or f"服务 {service_id}"
-                    status = service.get("status", "未知")
-                    mapped_address = service.get("mapped_address", "无映射")
-                    running = service.get("running", False)
-
-                    # 服务状态图标
-                    status_icon = "🟢" if running else "⚪"
-                    if running:
-                        running_count += 1
-
-                    # 添加服务信息
-                    if mapped_address and mapped_address != "无" and mapped_address != "无映射":
-                        message_content += f"{status_icon} {remark}: `{mapped_address}`\n"
-                    else:
-                        message_content += f"{status_icon} {remark}: 等待分配映射地址\n"
-
-                message_content += f"\n共 {services_count} 个服务，{running_count} 个运行中"
-            else:
-                message_content += "暂无加载的服务\n"
+            message_title = "🚀 Natter管理服务已启动"
+            message_content = create_startup_notification_layout(port, services, services_count)
 
             # 直接发送整合消息，不经过队列
             _send_iyuu_message_direct(message_title, message_content)
@@ -1804,6 +2106,23 @@ def save_iyuu_config():
     except Exception as e:
         print(f"保存IYUU配置失败: {e}")
         return False
+
+# 智能NAT类型推断
+def infer_nat_type_from_status(lan_status, wan_status, mapped_address, has_mapping_success):
+    """基于LAN/WAN状态和映射情况智能推断NAT类型"""
+    if mapped_address and has_mapping_success:
+        if lan_status == "OPEN" and wan_status == "OPEN":
+            return "Full Cone NAT (完全锥形)"
+        elif lan_status == "CLOSED" and wan_status == "OPEN":
+            return "Symmetric NAT (对称型)"
+        elif wan_status == "CLOSED":
+            return "Port Restricted NAT (端口受限)"
+        else:
+            return "Address Restricted NAT (地址受限)"
+    elif mapped_address:
+        return "NAT检测中..."
+    else:
+        return "无映射地址"
 
 if __name__ == "__main__":
     # 注册清理函数
