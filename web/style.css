@@ -1239,23 +1239,24 @@ input:checked + .slider:before {
 
 .service-card-actions {
     display: flex;
-    justify-content: flex-end;
-    margin-top: 10px;
     gap: 8px;
+    margin-top: 1rem;
+    justify-content: flex-start;
+    flex-wrap: wrap;
 }
 
 .service-card-actions button {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 3px 8px;
-    font-size: 0.8rem;
-    border-radius: 4px;
+    padding: 6px 12px;
     border: none;
+    border-radius: 4px;
+    font-size: 0.85rem;
     cursor: pointer;
-    transition: background-color 0.3s;
-    background-color: var(--light-color);
-    color: var(--dark-color);
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 65px;
+    justify-content: center;
 }
 
 .service-card-actions .btn-details {
@@ -1263,22 +1264,125 @@ input:checked + .slider:before {
     color: white;
 }
 
-.service-card-actions .btn-stop {
+.service-card-actions .btn-quick-action {
     background-color: var(--warning-color);
-    color: var(--dark-color);
+    color: white;
+    font-weight: 500;
 }
 
-.service-card-actions .btn-delete {
+.service-card-actions .btn-quick-action:hover {
+    background-color: #e0a800;
+    transform: translateY(-1px);
+}
+
+.service-card-actions .btn-quick-action[data-action="start"] {
+    background-color: var(--success-color);
+}
+
+.service-card-actions .btn-quick-action[data-action="start"]:hover {
+    background-color: #218838;
+}
+
+.service-card-actions .btn-stop {
     background-color: var(--danger-color);
     color: white;
 }
 
+.service-card-actions .btn-delete {
+    background-color: #6c757d;
+    color: white;
+}
+
 .service-card-actions button:hover {
-    opacity: 0.9;
+    transform: translateY(-1px);
 }
 
 .service-card-actions i {
-    font-size: 0.85rem;
+    font-size: 0.8rem;
+}
+
+/* 可点击地址样式 */
+.service-address.clickable-address {
+    cursor: pointer;
+    color: var(--primary-color);
+    text-decoration: underline;
+    transition: all 0.2s ease;
+    border-radius: 3px;
+    padding: 2px 4px;
+    margin: 0 4px;
+}
+
+.service-address.clickable-address:hover {
+    background-color: rgba(74, 111, 165, 0.1);
+    color: #2a4570;
+    text-decoration: none;
+}
+
+.service-address.clickable-address[data-available="false"] {
+    cursor: default;
+    color: var(--secondary-color);
+    text-decoration: none;
+}
+
+.service-address.clickable-address[data-available="false"]:hover {
+    background-color: transparent;
+    color: var(--secondary-color);
+}
+
+/* 打开地址按钮样式 */
+.open-address-btn {
+    padding: 4px 8px;
+    border: none;
+    border-radius: 4px;
+    background-color: var(--primary-color);
+    color: white;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-left: 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.open-address-btn:hover {
+    background-color: #2a4570;
+    transform: translateY(-1px);
+}
+
+.open-address-btn i {
+    font-size: 0.7rem;
+}
+
+/* 服务地址容器增强 */
+.service-address-container {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin: 8px 0;
+    padding: 8px;
+    background-color: rgba(0, 0, 0, 0.02);
+    border-radius: 6px;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.service-address-label {
+    font-weight: 500;
+    color: var(--dark-color);
+    white-space: nowrap;
+}
+
+.service-address {
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+    color: var(--secondary-color);
+    background-color: rgba(255, 255, 255, 0.8);
+    padding: 3px 6px;
+    border-radius: 3px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    flex: 1;
+    min-width: 100px;
 }
 
 .empty-services-message {

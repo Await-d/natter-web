@@ -474,9 +474,12 @@
 
                 <div class="service-address-container">
                     <span class="service-address-label">映射地址：</span>
-                    <span class="service-address">未映射</span>
+                    <span class="service-address clickable-address" title="点击跳转到地址">未映射</span>
                     <button class="copy-address-btn" title="复制地址">
                         <i class="fas fa-copy"></i> 复制
+                    </button>
+                    <button class="open-address-btn" title="在新窗口打开" style="display: none;">
+                        <i class="fas fa-external-link-alt"></i> 打开
                     </button>
                 </div>
                 <p class="service-cmd">命令: <span class="service-cmd-text">未知</span></p>
@@ -484,6 +487,9 @@
                 <div class="service-card-actions">
                     <button class="btn-details" title="查看详情">
                         <i class="fas fa-info-circle"></i> 详情
+                    </button>
+                    <button class="btn-quick-action" title="快速重启/启动">
+                        <i class="fas fa-redo"></i> <span class="action-text">重启</span>
                     </button>
                     <button class="btn-stop" title="停止服务">
                         <i class="fas fa-stop"></i> 停止

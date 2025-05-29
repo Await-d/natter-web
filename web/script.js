@@ -495,38 +495,10 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     if (copyAddressBtn) {
-        copyAddressBtn.addEventListener('click', function (event) {
-            event.stopPropagation(); // 防止事件冒泡
-            const address = serviceMappedAddress.textContent;
-
-            // 尝试使用新API
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(address)
-                    .then(() => {
-                        showCopyFeedback(copyAddressBtn);
-                        showNotification('地址已复制: ' + address, 'success');
-                    })
-                    .catch(err => {
-                        console.error('复制失败:', err);
-                        showNotification('复制失败，请手动复制', 'error');
-                    });
-            } else {
-                // 回退方法
-                try {
-                    const tempInput = document.createElement('input');
-                    tempInput.value = address;
-                    document.body.appendChild(tempInput);
-                    tempInput.select();
-                    document.execCommand('copy');
-                    document.body.removeChild(tempInput);
-
-                    showCopyFeedback(copyAddressBtn);
-                    showNotification('地址已复制: ' + address, 'success');
-                } catch (err) {
-                    console.error('复制失败:', err);
-                    showNotification('复制失败，请手动复制', 'error');
-                }
-            }
+        copyAddressBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const button = e.currentTarget;
+            copyMappedAddressAsUrl(service.mapped_address, button);
         });
     }
 
@@ -723,9 +695,73 @@ function renderServicesList(services) {
         const remarkRow = card.querySelector('.service-remark');
         remarkRow.style.display = service.remark ? 'block' : 'none';
 
+        // 设置映射地址的可点击性和跳转功能
+        const addressElement = card.querySelector('.service-address');
+        const openAddressBtn = card.querySelector('.open-address-btn');
+
+        if (service.mapped_address && service.mapped_address !== '未映射' && service.mapped_address !== '等待映射...') {
+            // 检查是否是有效的HTTP地址
+            const isValidAddress = isValidMappedAddress(service.mapped_address);
+
+            if (isValidAddress) {
+                addressElement.setAttribute('data-available', 'true');
+                addressElement.title = '点击跳转到 ' + service.mapped_address;
+                openAddressBtn.style.display = 'inline-flex';
+
+                // 为地址添加点击事件
+                addressElement.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openMappedAddress(service.mapped_address);
+                });
+
+                // 为打开按钮添加点击事件
+                openAddressBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openMappedAddress(service.mapped_address);
+                });
+            } else {
+                addressElement.setAttribute('data-available', 'false');
+                addressElement.title = '当前地址不支持直接跳转';
+                openAddressBtn.style.display = 'none';
+            }
+        } else {
+            addressElement.setAttribute('data-available', 'false');
+            addressElement.title = '暂无映射地址';
+            openAddressBtn.style.display = 'none';
+        }
+
+        // 设置快速操作按钮
+        const quickActionBtn = card.querySelector('.btn-quick-action');
+        const actionTextSpan = quickActionBtn.querySelector('.action-text');
+        const actionIcon = quickActionBtn.querySelector('i');
+
+        if (service.status === '运行中') {
+            // 运行中时显示重启按钮
+            quickActionBtn.setAttribute('data-action', 'restart');
+            actionTextSpan.textContent = '重启';
+            actionIcon.className = 'fas fa-redo';
+            quickActionBtn.title = '快速重启服务';
+        } else {
+            // 停止时显示启动按钮
+            quickActionBtn.setAttribute('data-action', 'start');
+            actionTextSpan.textContent = '启动';
+            actionIcon.className = 'fas fa-play';
+            quickActionBtn.title = '快速启动服务';
+        }
+
         // 添加事件监听器
         card.querySelector('.btn-details').addEventListener('click', () => {
             showServiceDetails(service.id);
+        });
+
+        quickActionBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const action = quickActionBtn.getAttribute('data-action');
+            if (action === 'restart') {
+                restartService(service.id);
+            } else if (action === 'start') {
+                startService(service.id);
+            }
         });
 
         card.querySelector('.btn-stop').addEventListener('click', (e) => {
@@ -741,7 +777,7 @@ function renderServicesList(services) {
         card.querySelector('.copy-address-btn').addEventListener('click', (e) => {
             e.stopPropagation();
             const button = e.currentTarget;
-            copyToClipboard(service.mapped_address, button);
+            copyMappedAddressAsUrl(service.mapped_address, button);
         });
 
         // 添加到列表
@@ -1153,6 +1189,38 @@ function showServiceDetailsPanel(service) {
     document.querySelectorAll('#service-id').forEach(el => el.textContent = service.id);
     document.getElementById('service-status').textContent = service.status;
     document.getElementById('service-mapped-address').textContent = service.mapped_address || '未映射';
+
+    // 为详情面板中的映射地址添加点击跳转功能
+    if (service.mapped_address && service.mapped_address !== '未映射' && service.mapped_address !== '等待映射...') {
+        const isValidAddress = isValidMappedAddress(service.mapped_address);
+
+        if (isValidAddress) {
+            serviceMappedAddress.style.cursor = 'pointer';
+            serviceMappedAddress.style.color = 'var(--primary-color)';
+            serviceMappedAddress.style.textDecoration = 'underline';
+            serviceMappedAddress.title = '点击跳转到 ' + service.mapped_address;
+
+            // 移除之前的事件监听器并添加新的
+            serviceMappedAddress.replaceWith(serviceMappedAddress.cloneNode(true));
+            serviceMappedAddress = document.getElementById('service-mapped-address');
+
+            serviceMappedAddress.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openMappedAddress(service.mapped_address);
+            });
+        } else {
+            serviceMappedAddress.style.cursor = 'default';
+            serviceMappedAddress.style.color = '';
+            serviceMappedAddress.style.textDecoration = 'none';
+            serviceMappedAddress.title = '当前地址不支持直接跳转';
+        }
+    } else {
+        serviceMappedAddress.style.cursor = 'default';
+        serviceMappedAddress.style.color = '';
+        serviceMappedAddress.style.textDecoration = 'none';
+        serviceMappedAddress.title = '暂无映射地址';
+    }
+
     document.getElementById('service-cmd-args').textContent = service.cmd_args.join(' ');
 
     // 设置备注区域
@@ -2735,4 +2803,92 @@ function addIyuuTokenAction() {
             console.error('添加IYUU令牌出错:', error);
             showNotification('添加令牌时发生错误', 'error');
         });
+}
+
+// 辅助函数：检查映射地址是否有效
+function isValidMappedAddress(address) {
+    if (!address || address === '未映射' || address === '等待映射...') {
+        return false;
+    }
+
+    // 检查是否包含端口号的地址格式
+    const addressPattern = /^([a-zA-Z0-9.-]+):(\d+)$/;
+    return addressPattern.test(address);
+}
+
+// 辅助函数：打开映射地址
+function openMappedAddress(address) {
+    if (!address || !isValidMappedAddress(address)) {
+        showNotification('无效的映射地址', 'error');
+        return;
+    }
+
+    // 尝试智能判断协议
+    let url = address;
+
+    // 如果地址中包含常见的HTTP端口，使用HTTP协议
+    const httpPorts = ['80', '8080', '3000', '8000', '8888', '9000'];
+    const httpsPorts = ['443', '8443', '9443'];
+
+    const parts = address.split(':');
+    if (parts.length === 2) {
+        const port = parts[1];
+
+        if (httpPorts.includes(port)) {
+            url = `http://${address}`;
+        } else if (httpsPorts.includes(port)) {
+            url = `https://${address}`;
+        } else {
+            // 对于其他端口，默认尝试HTTP
+            url = `http://${address}`;
+        }
+    }
+
+    try {
+        window.open(url, '_blank', 'noopener,noreferrer');
+        showNotification(`已在新窗口打开 ${url}`, 'success');
+    } catch (error) {
+        console.error('打开地址失败:', error);
+        showNotification('打开地址失败', 'error');
+    }
+}
+
+// 辅助函数：启动服务（用于已停止的服务快速启动）
+function startService(serviceId) {
+    if (!serviceId) {
+        showNotification('无效的服务ID', 'error');
+        return;
+    }
+
+    // 因为当前系统没有直接的启动API，我们使用重启功能来实现
+    restartService(serviceId);
+}
+
+// 增强地址复制功能，支持智能URL格式化
+function copyMappedAddressAsUrl(address, button) {
+    if (!address || !isValidMappedAddress(address)) {
+        copyToClipboard(address, button);
+        return;
+    }
+
+    // 生成完整的URL
+    const httpPorts = ['80', '8080', '3000', '8000', '8888', '9000'];
+    const httpsPorts = ['443', '8443', '9443'];
+
+    const parts = address.split(':');
+    let url = address;
+
+    if (parts.length === 2) {
+        const port = parts[1];
+
+        if (httpPorts.includes(port)) {
+            url = `http://${address}`;
+        } else if (httpsPorts.includes(port)) {
+            url = `https://${address}`;
+        } else {
+            url = `http://${address}`;
+        }
+    }
+
+    copyToClipboard(url, button);
 }
