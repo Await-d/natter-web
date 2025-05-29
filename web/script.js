@@ -1881,7 +1881,7 @@ function fetchWithAuth(url, options = {}) {
 
     // 添加认证头（如果有token）
     if (authToken) {
-        newOptions.headers['Authorization'] = `Basic ${authToken}`;
+        newOptions.headers['Authorization'] = `Bearer ${authToken}`;
     }
 
     return fetch(url, newOptions)
