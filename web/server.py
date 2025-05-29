@@ -1344,10 +1344,8 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                     return
 
             # API请求需要验证
-            if (
-                path not in ["/api/auth/login", "/api/auth/unified-login"]
-                and not self._authenticate()
-                and not self._authenticate_token()
+            if path not in ["/api/auth/login", "/api/auth/unified-login"] and not (
+                self._authenticate() or self._authenticate_token()
             ):
                 return
 
@@ -1478,10 +1476,8 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
         path = parsed_url.path
 
         # API请求需要验证，除了登录相关API
-        if (
-            path not in ["/api/auth/login", "/api/auth/unified-login"]
-            and not self._authenticate()
-            and not self._authenticate_token()
+        if path not in ["/api/auth/login", "/api/auth/unified-login"] and not (
+            self._authenticate() or self._authenticate_token()
         ):
             return
 
