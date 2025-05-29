@@ -28,6 +28,21 @@ steps:
         -e IYUU_ENABLED=true
         natter-web:latest
 
+  - name: cleanup-cache
+    image: docker:dind
+    volumes:
+      - name: docker-socket
+        path: /var/run/docker.sock
+    commands:
+      - echo "开始清理Docker构建缓存..."
+      - docker image prune -f --filter "until=24h" || true
+      - docker container prune -f || true
+      - docker builder prune -f --keep-storage 1GB || true
+      - docker system df
+      - echo "Docker缓存清理完成"
+    when:
+      status: [ success, failure ]
+
 volumes:
   - name: docker-socket
     host:
