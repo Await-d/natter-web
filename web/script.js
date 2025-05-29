@@ -8,9 +8,10 @@ let helpPanel = document.getElementById('help-panel');
 let templatesPanel = document.getElementById('templates-panel');
 let iyuuPanel = document.getElementById('iyuu-panel'); // IYUU推送设置面板
 let saveTemplateDialog = document.getElementById('save-template-dialog');
-let loginPanel = document.createElement('div');
-loginPanel.className = 'login-panel';
-loginPanel.style.display = 'none';
+// 以下loginPanel相关代码已不再需要，因为登录功能已移至login.html
+// let loginPanel = document.createElement('div');
+// loginPanel.className = 'login-panel';
+// loginPanel.style.display = 'none';
 
 // 表单元素
 let newServiceForm = document.getElementById('new-service-form');
@@ -1783,65 +1784,10 @@ function formatAddressShort(address) {
 
 // 添加登录表单HTML
 function createLoginForm() {
-    if (document.getElementById('login-form')) {
-        return; // 已存在，不重复创建
-    }
-
-    const loginHtml = `
-    <div class="card">
-        <div class="logo-container">
-            <div class="logo">N</div>
-        </div>
-        <h2>Natter管理界面登录</h2>
-        <form id="login-form">
-            <div class="form-group">
-                <label for="password">请输入管理密码:</label>
-                <input type="password" id="password" placeholder="输入密码" required autocomplete="current-password">
-            </div>
-            <div class="form-actions">
-                <button type="submit" class="btn-primary">登 录</button>
-            </div>
-            <div id="login-error" class="login-error" style="display:none;"></div>
-        </form>
-        <div class="footer-text">
-            Natter Web管理界面 - 安全登录
-        </div>
-    </div>
-    `;
-
-    loginPanel.innerHTML = loginHtml;
-    document.querySelector('.container').appendChild(loginPanel);
-
-    // 添加登录表单事件监听
-    const loginForm = document.getElementById('login-form');
-    loginForm.addEventListener('submit', function (e) {
-        e.preventDefault();
-        const password = document.getElementById('password').value;
-
-        // 为按钮添加加载状态
-        const submitBtn = this.querySelector('button[type="submit"]');
-        const originalText = submitBtn.textContent;
-        submitBtn.textContent = '登录中...';
-        submitBtn.disabled = true;
-
-        login(password)
-            .catch(() => {
-                // 恢复按钮状态
-                submitBtn.textContent = originalText;
-                submitBtn.disabled = false;
-            });
-    });
-
-    // 聚焦密码输入框
-    setTimeout(() => {
-        const passwordInput = document.getElementById('password');
-        if (passwordInput) {
-            passwordInput.focus();
-        }
-    }, 100);
+    // 直接重定向到登录页面
+    window.location.href = 'login.html';
 }
 
-// 检查是否需要认证
 // 检查是否需要认证
 function checkAuthRequired() {
     return fetchWithAuth(API.authCheck)
@@ -1849,18 +1795,8 @@ function checkAuthRequired() {
             // 检查响应状态
             if (!response.ok) {
                 // 如果响应不成功（例如500错误），视为配置加载失败
-                console.error('配置加载失败，显示登录界面');
-                createLoginForm();
-                hideAllPanels();
-                loginPanel.style.display = 'block';
-
-                // 在登录面板上显示错误信息
-                const loginErrorDiv = document.querySelector('#login-error');
-                if (loginErrorDiv) {
-                    loginErrorDiv.textContent = '配置加载失败，请联系管理员或检查服务器状态';
-                    loginErrorDiv.style.display = 'block';
-                }
-
+                console.error('配置加载失败，重定向到登录页面');
+                window.location.href = 'login.html';
                 // 抛出错误终止后续处理
                 throw new Error('配置加载失败');
             }
@@ -1869,17 +1805,10 @@ function checkAuthRequired() {
         .then(data => {
             const authRequired = data.auth_required;
             if (authRequired) {
-                // 如果需要认证但未认证，则显示登录表单
+                // 如果需要认证但未认证，则重定向到登录页面
                 if (!isAuthenticated && !authToken) {
-                    createLoginForm();
-                    hideAllPanels();
-                    loginPanel.style.display = 'block';
-
-                    // 隐藏登出按钮
-                    const logoutBtn = document.getElementById('logout-btn');
-                    if (logoutBtn) {
-                        logoutBtn.style.display = 'none';
-                    }
+                    window.location.href = 'login.html';
+                    return;
                 } else if (authToken) {
                     // 已有token，尝试使用
                     isAuthenticated = true;
@@ -1908,87 +1837,18 @@ function checkAuthRequired() {
         })
         .catch(error => {
             console.error('检查认证状态时出错:', error);
-            // 出错时显示登录界面
-            createLoginForm();
-            hideAllPanels();
-            loginPanel.style.display = 'block';
-
-            // 在登录面板上显示错误信息
-            const loginErrorDiv = document.querySelector('#login-error');
-            if (loginErrorDiv) {
-                loginErrorDiv.textContent = '连接服务器失败，请稍后再试';
-                loginErrorDiv.style.display = 'block';
-            }
-
+            // 出错时重定向到登录页面
+            window.location.href = 'login.html';
             return true; // 默认需要认证
         });
 }
 
-// 登录功能
+// 登录功能 - 现在已不需要，登录在login.html中处理
 function login(password) {
-    const loginError = document.getElementById('login-error');
-    loginError.style.display = 'none';
-
-    return fetchWithAuth(API.authLogin, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                password: password
-            })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                // 保存认证token
-                authToken = data.token;
-                localStorage.setItem('natter_auth_token', authToken);
-                isAuthenticated = true;
-
-                // 显示登出按钮
-                const logoutBtn = document.getElementById('logout-btn');
-                if (logoutBtn) {
-                    logoutBtn.style.display = 'block';
-                }
-
-                // 隐藏登录面板
-                loginPanel.style.display = 'none';
-
-                // 显示成功通知
-                showNotification('登录成功，欢迎使用Natter管理界面', 'success');
-
-                // 显示服务列表
-                showServicesList();
-            } else {
-                // 显示错误
-                loginError.textContent = data.error || '密码错误，请重试';
-                loginError.style.display = 'block';
-
-                // 恢复按钮状态
-                const submitBtn = document.querySelector('#login-form button[type="submit"]');
-                if (submitBtn) {
-                    submitBtn.textContent = '登 录';
-                    submitBtn.disabled = false;
-                }
-
-                throw new Error('登录失败');
-            }
-        })
-        .catch(error => {
-            console.error('登录请求出错:', error);
-            loginError.textContent = '登录请求失败，请检查网络连接';
-            loginError.style.display = 'block';
-
-            // 恢复按钮状态
-            const submitBtn = document.querySelector('#login-form button[type="submit"]');
-            if (submitBtn) {
-                submitBtn.textContent = '登 录';
-                submitBtn.disabled = false;
-            }
-
-            throw error;
-        });
+    // 这个函数现在不再使用，因为登录已移至login.html
+    // 保留此函数以避免可能的引用错误
+    console.warn('login函数不再使用，请使用login.html进行登录');
+    return Promise.reject(new Error('请使用login.html进行登录'));
 }
 
 // 登出功能
