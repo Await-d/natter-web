@@ -9,7 +9,13 @@ steps:
       - name: docker-socket
         path: /var/run/docker.sock
     commands:
-      - docker build -t natter-web:latest ./web
+      - echo "清理Docker缓存以避免构建错误..."
+      - docker system prune -f --volumes || true
+      - docker builder prune -f || true
+      - echo "强制拉取最新基础镜像..."
+      - docker pull python:3.9-slim --platform linux/amd64 || true
+      - echo "开始构建镜像..."
+      - docker build -t natter-web:latest ./web --no-cache --pull
       - docker stop natter-web-container || true
       - docker rm natter-web-container || true
       - >
