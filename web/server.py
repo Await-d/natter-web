@@ -1251,14 +1251,7 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
             except Exception as e:
                 print(f"认证解析出错: {e}")
 
-        # 如果是API请求，返回JSON格式的401错误
-        # 但不发送WWW-Authenticate头，避免触发浏览器内置认证弹窗
-        self.send_response(401)
-        self.send_header("Content-type", "application/json")
-        self.end_headers()
-        self.wfile.write(
-            json.dumps({"error": "需要认证", "auth_required": True}).encode()
-        )
+        # Basic认证失败，返回False让token认证有机会执行
         return False
 
     def do_OPTIONS(self):
@@ -1344,10 +1337,18 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                     return
 
             # API请求需要验证
-            if path not in ["/api/auth/login", "/api/auth/unified-login"] and not (
-                self._authenticate() or self._authenticate_token()
-            ):
-                return
+            if path not in ["/api/auth/login", "/api/auth/unified-login"]:
+                if not (self._authenticate() or self._authenticate_token()):
+                    # 认证失败，发送401响应
+                    self.send_response(401)
+                    self.send_header("Content-type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(
+                        json.dumps(
+                            {"error": "需要认证", "auth_required": True}
+                        ).encode()
+                    )
+                    return
 
             # API端点
             if path == "/api/services":
@@ -1476,10 +1477,16 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
         path = parsed_url.path
 
         # API请求需要验证，除了登录相关API
-        if path not in ["/api/auth/login", "/api/auth/unified-login"] and not (
-            self._authenticate() or self._authenticate_token()
-        ):
-            return
+        if path not in ["/api/auth/login", "/api/auth/unified-login"]:
+            if not (self._authenticate() or self._authenticate_token()):
+                # 认证失败，发送401响应
+                self.send_response(401)
+                self.send_header("Content-type", "application/json")
+                self.end_headers()
+                self.wfile.write(
+                    json.dumps({"error": "需要认证", "auth_required": True}).encode()
+                )
+                return
 
         # 读取请求体
         content_length = int(self.headers["Content-Length"])
