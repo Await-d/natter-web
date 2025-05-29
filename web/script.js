@@ -8,6 +8,7 @@ let helpPanel = document.getElementById('help-panel');
 let templatesPanel = document.getElementById('templates-panel');
 let iyuuPanel = document.getElementById('iyuu-panel'); // IYUU推送设置面板
 let saveTemplateDialog = document.getElementById('save-template-dialog');
+let groupsPanel = document.getElementById('groups-panel'); // 分组管理面板
 // 以下loginPanel相关代码已不再需要，因为登录功能已移至login.html
 // let loginPanel = document.createElement('div');
 // loginPanel.className = 'login-panel';
@@ -33,6 +34,7 @@ let notificationScript = document.getElementById('notification-script');
 let retryMode = document.getElementById('retry-mode');
 let quitOnChange = document.getElementById('quit-on-change');
 let autoRestart = document.getElementById('auto-restart');
+let serviceGroup = document.getElementById('service-group'); // 新建服务分组选择
 
 // 详情页元素
 let serviceId = document.getElementById('service-id');
@@ -82,6 +84,16 @@ let testIyuuPush = document.getElementById('test-iyuu-push'); // 测试推送按
 let saveIyuuSettings = document.getElementById('save-iyuu-settings'); // 保存设置按钮
 let backFromIyuuBtn = document.getElementById('back-from-iyuu-btn'); // 返回按钮
 
+// 分组管理相关DOM元素
+let groupsManagementBtn = document.getElementById('groups-management-btn');
+let groupsList = document.getElementById('groups-list');
+let newGroupName = document.getElementById('new-group-name');
+let addGroupBtn = document.getElementById('add-group-btn');
+let batchSourceGroup = document.getElementById('batch-source-group');
+let batchTargetGroup = document.getElementById('batch-target-group');
+let batchMoveBtn = document.getElementById('batch-move-btn');
+let backFromGroupsBtn = document.getElementById('back-from-groups-btn');
+
 // 当前视图状态
 let currentServiceId = null;
 let refreshIntervalId = null;
@@ -118,7 +130,13 @@ const API = {
     iyuuTest: '/api/iyuu/test',
     iyuuAddToken: '/api/iyuu/add_token',
     iyuuDeleteToken: '/api/iyuu/delete_token',
-    iyuuPushNow: '/api/iyuu/push_now'
+    iyuuPushNow: '/api/iyuu/push_now',
+    groups: '/api/groups',
+    createGroup: '/api/groups/create',
+    deleteGroup: '/api/groups/delete',
+    renameGroup: '/api/groups/rename',
+    moveService: '/api/groups/move-service',
+    batchMove: '/api/groups/batch-move'
 };
 
 // 工具状态信息
@@ -646,6 +664,34 @@ document.addEventListener('DOMContentLoaded', function () {
             pushServicesNow();
         });
     }
+
+    // 分组管理相关事件监听器
+    if (groupsManagementBtn) {
+        groupsManagementBtn.addEventListener('click', function () {
+            showGroupsPanel();
+        });
+    }
+
+    if (addGroupBtn) {
+        addGroupBtn.addEventListener('click', function () {
+            createGroup();
+        });
+    }
+
+    if (batchMoveBtn) {
+        batchMoveBtn.addEventListener('click', function () {
+            batchMoveServices();
+        });
+    }
+
+    if (backFromGroupsBtn) {
+        backFromGroupsBtn.addEventListener('click', function () {
+            hideGroupsPanel();
+        });
+    }
+
+    // 加载分组列表到服务创建表单中
+    loadGroupsForSelect();
 });
 
 // 加载服务列表
@@ -835,6 +881,7 @@ function startNewService() {
     let args = [];
     let auto_restart = autoRestart.checked;
     let remark = document.getElementById('service-remark')?.value || "";
+    let group_id = serviceGroup?.value || "";
 
     if (serviceMode.value === 'basic') {
         // 基础模式，构建参数列表
@@ -859,7 +906,8 @@ function startNewService() {
             body: JSON.stringify({
                 args: args,
                 auto_restart: auto_restart,
-                remark: remark
+                remark: remark,
+                group_id: group_id
             })
         })
         .then(response => response.json())
@@ -872,6 +920,9 @@ function startNewService() {
                 newServiceForm.reset();
                 // 手动清空 targetIp，因为 reset 可能对后面添加的字段无效
                 if (targetIp) targetIp.value = '';
+
+                // 重新加载分组选择框
+                loadGroupsForSelect();
             } else {
                 alert('服务启动失败：' + (data.error || '未知错误'));
             }
@@ -1869,6 +1920,7 @@ function hideAllPanels() {
     helpPanel.style.display = 'none';
     templatesPanel.style.display = 'none';
     iyuuPanel.style.display = 'none';
+    groupsPanel.style.display = 'none';
 }
 
 // 添加Authorization头到fetch请求
@@ -2491,4 +2543,395 @@ function showMainInterface() {
     if (!window.refreshTimer) {
         window.refreshTimer = setInterval(loadServices, 10000);
     }
+}
+
+// ==================== 分组管理功能 ====================
+
+// 显示分组管理面板
+function showGroupsPanel() {
+    previousView = {
+        servicesPanel: servicesPanel.style.display,
+        newServicePanel: newServicePanel.style.display,
+        serviceDetailsPanel: serviceDetailsPanel.style.display,
+        helpPanel: helpPanel.style.display,
+        templatesPanel: templatesPanel.style.display,
+        iyuuPanel: iyuuPanel.style.display
+    };
+
+    // 隐藏其他面板
+    hideAllPanels();
+
+    // 显示分组面板
+    groupsPanel.style.display = 'block';
+
+    // 加载分组列表
+    loadGroups();
+    loadGroupsForBatchOperations();
+}
+
+// 隐藏分组管理面板
+function hideGroupsPanel() {
+    groupsPanel.style.display = 'none';
+
+    if (previousView) {
+        servicesPanel.style.display = previousView.servicesPanel;
+        newServicePanel.style.display = previousView.newServicePanel;
+        serviceDetailsPanel.style.display = previousView.serviceDetailsPanel;
+        helpPanel.style.display = previousView.helpPanel;
+        templatesPanel.style.display = previousView.templatesPanel;
+        iyuuPanel.style.display = previousView.iyuuPanel;
+    } else {
+        showServicesList();
+    }
+}
+
+// 加载分组列表
+function loadGroups() {
+    fetchWithAuth(API.groups)
+        .then(response => response.json())
+        .then(data => {
+            if (data.groups) {
+                renderGroupsList(data.groups);
+            } else {
+                showNotification('加载分组列表失败', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('加载分组列表出错:', error);
+            groupsList.innerHTML = '<div class="loading">加载分组失败</div>';
+        });
+}
+
+// 渲染分组列表
+function renderGroupsList(groups) {
+    if (!groups || groups.length === 0) {
+        groupsList.innerHTML = '<div class="empty-services-message">暂无分组</div>';
+        return;
+    }
+
+    groupsList.innerHTML = '';
+    const template = document.getElementById('group-card-template');
+
+    groups.forEach(group => {
+        const card = document.importNode(template.content, true);
+        const groupCard = card.querySelector('.group-card');
+
+        // 设置分组数据
+        groupCard.dataset.groupId = group.id;
+        card.querySelector('.group-name').textContent = group.name;
+        card.querySelector('.group-service-count').textContent = `${group.service_count || 0} 个服务`;
+
+        // 渲染服务列表
+        const servicesList = card.querySelector('.group-services-list');
+        if (group.services && group.services.length > 0) {
+            servicesList.innerHTML = '';
+            group.services.forEach(service => {
+                const serviceItem = document.createElement('div');
+                serviceItem.className = 'group-service-item';
+                serviceItem.innerHTML = `
+                    <span>${formatAddressShort(service.mapped_address || '未映射')}</span>
+                    <button class="btn btn-small btn-secondary move-service-btn" 
+                            data-service-id="${service.id}" data-current-group="${group.id}">
+                        移动
+                    </button>
+                `;
+                servicesList.appendChild(serviceItem);
+            });
+        } else {
+            servicesList.innerHTML = '<div style="color: #666; font-style: italic;">暂无服务</div>';
+        }
+
+        // 添加事件监听器
+        const renameBtn = card.querySelector('.rename-group-btn');
+        const deleteBtn = card.querySelector('.delete-group-btn');
+
+        renameBtn.addEventListener('click', function () {
+            renameGroup(group.id, group.name);
+        });
+
+        deleteBtn.addEventListener('click', function () {
+            if (confirm('确定要删除此分组吗？分组中的服务将移动到默认分组。')) {
+                deleteGroup(group.id);
+            }
+        });
+
+        // 为移动按钮添加事件监听器
+        card.querySelectorAll('.move-service-btn').forEach(btn => {
+            btn.addEventListener('click', function () {
+                const serviceId = this.dataset.serviceId;
+                const currentGroup = this.dataset.currentGroup;
+                showMoveServiceDialog(serviceId, currentGroup);
+            });
+        });
+
+        groupsList.appendChild(card);
+    });
+}
+
+// 创建新分组
+function createGroup() {
+    const groupName = newGroupName.value.trim();
+
+    if (!groupName) {
+        showNotification('请输入分组名称', 'warning');
+        return;
+    }
+
+    fetchWithAuth(API.createGroup, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                name: groupName
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification('分组创建成功', 'success');
+                newGroupName.value = '';
+                loadGroups();
+                loadGroupsForSelect();
+                loadGroupsForBatchOperations();
+            } else {
+                showNotification('创建分组失败：' + (data.error || '未知错误'), 'error');
+            }
+        })
+        .catch(error => {
+            console.error('创建分组出错:', error);
+            showNotification('创建分组时发生错误', 'error');
+        });
+}
+
+// 重命名分组
+function renameGroup(groupId, currentName) {
+    const newName = prompt('请输入新的分组名称:', currentName);
+
+    if (!newName || newName.trim() === '' || newName.trim() === currentName) {
+        return;
+    }
+
+    fetchWithAuth(API.renameGroup, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                id: groupId,
+                name: newName.trim()
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification('分组重命名成功', 'success');
+                loadGroups();
+                loadGroupsForSelect();
+                loadGroupsForBatchOperations();
+            } else {
+                showNotification('重命名分组失败：' + (data.error || '未知错误'), 'error');
+            }
+        })
+        .catch(error => {
+            console.error('重命名分组出错:', error);
+            showNotification('重命名分组时发生错误', 'error');
+        });
+}
+
+// 删除分组
+function deleteGroup(groupId) {
+    fetchWithAuth(API.deleteGroup, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                id: groupId
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification('分组删除成功', 'success');
+                loadGroups();
+                loadGroupsForSelect();
+                loadGroupsForBatchOperations();
+            } else {
+                showNotification('删除分组失败：' + (data.error || '未知错误'), 'error');
+            }
+        })
+        .catch(error => {
+            console.error('删除分组出错:', error);
+            showNotification('删除分组时发生错误', 'error');
+        });
+}
+
+// 显示移动服务对话框
+function showMoveServiceDialog(serviceId, currentGroupId) {
+    // 获取分组列表
+    fetchWithAuth(API.groups)
+        .then(response => response.json())
+        .then(data => {
+            if (data.groups) {
+                const groups = data.groups;
+                let options = '<option value="">默认分组</option>';
+
+                groups.forEach(group => {
+                    if (group.id !== currentGroupId) {
+                        options += `<option value="${group.id}">${group.name}</option>`;
+                    }
+                });
+
+                const targetGroup = prompt(`请选择目标分组:\n\n可用分组:\n${groups.filter(g => g.id !== currentGroupId).map(g => `- ${g.name}`).join('\n')}\n- 默认分组\n\n请输入分组名称(输入"默认"表示移动到默认分组):`);
+
+                if (targetGroup !== null) {
+                    let targetGroupId = '';
+
+                    if (targetGroup.trim() === '默认' || targetGroup.trim() === '') {
+                        targetGroupId = '';
+                    } else {
+                        const foundGroup = groups.find(g => g.name === targetGroup.trim());
+                        if (foundGroup) {
+                            targetGroupId = foundGroup.id;
+                        } else {
+                            showNotification('未找到指定的分组', 'warning');
+                            return;
+                        }
+                    }
+
+                    moveServiceToGroup(serviceId, targetGroupId);
+                }
+            }
+        })
+        .catch(error => {
+            console.error('获取分组列表出错:', error);
+            showNotification('获取分组列表失败', 'error');
+        });
+}
+
+// 移动服务到指定分组
+function moveServiceToGroup(serviceId, targetGroupId) {
+    fetchWithAuth(API.moveService, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                service_id: serviceId,
+                group_id: targetGroupId || ''
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification('服务移动成功', 'success');
+                loadGroups();
+                loadServices(); // 刷新主界面的服务列表
+            } else {
+                showNotification('移动服务失败：' + (data.error || '未知错误'), 'error');
+            }
+        })
+        .catch(error => {
+            console.error('移动服务出错:', error);
+            showNotification('移动服务时发生错误', 'error');
+        });
+}
+
+// 批量移动服务
+function batchMoveServices() {
+    const sourceGroupId = batchSourceGroup.value;
+    const targetGroupId = batchTargetGroup.value;
+
+    if (sourceGroupId === targetGroupId) {
+        showNotification('源分组和目标分组不能相同', 'warning');
+        return;
+    }
+
+    if (!confirm('确定要将所有服务从源分组移动到目标分组吗？')) {
+        return;
+    }
+
+    fetchWithAuth(API.batchMove, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                source_group_id: sourceGroupId || '',
+                target_group_id: targetGroupId || ''
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification(`成功移动 ${data.moved_count} 个服务`, 'success');
+                loadGroups();
+                loadServices();
+
+                // 重置选择框
+                batchSourceGroup.value = '';
+                batchTargetGroup.value = '';
+            } else {
+                showNotification('批量移动失败：' + (data.error || '未知错误'), 'error');
+            }
+        })
+        .catch(error => {
+            console.error('批量移动服务出错:', error);
+            showNotification('批量移动服务时发生错误', 'error');
+        });
+}
+
+// 加载分组到服务创建表单的选择框中
+function loadGroupsForSelect() {
+    if (!serviceGroup) return;
+
+    fetchWithAuth(API.groups)
+        .then(response => response.json())
+        .then(data => {
+            if (data.groups) {
+                serviceGroup.innerHTML = '<option value="">默认分组</option>';
+
+                data.groups.forEach(group => {
+                    const option = document.createElement('option');
+                    option.value = group.id;
+                    option.textContent = group.name;
+                    serviceGroup.appendChild(option);
+                });
+            }
+        })
+        .catch(error => {
+            console.error('加载分组列表出错:', error);
+        });
+}
+
+// 加载分组到批量操作的选择框中
+function loadGroupsForBatchOperations() {
+    if (!batchSourceGroup || !batchTargetGroup) return;
+
+    fetchWithAuth(API.groups)
+        .then(response => response.json())
+        .then(data => {
+            if (data.groups) {
+                // 清空现有选项
+                batchSourceGroup.innerHTML = '<option value="">默认分组</option>';
+                batchTargetGroup.innerHTML = '<option value="">默认分组</option>';
+
+                // 添加分组选项
+                data.groups.forEach(group => {
+                    const sourceOption = document.createElement('option');
+                    sourceOption.value = group.id;
+                    sourceOption.textContent = group.name;
+                    batchSourceGroup.appendChild(sourceOption);
+
+                    const targetOption = document.createElement('option');
+                    targetOption.value = group.id;
+                    targetOption.textContent = group.name;
+                    batchTargetGroup.appendChild(targetOption);
+                });
+            }
+        })
+        .catch(error => {
+            console.error('加载分组列表出错:', error);
+        });
 }
