@@ -1418,12 +1418,24 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                         ).encode()
                     )
                 else:
+                    # 没有设置管理员密码的情况
+                    # 检查是否有访客组，如果没有访客组，则视为管理员模式
+                    has_guest_groups = len(service_groups.get("groups", {})) > 0
                     self._set_headers()
-                    self.wfile.write(
-                        json.dumps(
-                            {"authenticated": True, "auth_required": False, "admin_mode": False}
-                        ).encode()
-                    )
+                    if has_guest_groups:
+                        # 有访客组，当前是访客模式
+                        self.wfile.write(
+                            json.dumps(
+                                {"authenticated": True, "auth_required": False, "admin_mode": False}
+                            ).encode()
+                        )
+                    else:
+                        # 没有访客组，默认管理员模式
+                        self.wfile.write(
+                            json.dumps(
+                                {"authenticated": True, "auth_required": False, "admin_mode": True}
+                            ).encode()
+                        )
             elif path == "/api/iyuu/config":
                 # 获取IYUU配置
                 self._set_headers()
@@ -1938,6 +1950,35 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                     self._error(500, "从组中移除服务失败")
             else:
                 self._error(400, "缺少必要参数")
+        elif path == "/api/groups/move-service":
+            # 移动服务到指定组
+            if "service_id" in data:
+                service_id = data["service_id"]
+                target_group_id = data.get("group_id", "")  # 允许空字符串表示移到默认组
+                
+                with service_lock:
+                    if service_id in running_services:
+                        service = running_services[service_id]
+                        # 从原来的组中移除（如果有）
+                        if hasattr(service, 'group_id') and service.group_id:
+                            ServiceGroupManager.remove_service_from_group(service.group_id, service_id)
+                        
+                        # 设置新的组ID
+                        service.group_id = target_group_id
+                        
+                        # 添加到新组（如果指定了组）
+                        if target_group_id:
+                            ServiceGroupManager.add_service_to_group(target_group_id, service_id)
+                        
+                        # 保存服务配置
+                        NatterManager.save_services()
+                        
+                        self._set_headers()
+                        self.wfile.write(json.dumps({"success": True}).encode())
+                    else:
+                        self._error(404, "服务未找到")
+            else:
+                self._error(400, "缺少service_id参数")
         elif path == "/api/auth/unified-login":
             # 统一登录验证API
             if "password" in data:
