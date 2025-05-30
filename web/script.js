@@ -1272,6 +1272,9 @@ function showServiceDetailsPanel(service) {
     // 存储当前服务数据供其他函数使用
     window.currentServiceData = service;
 
+    console.log('显示服务详情面板，服务数据:', service);
+    console.log('服务分组信息 - group_id:', service.group_id, '类型:', typeof service.group_id, 'group_name:', service.group_name);
+
     // 显示面板
     const detailsPanel = document.getElementById('service-details-panel');
     detailsPanel.style.display = 'block';
@@ -1289,6 +1292,7 @@ function showServiceDetailsPanel(service) {
     }
 
     // 加载分组选项并设置当前分组
+    console.log('准备加载分组选项，传入的group_id:', service.group_id);
     loadGroupsForServiceDetail(service.group_id);
 
     // 添加备注保存按钮事件监听
@@ -1398,6 +1402,9 @@ function updateServiceDetailsPanel(service) {
     // 存储当前服务数据供其他函数使用
     window.currentServiceData = service;
 
+    console.log('更新服务详情面板，服务数据:', service);
+    console.log('更新时的服务分组信息 - group_id:', service.group_id, '类型:', typeof service.group_id, 'group_name:', service.group_name);
+
     // 填充数据
     document.querySelectorAll('#service-id').forEach(el => el.textContent = service.id);
     document.getElementById('service-status').textContent = service.status;
@@ -1409,6 +1416,37 @@ function updateServiceDetailsPanel(service) {
     if (debugRemarkArea) {
         debugRemarkArea.value = service.remark || '';
     }
+
+    // 加载分组选项并设置当前分组（重要：确保下拉框值被刷新）
+    console.log('更新时准备加载分组选项，传入的group_id:', service.group_id);
+    loadGroupsForServiceDetail(service.group_id);
+
+    // 重新绑定分组保存按钮事件监听器（修复刷新后按钮失效的问题）
+    replaceButtonAndAddListener('save-service-group-btn', function (event) {
+        event.preventDefault();
+        const groupSelect = document.getElementById('service-group-select');
+        if (groupSelect) {
+            const newGroupId = groupSelect.value;
+            console.log('准备保存分组，服务ID:', service.id, '新分组ID:', newGroupId);
+            saveServiceGroup(service.id, newGroupId);
+        }
+    });
+
+    // 重新绑定备注保存按钮事件监听器
+    replaceButtonAndAddListener('save-debug-remark-btn', function (event) {
+        event.preventDefault();
+        if (debugRemarkArea) {
+            const debugValue = debugRemarkArea.value;
+            console.log('准备保存备注，服务ID:', service.id, '备注值:', debugValue);
+            saveServiceRemark(service.id, debugValue);
+        }
+    });
+
+    // 重新绑定推送单个服务状态按钮事件监听器
+    replaceButtonAndAddListener('push-service-now', function (event) {
+        event.preventDefault();
+        pushServiceNow(service.id);
+    });
 
     // 设置状态文本和样式
     serviceStatus.textContent = service.status;
@@ -3283,12 +3321,19 @@ function loadGroupsForBatchOperations() {
 // 加载分组到服务详情页面的选择框中
 function loadGroupsForServiceDetail(currentGroupId) {
     const groupSelect = document.getElementById('service-group-select');
-    if (!groupSelect) return;
+    if (!groupSelect) {
+        console.warn('服务分组选择框未找到');
+        return;
+    }
+
+    console.log('正在加载分组选项，当前分组ID:', currentGroupId, '类型:', typeof currentGroupId);
 
     fetchWithAuth(API.groups)
         .then(response => response.json())
         .then(data => {
             if (data.groups) {
+                console.log('获取到分组数据:', data.groups);
+
                 // 清空现有选项
                 groupSelect.innerHTML = '<option value="">默认分组</option>';
 
@@ -3297,28 +3342,95 @@ function loadGroupsForServiceDetail(currentGroupId) {
                     const option = document.createElement('option');
                     option.value = group.id;
                     option.textContent = group.name;
-
-                    // 如果是当前分组，设置为选中状态
-                    if (group.id === currentGroupId) {
-                        option.selected = true;
-                    }
-
                     groupSelect.appendChild(option);
                 });
 
-                // 如果当前服务在默认分组中，选中默认分组选项
-                if (!currentGroupId || currentGroupId === '') {
+                // 设置选中状态 - 使用更稳定的方法
+                // 等待DOM更新完成后再设置选中状态
+                setTimeout(() => {
+                    // 转换为字符串进行比较，确保类型一致
+                    const currentGroupIdStr = String(currentGroupId || '');
+                    let optionSelected = false;
+
+                    console.log('开始设置选中状态，目标分组ID（字符串）:', currentGroupIdStr);
+                    console.log('可用的选项数量:', groupSelect.options.length);
+
+                    // 遍历所有选项进行匹配
+                    for (let i = 0; i < groupSelect.options.length; i++) {
+                        const option = groupSelect.options[i];
+                        const optionValueStr = String(option.value || '');
+
+                        console.log(`选项 ${i}: 文本="${option.textContent}", 值="${optionValueStr}", 匹配结果=${optionValueStr === currentGroupIdStr}`);
+
+                        if (optionValueStr === currentGroupIdStr) {
+                            option.selected = true;
+                            groupSelect.value = option.value;
+                            optionSelected = true;
+                            console.log('✓ 设置选中分组:', option.textContent, 'ID:', option.value);
+                            break;
+                        }
+                    }
+
+                    // 如果没有匹配到任何选项，选择默认分组
+                    if (!optionSelected) {
+                        groupSelect.value = '';
+                        groupSelect.selectedIndex = 0; // 明确选择第一个选项（默认分组）
+                        console.log('✓ 设置为默认分组（未找到匹配的分组）');
+                    }
+
+                    // 最终验证和日志
+                    const finalSelectedOption = groupSelect.options[groupSelect.selectedIndex];
+                    console.log('分组下拉框设置完成:');
+                    console.log('  - 选中索引:', groupSelect.selectedIndex);
+                    console.log('  - 选中值:', groupSelect.value);
+                    console.log('  - 显示文本:', finalSelectedOption?.textContent);
+                    console.log('  - 原始目标分组ID:', currentGroupId);
+
+                    // 验证选择是否正确
+                    if (currentGroupId && String(currentGroupId) !== String(groupSelect.value)) {
+                        console.warn('⚠️ 警告：分组选择可能不正确！');
+                        console.warn('  期望的分组ID:', currentGroupId);
+                        console.warn('  实际选中的ID:', groupSelect.value);
+
+                        // 尝试二次匹配
+                        console.log('尝试二次匹配...');
+                        for (let i = 0; i < groupSelect.options.length; i++) {
+                            const option = groupSelect.options[i];
+                            // 尝试更宽松的匹配
+                            if (option.value == currentGroupId || String(option.value) == String(currentGroupId)) {
+                                option.selected = true;
+                                groupSelect.value = option.value;
+                                console.log('✓ 二次匹配成功:', option.textContent, 'ID:', option.value);
+                                break;
+                            }
+                        }
+                    }
+                }, 100); // 增加延迟到100ms确保DOM完全更新
+
+            } else {
+                console.warn('分组数据为空');
+                // 确保至少有默认分组选项
+                setTimeout(() => {
                     groupSelect.value = '';
-                }
+                    groupSelect.selectedIndex = 0;
+                }, 100);
             }
         })
         .catch(error => {
             console.error('加载分组列表出错:', error);
+            // 如果加载失败，至少保证有默认分组选项
+            groupSelect.innerHTML = '<option value="">默认分组</option>';
+            setTimeout(() => {
+                groupSelect.value = '';
+                groupSelect.selectedIndex = 0;
+            }, 100);
         });
 }
 
 // 保存服务分组
 function saveServiceGroup(serviceId, groupId) {
+    console.log('saveServiceGroup 被调用，服务ID:', serviceId, '分组ID:', groupId);
+
     fetchWithAuth(API.moveService, {
             method: 'POST',
             headers: {
@@ -3329,23 +3441,37 @@ function saveServiceGroup(serviceId, groupId) {
                 group_id: groupId || ''
             })
         })
-        .then(response => response.json())
+        .then(response => {
+            console.log('移动服务响应状态:', response.status);
+            return response.json();
+        })
         .then(data => {
+            console.log('移动服务响应数据:', data);
             if (data.success) {
-                const groupName = groupId ?
-                    document.querySelector(`#service-group-select option[value="${groupId}"]`)?.textContent || '未知分组' :
+                const groupSelect = document.getElementById('service-group-select');
+                const groupName = groupId && groupSelect ?
+                    (groupSelect.querySelector(`option[value="${groupId}"]`)?.textContent || '未知分组') :
                     '默认分组';
+
+                console.log('服务移动成功，新分组:', groupName);
                 showNotification(`服务已移动到: ${groupName}`, 'success');
 
                 // 更新当前服务数据
                 if (window.currentServiceData) {
                     window.currentServiceData.group_id = groupId;
                     window.currentServiceData.group_name = groupName;
+                    console.log('已更新当前服务数据的分组信息');
                 }
 
                 // 刷新主界面的服务列表
                 loadServices();
+
+                // 重新加载分组下拉框确保数据一致性
+                setTimeout(() => {
+                    loadGroupsForServiceDetail(groupId);
+                }, 500);
             } else {
+                console.error('移动服务失败:', data.error);
                 showNotification('更改分组失败：' + (data.error || '未知错误'), 'error');
             }
         })

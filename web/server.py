@@ -1094,7 +1094,14 @@ class NatterManager:
         """获取指定服务的信息"""
         with service_lock:
             if service_id in running_services:
-                return running_services[service_id].get_info()
+                service_info = running_services[service_id].get_info()
+                
+                # 添加分组信息（和list_services方法保持一致）
+                group_id, group_info = ServiceGroupManager.get_group_by_service(service_id)
+                service_info["group_id"] = group_id
+                service_info["group_name"] = group_info.get("name") if group_info else "默认分组"
+                
+                return service_info
         return None
 
     @staticmethod

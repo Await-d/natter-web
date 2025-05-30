@@ -6,7 +6,6 @@
       "password": "123",
       "description": "",
       "services": [
-        "1748566074944",
         "1748580209639"
       ],
       "created_at": 1748578941.060891
@@ -16,7 +15,9 @@
       "name": "演示分组",
       "password": "demo123",
       "description": "",
-      "services": [],
+      "services": [
+        "1748566074944"
+      ],
       "created_at": 1748580237.6255229
     }
   },
