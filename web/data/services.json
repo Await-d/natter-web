@@ -1,0 +1,13 @@
+{
+  "1748566074944": {
+    "args": [
+      "-p",
+      "8080"
+    ],
+    "status": "运行中",
+    "auto_restart": false,
+    "start_time": 1748566074.945345,
+    "remark": "测试服务",
+    "local_port": 8080
+  }
+}

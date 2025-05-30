@@ -621,16 +621,23 @@ class NatterService:
         self.remark = remark  # 服务备注
         self.group_id = ""  # 所属分组ID
         
+        # 初始化端口信息
+        self.local_port = None
+        self.remote_port = None
+        
         # 解析端口信息
         self.local_port, self.remote_port = self._parse_ports_from_args()
 
     def _parse_ports_from_args(self):
         """从命令参数中解析端口信息"""
+        local_port = None
+        remote_port = None
+        
         try:
             # 查找 -p 参数后面的端口号
             for i, arg in enumerate(self.cmd_args):
                 if arg == "-p" and i + 1 < len(self.cmd_args):
-                    self.local_port = int(self.cmd_args[i + 1])
+                    local_port = int(self.cmd_args[i + 1])
                     break
 
             # 在映射地址中寻找远程端口
@@ -638,13 +645,13 @@ class NatterService:
                 parts = self.mapped_address.split(":")
                 if len(parts) >= 2:
                     try:
-                        self.remote_port = int(parts[-1])
+                        remote_port = int(parts[-1])
                     except ValueError:
                         pass
         except Exception as e:
             print(f"解析端口信息出错: {e}")
 
-        return self.local_port, self.remote_port
+        return local_port, remote_port
 
     def start(self):
         """启动Natter服务"""
@@ -1967,6 +1974,17 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                     )
                     return
 
+                # 如果没有设置管理员密码且没有访客组，允许空密码或任意密码登录
+                if not ADMIN_PASSWORD and len(service_groups.get("groups", {})) == 0:
+                    # 无密码模式，直接允许访问管理界面
+                    self._set_headers()
+                    self.wfile.write(
+                        json.dumps(
+                            {"success": True, "user_type": "admin", "token": "no-auth"}
+                        ).encode()
+                    )
+                    return
+
                 # 密码不匹配
                 self._error(401, "密码错误")
             else:
@@ -2345,8 +2363,7 @@ class ServiceGroupManager:
     @staticmethod
     def get_group_by_password(password):
         """根据密码获取访客组"""
-        groups = ServiceGroupManager.load_groups()
-        for group_id, group_data in groups.items():
+        for group_id, group_data in service_groups["groups"].items():
             if group_data.get("password") == password:
                 return group_id, group_data
         return None, None
