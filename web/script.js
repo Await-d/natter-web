@@ -134,9 +134,10 @@ const API = {
     groups: '/api/groups',
     createGroup: '/api/groups/create',
     deleteGroup: '/api/groups/delete',
-    renameGroup: '/api/groups/rename',
+    renameGroup: '/api/groups/update',
     moveService: '/api/groups/move-service',
-    batchMove: '/api/groups/batch-move'
+    batchMove: '/api/groups/batch-move',
+    updateGroup: '/api/groups/update'
 };
 
 // 工具状态信息
@@ -283,6 +284,16 @@ document.addEventListener('DOMContentLoaded', function () {
     testIyuuPush = document.getElementById('test-iyuu-push');
     saveIyuuSettings = document.getElementById('save-iyuu-settings');
     backFromIyuuBtn = document.getElementById('back-from-iyuu-btn');
+
+    // 分组管理相关元素 - 重新获取确保元素存在
+    groupsManagementBtn = document.getElementById('groups-management-btn');
+    groupsList = document.getElementById('groups-list');
+    newGroupName = document.getElementById('new-group-name');
+    addGroupBtn = document.getElementById('add-group-btn');
+    batchSourceGroup = document.getElementById('batch-source-group');
+    batchTargetGroup = document.getElementById('batch-target-group');
+    batchMoveBtn = document.getElementById('batch-move-btn');
+    backFromGroupsBtn = document.getElementById('back-from-groups-btn');
 
     // 新增的IYUU相关元素
     const addScheduleTimeBtn = document.getElementById('add-schedule-time');
@@ -575,6 +586,22 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    // 分组密码编辑对话框按钮事件监听器
+    const confirmEditPasswordBtn = document.getElementById('confirm-edit-password');
+    const cancelEditPasswordBtn = document.getElementById('cancel-edit-password');
+
+    if (confirmEditPasswordBtn) {
+        confirmEditPasswordBtn.addEventListener('click', function () {
+            confirmEditPassword();
+        });
+    }
+
+    if (cancelEditPasswordBtn) {
+        cancelEditPasswordBtn.addEventListener('click', function () {
+            cancelEditPassword();
+        });
+    }
+
     // 添加删除服务按钮的事件监听
     if (deleteServiceBtn) {
         deleteServiceBtn.addEventListener('click', function () {
@@ -670,17 +697,41 @@ document.addEventListener('DOMContentLoaded', function () {
         groupsManagementBtn.addEventListener('click', function () {
             showGroupsPanel();
         });
+        console.log('分组管理按钮事件监听器已绑定');
+    } else {
+        console.error('找不到分组管理按钮元素');
     }
 
     if (addGroupBtn) {
         addGroupBtn.addEventListener('click', function () {
+            console.log('添加分组按钮被点击');
             createGroup();
         });
+        console.log('添加分组按钮事件监听器已绑定');
+    } else {
+        console.error('找不到添加分组按钮元素');
     }
 
     if (batchMoveBtn) {
         batchMoveBtn.addEventListener('click', function () {
             batchMoveServices();
+        });
+        console.log('批量移动按钮事件监听器已绑定');
+    } else {
+        console.error('找不到批量移动按钮元素');
+    }
+
+    // 添加源分组选择change事件监听器
+    if (batchSourceGroup) {
+        batchSourceGroup.addEventListener('change', function () {
+            updateBatchSourcePreview();
+        });
+    }
+
+    // 添加目标分组选择change事件监听器
+    if (batchTargetGroup) {
+        batchTargetGroup.addEventListener('change', function () {
+            updateBatchTargetPreview();
         });
     }
 
@@ -688,6 +739,9 @@ document.addEventListener('DOMContentLoaded', function () {
         backFromGroupsBtn.addEventListener('click', function () {
             hideGroupsPanel();
         });
+        console.log('返回按钮事件监听器已绑定');
+    } else {
+        console.error('找不到返回按钮元素');
     }
 
     // 加载分组列表到服务创建表单中
@@ -729,24 +783,38 @@ function renderServicesList(services) {
         serviceCard.dataset.id = service.id;
         serviceCard.dataset.status = service.status === '运行中' ? 'running' : 'stopped';
 
-        // 填充数据
-        card.querySelector('.service-mapped-address').textContent = formatAddressShort(service.mapped_address || '未映射');
-        card.querySelector('.service-status').textContent = service.status;
-        card.querySelector('.service-status').className = `service-status service-status-${service.status === '运行中' ? 'running' : 'stopped'}`;
-        card.querySelector('.service-address').textContent = service.mapped_address || '未映射';
-        card.querySelector('.service-cmd-text').textContent = service.cmd_args.join(' ');
+        // 填充服务名称和状态
+        const remarkDisplay = card.querySelector('.service-remark-display');
+        remarkDisplay.textContent = service.remark || `服务 ${service.id}`;
 
-        // 设置备注
-        const remarkText = card.querySelector('.service-remark-text');
-        remarkText.textContent = service.remark || '无';
+        const statusElement = card.querySelector('.service-status');
+        statusElement.textContent = service.status;
+        statusElement.className = `service-status service-status-${service.status === '运行中' ? 'running' : 'stopped'}`;
 
-        // 如果有备注，显示备注行，否则隐藏
-        const remarkRow = card.querySelector('.service-remark');
-        remarkRow.style.display = service.remark ? 'block' : 'none';
+        // 填充映射地址
+        const addressElement = card.querySelector('.service-address');
+        const mappedAddress = service.mapped_address || '未映射';
+        addressElement.textContent = mappedAddress;
 
-        // 设置分组显示
-        const groupText = card.querySelector('.service-group-text');
-        groupText.textContent = service.group_name || '默认分组';
+        // 设置快速跳转按钮
+        const quickJumpBtn = card.querySelector('.quick-jump-btn');
+        if (mappedAddress && mappedAddress !== '未映射' && mappedAddress.includes(':')) {
+            quickJumpBtn.style.display = 'inline-block';
+            quickJumpBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const url = mappedAddress.startsWith('http') ? mappedAddress : `http://${mappedAddress}`;
+                window.open(url, '_blank');
+            });
+        } else {
+            quickJumpBtn.style.display = 'none';
+        }
+
+        // 设置复制地址按钮
+        const copyBtn = card.querySelector('.copy-address-btn');
+        copyBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            copyToClipboard(mappedAddress, copyBtn);
+        });
 
         // 设置快速状态信息
         const lanStatusEl = card.querySelector('.lan-status');
@@ -772,31 +840,41 @@ function renderServicesList(services) {
             }
         }
 
+        // 设置分组信息
+        const groupText = card.querySelector('.service-group-text');
+        groupText.textContent = service.group_name || '默认分组';
+
+        // 设置命令信息
+        const cmdText = card.querySelector('.service-cmd-text');
+        cmdText.textContent = service.cmd_args ? service.cmd_args.join(' ') : '未知';
+
         // 添加事件监听器
         card.querySelector('.service-detail-btn').addEventListener('click', () => {
             showServiceDetails(service.id);
         });
 
-        // 添加快速状态查看按钮事件
+        // 快速状态查看按钮
         card.querySelector('.service-quick-status-btn').addEventListener('click', (e) => {
             e.stopPropagation();
             showQuickStatusView(service);
         });
 
+        // 快速重启按钮
+        card.querySelector('.service-restart-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            restartService(service.id);
+        });
+
+        // 停止按钮
         card.querySelector('.service-stop-btn').addEventListener('click', (e) => {
             e.stopPropagation();
             stopService(service.id);
         });
 
+        // 删除按钮
         card.querySelector('.service-delete-btn').addEventListener('click', (e) => {
             e.stopPropagation();
             deleteService(service.id);
-        });
-
-        card.querySelector('.copy-address-btn').addEventListener('click', (e) => {
-            e.stopPropagation();
-            const button = e.currentTarget;
-            copyToClipboard(service.mapped_address, button);
         });
 
         // 添加到列表
@@ -1163,11 +1241,20 @@ function loadServiceDetails(id) {
         clearInterval(refreshIntervalId);
     }
 
+    // 检查当前是否在服务详情页面，如果不在则不更新
+    const detailsPanel = document.getElementById('service-details-panel');
+    if (!detailsPanel || detailsPanel.style.display === 'none') {
+        return;
+    }
+
     fetchWithAuth(`${API.service}?id=${id}`)
         .then(response => response.json())
         .then(data => {
             if (data.service) {
-                showServiceDetailsPanel(data.service);
+                // 再次检查，确保在异步加载过程中用户没有切换页面
+                if (detailsPanel && detailsPanel.style.display !== 'none') {
+                    updateServiceDetailsPanel(data.service);
+                }
             } else {
                 showNotification('加载服务详情失败', 'error');
             }
@@ -1306,6 +1393,87 @@ function showServiceDetailsPanel(service) {
     startDetailRefresh();
 }
 
+// 更新服务详情面板内容（不强制显示面板）
+function updateServiceDetailsPanel(service) {
+    // 存储当前服务数据供其他函数使用
+    window.currentServiceData = service;
+
+    // 填充数据
+    document.querySelectorAll('#service-id').forEach(el => el.textContent = service.id);
+    document.getElementById('service-status').textContent = service.status;
+    document.getElementById('service-mapped-address').textContent = service.mapped_address || '未映射';
+    document.getElementById('service-cmd-args').textContent = service.cmd_args.join(' ');
+
+    // 设置备注区域
+    const debugRemarkArea = document.getElementById('remark-debug-area');
+    if (debugRemarkArea) {
+        debugRemarkArea.value = service.remark || '';
+    }
+
+    // 设置状态文本和样式
+    serviceStatus.textContent = service.status;
+    setStatusColor(serviceStatus, service.status);
+
+    // 设置映射地址
+    serviceMappedAddress.textContent = service.mapped_address || '未映射';
+
+    // 设置命令参数
+    serviceCmdArgs.textContent = service.cmd_args.join(' ');
+
+    // 更新详情标签中的LAN/WAN状态和NAT类型
+    lanStatus.textContent = service.lan_status || '未知';
+    wanStatus.textContent = service.wan_status || '未知';
+    natType.textContent = service.nat_type || '未知';
+
+    // 设置LAN/WAN状态颜色
+    setStatusColor(lanStatus, service.lan_status);
+    setStatusColor(wanStatus, service.wan_status);
+
+    // 更新状态面板中的可用性信息
+    const statusPanelLanStatus = document.querySelector('.status-panel #lan-status');
+    const statusPanelWanStatus = document.querySelector('.status-panel #wan-status');
+    const statusPanelNatType = document.querySelector('.status-panel #nat-type');
+
+    if (statusPanelLanStatus) {
+        statusPanelLanStatus.textContent = service.lan_status || '未知';
+        setStatusColor(statusPanelLanStatus, service.lan_status);
+    }
+
+    if (statusPanelWanStatus) {
+        statusPanelWanStatus.textContent = service.wan_status || '未知';
+        setStatusColor(statusPanelWanStatus, service.wan_status);
+    }
+
+    if (statusPanelNatType) {
+        statusPanelNatType.textContent = service.nat_type || '未知';
+    }
+
+    // 设置自动重启状态
+    if (autoRestartToggle) {
+        autoRestartToggle.checked = service.auto_restart;
+        autoRestartStatus.textContent = service.auto_restart ? '已启用' : '已禁用';
+
+        // 添加状态样式类
+        autoRestartStatus.className = service.auto_restart ? 'status-enabled' : 'status-disabled';
+    }
+
+    // 显示输出日志
+    updateServiceLog(service.last_output);
+
+    // 设置服务详情页标题
+    document.querySelector('#service-details-panel h2').textContent =
+        `服务详情: ${formatAddressShort(service.mapped_address || '未映射')}`;
+
+    // 如果服务已停止，禁用停止按钮，但启用重启按钮
+    if (service.status === '已停止' || !service.running) {
+        stopServiceBtn.disabled = true;
+        restartServiceBtn.disabled = false; // 允许重启已停止的服务
+    } else {
+        stopServiceBtn.disabled = false;
+        restartServiceBtn.disabled = false;
+    }
+}
+
 // 辅助函数：替换按钮并添加新的事件监听器
 function replaceButtonAndAddListener(buttonId, clickHandler) {
     const button = document.getElementById(buttonId);
@@ -1380,14 +1548,17 @@ function updateAllRemarkDisplays(serviceId, remarkValue) {
 
 // 设置状态显示的颜色
 function setStatusColor(element, status) {
-    element.className = 'status-value';
+    // 清除之前的状态类
+    element.classList.remove('status-good', 'status-warning', 'status-error', 'status-info');
 
-    if (status === 'OPEN') {
-        element.classList.add('text-success');
-    } else if (status === 'CLOSED') {
-        element.classList.add('text-danger');
-    } else if (status === 'UNKNOWN') {
-        element.classList.add('text-warning');
+    if (status === 'OPEN' || status === '可达' || status === '正常') {
+        element.classList.add('status-good');
+    } else if (status === 'CLOSED' || status === '不可达' || status === '错误') {
+        element.classList.add('status-error');
+    } else if (status === 'UNKNOWN' || status === '未知' || status === '检测中') {
+        element.classList.add('status-warning');
+    } else {
+        element.classList.add('status-info');
     }
 }
 
@@ -1902,43 +2073,64 @@ function checkAuthRequired() {
         })
         .then(data => {
             const authRequired = data.auth_required;
+            const authenticated = data.authenticated;
+
+            console.log('认证检查结果:', {
+                authRequired,
+                authenticated,
+                hasToken: !!authToken
+            });
+
             if (authRequired) {
-                // 如果需要认证但未认证，则重定向到登录页面
-                if (!isAuthenticated && !authToken) {
+                // 如果需要认证
+                if (!authenticated && !authToken) {
+                    // 未认证且无token，重定向到登录页面
+                    console.log('需要认证但未登录，重定向到登录页面');
                     window.location.href = 'login.html';
                     return;
-                } else if (authToken) {
-                    // 已有token，尝试使用
+                } else if (authenticated || authToken) {
+                    // 已认证或有token，显示管理员功能
+                    console.log('管理员已认证，显示管理员功能按钮');
                     isAuthenticated = true;
 
-                    // 显示登出按钮
+                    // 显示退出登录按钮
                     const logoutBtn = document.getElementById('logout-btn');
                     if (logoutBtn) {
-                        logoutBtn.style.display = 'block';
+                        logoutBtn.style.display = 'inline-flex';
+                        console.log('显示退出登录按钮');
                     }
 
                     // 显示IYUU推送设置按钮
                     const iyuuSettingsBtn = document.getElementById('iyuu-settings-btn');
                     if (iyuuSettingsBtn) {
-                        iyuuSettingsBtn.style.display = 'block';
+                        iyuuSettingsBtn.style.display = 'inline-flex';
+                        console.log('显示IYUU推送设置按钮');
                     }
 
                     showServicesList();
                 }
             } else {
-                // 不需要认证
+                // 不需要认证，但仍然显示功能按钮
+                console.log('不需要认证，显示功能按钮');
                 isAuthenticated = true;
 
-                // 隐藏登出按钮，因为不需要认证
+                // 如果用户已认证，显示退出按钮
+                const token = localStorage.getItem('natter_auth_token');
                 const logoutBtn = document.getElementById('logout-btn');
                 if (logoutBtn) {
-                    logoutBtn.style.display = 'none';
+                    if (token && authenticated) {
+                        logoutBtn.style.display = 'inline-flex';
+                        console.log('显示退出登录按钮（用户已认证但系统不强制要求认证）');
+                    } else {
+                        logoutBtn.style.display = 'none';
+                    }
                 }
 
                 // 显示IYUU推送设置按钮（即使不需要认证也可以使用推送功能）
                 const iyuuSettingsBtn = document.getElementById('iyuu-settings-btn');
                 if (iyuuSettingsBtn) {
-                    iyuuSettingsBtn.style.display = 'block';
+                    iyuuSettingsBtn.style.display = 'inline-flex';
+                    console.log('显示IYUU推送设置按钮（无认证模式）');
                 }
 
                 showServicesList();
@@ -1975,6 +2167,19 @@ function logout() {
 function hideAllPanels() {
     servicesPanel.style.display = 'none';
     newServicePanel.style.display = 'none';
+
+    // 如果隐藏服务详情面板，清理相关定时器
+    if (serviceDetailsPanel.style.display !== 'none') {
+        if (refreshIntervalId) {
+            clearInterval(refreshIntervalId);
+            refreshIntervalId = null;
+        }
+        if (runtimeIntervalId) {
+            clearInterval(runtimeIntervalId);
+            runtimeIntervalId = null;
+        }
+    }
+
     serviceDetailsPanel.style.display = 'none';
     helpPanel.style.display = 'none';
     templatesPanel.style.display = 'none';
@@ -2592,6 +2797,23 @@ function checkAuth() {
 
 // 显示主界面
 function showMainInterface() {
+    // 显示退出登录按钮（如果用户已认证）
+    const token = localStorage.getItem('natter_auth_token');
+    if (token) {
+        const logoutBtn = document.getElementById('logout-btn');
+        if (logoutBtn) {
+            logoutBtn.style.display = 'inline-flex';
+            console.log('显示退出登录按钮（已认证用户）');
+        }
+
+        // 显示IYUU推送设置按钮
+        const iyuuSettingsBtn = document.getElementById('iyuu-settings-btn');
+        if (iyuuSettingsBtn) {
+            iyuuSettingsBtn.style.display = 'inline-flex';
+            console.log('显示IYUU推送设置按钮');
+        }
+    }
+
     // 加载服务列表
     loadServices();
 
@@ -2680,6 +2902,11 @@ function renderGroupsList(groups) {
         card.querySelector('.group-name').textContent = group.name;
         card.querySelector('.group-service-count').textContent = `${group.service_count || 0} 个服务`;
 
+        // 设置密码显示（需要从后端获取完整的分组信息）
+        const passwordValue = card.querySelector('.password-value');
+        passwordValue.dataset.password = group.password || '';
+        passwordValue.textContent = '••••••••'; // 默认隐藏
+
         // 渲染服务列表
         const servicesList = card.querySelector('.group-services-list');
         if (group.services && group.services.length > 0) {
@@ -2700,7 +2927,27 @@ function renderGroupsList(groups) {
             servicesList.innerHTML = '<div style="color: #666; font-style: italic;">暂无服务</div>';
         }
 
-        // 添加事件监听器
+        // 添加密码相关事件监听器
+        const passwordToggleBtn = card.querySelector('.password-toggle-btn');
+        const viewPasswordBtn = card.querySelector('.view-password-btn');
+        const editPasswordBtn = card.querySelector('.edit-password-btn');
+
+        // 密码显示/隐藏切换
+        passwordToggleBtn.addEventListener('click', function () {
+            togglePasswordVisibility(passwordValue);
+        });
+
+        // 查看密码（快速显示3秒后自动隐藏）
+        viewPasswordBtn.addEventListener('click', function () {
+            showPasswordTemporarily(passwordValue);
+        });
+
+        // 编辑密码
+        editPasswordBtn.addEventListener('click', function () {
+            editGroupPassword(group.id, group.name, group.password || '');
+        });
+
+        // 添加原有事件监听器
         const renameBtn = card.querySelector('.rename-group-btn');
         const deleteBtn = card.querySelector('.delete-group-btn');
 
@@ -2729,12 +2976,39 @@ function renderGroupsList(groups) {
 
 // 创建新分组
 function createGroup() {
-    const groupName = newGroupName.value.trim();
+    // 确保DOM元素存在
+    const groupNameElement = document.getElementById('new-group-name');
+    const groupPasswordElement = document.getElementById('new-group-password');
+
+    if (!groupNameElement) {
+        console.error('找不到分组名称输入框元素');
+        showNotification('页面元素错误，请刷新页面重试', 'error');
+        return;
+    }
+
+    if (!groupPasswordElement) {
+        console.error('找不到分组密码输入框元素');
+        showNotification('页面元素错误，请刷新页面重试', 'error');
+        return;
+    }
+
+    const groupName = groupNameElement.value.trim();
+    const groupPassword = groupPasswordElement.value.trim();
+
+    console.log('创建分组 - 分组名称:', groupName);
+    console.log('创建分组 - 密码长度:', groupPassword.length);
 
     if (!groupName) {
         showNotification('请输入分组名称', 'warning');
         return;
     }
+
+    if (!groupPassword) {
+        showNotification('请输入分组密码', 'warning');
+        return;
+    }
+
+    console.log('发送创建分组请求...');
 
     fetchWithAuth(API.createGroup, {
             method: 'POST',
@@ -2742,14 +3016,17 @@ function createGroup() {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                name: groupName
+                name: groupName,
+                password: groupPassword
             })
         })
         .then(response => response.json())
         .then(data => {
-            if (data.success) {
+            console.log('创建分组响应:', data);
+            if (data.group_id) {
                 showNotification('分组创建成功', 'success');
-                newGroupName.value = '';
+                groupNameElement.value = '';
+                groupPasswordElement.value = '';
                 loadGroups();
                 loadGroupsForSelect();
                 loadGroupsForBatchOperations();
@@ -2777,7 +3054,7 @@ function renameGroup(groupId, currentName) {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                id: groupId,
+                group_id: groupId,
                 name: newName.trim()
             })
         })
@@ -2806,7 +3083,7 @@ function deleteGroup(groupId) {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                id: groupId
+                group_id: groupId
             })
         })
         .then(response => response.json())
@@ -2972,22 +3249,30 @@ function loadGroupsForBatchOperations() {
         .then(response => response.json())
         .then(data => {
             if (data.groups) {
-                // 清空现有选项
-                batchSourceGroup.innerHTML = '<option value="">默认分组</option>';
-                batchTargetGroup.innerHTML = '<option value="">默认分组</option>';
+                // 清空现有选项并添加默认选项
+                batchSourceGroup.innerHTML = '<option value="">选择源分组...</option>';
+                batchTargetGroup.innerHTML = '<option value="">选择目标分组...</option>';
 
-                // 添加分组选项
+                // 添加默认分组选项
+                batchSourceGroup.innerHTML += '<option value="">默认分组</option>';
+                batchTargetGroup.innerHTML += '<option value="">默认分组</option>';
+
+                // 添加其他分组选项
                 data.groups.forEach(group => {
                     const sourceOption = document.createElement('option');
                     sourceOption.value = group.id;
-                    sourceOption.textContent = group.name;
+                    sourceOption.textContent = `${group.name} (${group.service_count} 个服务)`;
                     batchSourceGroup.appendChild(sourceOption);
 
                     const targetOption = document.createElement('option');
                     targetOption.value = group.id;
-                    targetOption.textContent = group.name;
+                    targetOption.textContent = `${group.name} (${group.service_count} 个服务)`;
                     batchTargetGroup.appendChild(targetOption);
                 });
+
+                // 重置预览显示
+                updateBatchSourcePreview();
+                updateBatchTargetPreview();
             }
         })
         .catch(error => {
@@ -3087,4 +3372,243 @@ function showQuickStatusView(service) {
     `;
 
     showNotification(statusInfo, 'info', 8000);
+}
+
+// 添加源分组选择change事件监听器
+function updateBatchSourcePreview() {
+    const sourceGroupId = batchSourceGroup.value;
+    const previewContainer = document.getElementById('source-services-preview');
+
+    if (!sourceGroupId) {
+        previewContainer.innerHTML = '<small>请先选择源分组</small>';
+        updateBatchPreview();
+        return;
+    }
+
+    // 显示加载状态
+    previewContainer.innerHTML = '<small>加载中...</small>';
+
+    // 获取分组中的服务
+    fetchWithAuth(`${API.groups}/services?group_id=${sourceGroupId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.services && data.services.length > 0) {
+                let html = `<div class="services-preview-list">`;
+                html += `<strong>包含 ${data.services.length} 个服务:</strong>`;
+
+                data.services.forEach(service => {
+                    const address = formatAddressShort(service.mapped_address || '未映射');
+                    html += `
+                        <div class="service-preview-item">
+                            <span class="service-preview-address">${address}</span>
+                            <span class="service-preview-status">${service.status}</span>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+                previewContainer.innerHTML = html;
+            } else {
+                previewContainer.innerHTML = '<small style="color: #999;">该分组中暂无服务</small>';
+            }
+            updateBatchPreview();
+        })
+        .catch(error => {
+            console.error('获取源分组服务出错:', error);
+            previewContainer.innerHTML = '<small style="color: #e74c3c;">加载失败</small>';
+            updateBatchPreview();
+        });
+}
+
+// 更新目标分组预览
+function updateBatchTargetPreview() {
+    const targetGroupId = batchTargetGroup.value;
+    const infoContainer = document.getElementById('target-services-info');
+
+    if (!targetGroupId) {
+        infoContainer.innerHTML = '<small>请先选择目标分组</small>';
+        updateBatchPreview();
+        return;
+    }
+
+    // 获取目标分组信息
+    fetchWithAuth(API.groups)
+        .then(response => response.json())
+        .then(data => {
+            if (data.groups) {
+                const targetGroup = data.groups.find(g => g.id === targetGroupId);
+                if (targetGroup) {
+                    infoContainer.innerHTML = `
+                        <strong>${targetGroup.name}</strong><br>
+                        <small>当前包含 ${targetGroup.service_count} 个服务</small>
+                    `;
+                } else {
+                    infoContainer.innerHTML = '<small>默认分组</small>';
+                }
+            }
+            updateBatchPreview();
+        })
+        .catch(error => {
+            console.error('获取目标分组信息出错:', error);
+            infoContainer.innerHTML = '<small style="color: #e74c3c;">加载失败</small>';
+            updateBatchPreview();
+        });
+}
+
+// 更新批量移动预览和按钮状态
+function updateBatchPreview() {
+    const sourceGroupId = batchSourceGroup.value;
+    const targetGroupId = batchTargetGroup.value;
+    const previewContainer = document.getElementById('batch-preview');
+    const previewText = document.getElementById('preview-text');
+    const moveButton = document.getElementById('batch-move-btn');
+
+    // 检查是否选择了有效的源分组和目标分组
+    // 需要特殊处理：空字符串可能是默认分组，只有当选择的文本是提示文本时才认为未选择
+    const sourceSelectedText = batchSourceGroup.options[batchSourceGroup.selectedIndex]?.text || '';
+    const targetSelectedText = batchTargetGroup.options[batchTargetGroup.selectedIndex]?.text || '';
+
+    const hasValidSource = sourceSelectedText !== '选择源分组...';
+    const hasValidTarget = targetSelectedText !== '选择目标分组...';
+    const isDifferent = sourceGroupId !== targetGroupId || sourceSelectedText !== targetSelectedText;
+
+    if (hasValidSource && hasValidTarget && isDifferent) {
+        // 获取源分组的服务数量
+        fetchWithAuth(`${API.groups}/services?group_id=${sourceGroupId}`)
+            .then(response => response.json())
+            .then(data => {
+                const serviceCount = data.services ? data.services.length : 0;
+
+                if (serviceCount > 0) {
+                    previewText.textContent = `将要移动 ${serviceCount} 个服务`;
+                    previewContainer.style.display = 'block';
+                    moveButton.disabled = false;
+                } else {
+                    previewText.textContent = '源分组中没有服务可移动';
+                    previewContainer.style.display = 'block';
+                    moveButton.disabled = true;
+                }
+            })
+            .catch(error => {
+                console.error('获取服务数量出错:', error);
+                previewText.textContent = '无法获取服务信息';
+                previewContainer.style.display = 'block';
+                moveButton.disabled = true;
+            });
+    } else {
+        previewContainer.style.display = 'none';
+        moveButton.disabled = true;
+
+        if (hasValidSource && hasValidTarget && !isDifferent) {
+            showNotification('源分组和目标分组不能相同', 'warning', 3000);
+        }
+    }
+}
+
+// ==================== 分组密码管理功能 ====================
+
+// 切换密码显示/隐藏
+function togglePasswordVisibility(passwordElement) {
+    const password = passwordElement.dataset.password;
+    const isVisible = passwordElement.classList.contains('visible');
+
+    if (isVisible) {
+        // 隐藏密码
+        passwordElement.textContent = '••••••••';
+        passwordElement.classList.remove('visible');
+    } else {
+        // 显示密码
+        passwordElement.textContent = password || '未设置';
+        passwordElement.classList.add('visible');
+    }
+}
+
+// 临时显示密码（3秒后自动隐藏）
+function showPasswordTemporarily(passwordElement) {
+    const password = passwordElement.dataset.password;
+
+    // 显示密码
+    passwordElement.textContent = password || '未设置';
+    passwordElement.classList.add('visible');
+
+    // 3秒后自动隐藏
+    setTimeout(() => {
+        passwordElement.textContent = '••••••••';
+        passwordElement.classList.remove('visible');
+    }, 3000);
+
+    showNotification('密码已显示，3秒后自动隐藏', 'info');
+}
+
+// 编辑分组密码
+function editGroupPassword(groupId, groupName, currentPassword) {
+    const dialog = document.getElementById('edit-group-password-dialog');
+    const groupNameText = document.querySelector('#editing-group-name .group-name-text');
+    const currentPasswordText = document.getElementById('current-password-text');
+    const newPasswordInput = document.getElementById('new-group-password-input');
+
+    // 设置对话框内容
+    groupNameText.textContent = groupName;
+    currentPasswordText.textContent = currentPassword || '未设置';
+    newPasswordInput.value = '';
+
+    // 显示对话框
+    dialog.classList.add('active');
+
+    // 存储当前编辑的分组信息
+    dialog.dataset.groupId = groupId;
+    dialog.dataset.groupName = groupName;
+
+    // 聚焦到密码输入框
+    setTimeout(() => {
+        newPasswordInput.focus();
+    }, 100);
+}
+
+// 确认修改密码
+function confirmEditPassword() {
+    const dialog = document.getElementById('edit-group-password-dialog');
+    const groupId = dialog.dataset.groupId;
+    const newPasswordInput = document.getElementById('new-group-password-input');
+    const newPassword = newPasswordInput.value.trim();
+
+    if (!newPassword) {
+        showNotification('请输入新密码', 'warning');
+        return;
+    }
+
+    // 发送更新请求
+    fetchWithAuth(API.updateGroup, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                group_id: groupId,
+                password: newPassword
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification('密码修改成功', 'success');
+
+                // 关闭对话框
+                dialog.classList.remove('active');
+
+                // 重新加载分组列表以更新密码显示
+                loadGroups();
+            } else {
+                showNotification('修改密码失败：' + (data.error || '未知错误'), 'error');
+            }
+        })
+        .catch(error => {
+            console.error('修改密码出错:', error);
+            showNotification('修改密码时发生错误', 'error');
+        });
+}
+
+// 取消修改密码
+function cancelEditPassword() {
+    const dialog = document.getElementById('edit-group-password-dialog');
+    dialog.classList.remove('active');
 }

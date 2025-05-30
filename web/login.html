@@ -17,6 +17,7 @@
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
             line-height: 1.5;
@@ -27,6 +28,7 @@
         .container {
             width: 100%;
             max-width: 450px;
+            flex-shrink: 0;
         }
 
         .login-card {
@@ -236,6 +238,26 @@
             text-decoration: underline;
         }
 
+        /* Logo区域样式 */
+        .logo-section {
+            width: 100%;
+            text-align: center;
+            margin-bottom: 1rem;
+            flex-shrink: 0;
+        }
+
+        .logo-section img {
+            height: 56px;
+            max-width: 90vw;
+            filter: drop-shadow(0 2px 8px rgba(0, 230, 195, 0.3));
+            transition: all 0.3s ease;
+        }
+
+        .logo-section img:hover {
+            transform: scale(1.05);
+            filter: drop-shadow(0 4px 12px rgba(0, 230, 195, 0.5));
+        }
+
         /* 响应式设计 */
         @media (max-width: 480px) {
             body {
@@ -272,6 +294,11 @@
 </head>
 
 <body>
+    <!-- Logo区域 -->
+    <div class="logo-section">
+        <img src="await-logo.svg" alt="Await Logo" onerror="this.style.display='none';">
+    </div>
+
     <div class="container">
         <div class="login-card">
             <div class="login-header">
