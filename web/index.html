@@ -1068,6 +1068,15 @@
                         </div>
                     </div>
                     <div class="detail-row">
+                        <label>分组:</label>
+                        <div class="service-group-edit">
+                            <select id="service-group-select" class="form-control">
+                                <option value="">默认分组</option>
+                            </select>
+                            <button id="save-service-group-btn" class="btn btn-sm btn-primary">更改分组</button>
+                        </div>
+                    </div>
+                    <div class="detail-row">
                         <label>LAN状态:</label>
                         <span id="lan-status"></span>
                     </div>
@@ -1319,9 +1328,27 @@
                 </div>
                 <p class="service-cmd">命令: <span class="service-cmd-text">未知</span></p>
                 <p class="service-remark">备注: <span class="service-remark-text">无</span></p>
+                <p class="service-group">分组: <span class="service-group-text">默认分组</span></p>
+                <div class="service-quick-status">
+                    <div class="status-quick-item">
+                        <span class="status-quick-label">LAN:</span>
+                        <span class="status-quick-value lan-status">检测中</span>
+                    </div>
+                    <div class="status-quick-item">
+                        <span class="status-quick-label">WAN:</span>
+                        <span class="status-quick-value wan-status">检测中</span>
+                    </div>
+                    <div class="status-quick-item">
+                        <span class="status-quick-label">运行时间:</span>
+                        <span class="status-quick-value runtime">计算中</span>
+                    </div>
+                </div>
                 <div class="service-card-actions">
                     <button class="btn btn-secondary service-detail-btn" data-service-id="{{id}}">
                         <span class="icon icon-info"></span> 详情
+                    </button>
+                    <button class="btn btn-primary service-quick-status-btn" data-service-id="{{id}}" title="快速查看运行状态">
+                        <span class="icon icon-pulse"></span> 状态
                     </button>
                     <button class="btn btn-danger service-stop-btn" data-service-id="{{id}}">
                         <span class="icon icon-stop"></span> 停止

@@ -612,32 +612,28 @@ class NatterService:
         self.process = None
         self.start_time = None
         self.output_lines = []
-        self.status = "已停止"
-        self.mapped_address = ""
-        self.lan_status = ""
-        self.wan_status = ""
-        self.nat_type = ""
+        self.mapped_address = None
+        self.status = "初始化中"
+        self.lan_status = "未知"
+        self.wan_status = "未知"
+        self.nat_type = "未知"
         self.auto_restart = False
-        self.remark = remark  # 服务备注
-        self.group_id = ""  # 所属分组ID
-        
-        # 初始化端口信息
-        self.local_port = None
-        self.remote_port = None
-        
-        # 解析端口信息
-        self.local_port, self.remote_port = self._parse_ports_from_args()
+        self.restart_thread = None
+        self.local_port = None  # 添加本地端口属性
+        self.remote_port = None  # 添加远程端口属性
+        self.remark = remark  # 添加备注属性
+        self.last_mapped_address = None  # 记录上一次的映射地址，用于检测变更
+
+        # 尝试从命令参数中解析端口信息
+        self._parse_ports_from_args()
 
     def _parse_ports_from_args(self):
         """从命令参数中解析端口信息"""
-        local_port = None
-        remote_port = None
-        
         try:
             # 查找 -p 参数后面的端口号
             for i, arg in enumerate(self.cmd_args):
                 if arg == "-p" and i + 1 < len(self.cmd_args):
-                    local_port = int(self.cmd_args[i + 1])
+                    self.local_port = int(self.cmd_args[i + 1])
                     break
 
             # 在映射地址中寻找远程端口
@@ -645,13 +641,11 @@ class NatterService:
                 parts = self.mapped_address.split(":")
                 if len(parts) >= 2:
                     try:
-                        remote_port = int(parts[-1])
+                        self.remote_port = int(parts[-1])
                     except ValueError:
                         pass
         except Exception as e:
             print(f"解析端口信息出错: {e}")
-
-        return local_port, remote_port
 
     def start(self):
         """启动Natter服务"""
@@ -923,16 +917,6 @@ class NatterService:
         running = self.process and self.process.poll() is None
         runtime = time.time() - self.start_time if self.start_time else 0
 
-        # 获取分组名称
-        group_name = ""
-        if self.group_id:
-            try:
-                service_groups = ServiceGroupManager.load_service_groups()
-                if self.group_id in service_groups.get("groups", {}):
-                    group_name = service_groups["groups"][self.group_id].get("name", "")
-            except:
-                pass
-
         return {
             "id": self.service_id,
             "cmd_args": self.cmd_args,
@@ -947,8 +931,6 @@ class NatterService:
             "nat_type": self.nat_type,
             "auto_restart": self.auto_restart,
             "remark": self.remark,
-            "group_id": self.group_id,
-            "group_name": group_name,
         }
 
     def to_dict(self):
@@ -959,7 +941,6 @@ class NatterService:
             "auto_restart": self.auto_restart,
             "created_at": self.start_time or time.time(),
             "remark": self.remark,
-            "group_id": self.group_id,
         }
 
 
@@ -1035,19 +1016,15 @@ class TemplateManager:
 
 class NatterManager:
     @staticmethod
-    def start_service(args, auto_restart=False, remark="", group_id=""):
+    def start_service(args, auto_restart=False, remark=""):
         """启动一个新的Natter服务"""
         service_id = generate_service_id()
 
         with service_lock:
             service = NatterService(service_id, args, remark)
             service.set_auto_restart(auto_restart)
-            service.group_id = group_id  # 设置分组ID
             if service.start():
                 running_services[service_id] = service
-                # 如果指定了分组ID，将服务添加到分组中
-                if group_id:
-                    ServiceGroupManager.add_service_to_group(group_id, service_id)
                 # 保存服务配置
                 NatterManager.save_services()
                 return service_id
@@ -1405,37 +1382,21 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                 # 检查认证状态
                 if self._authenticate_token():
                     self._set_headers()
-                    self.wfile.write(json.dumps({
-                        "authenticated": True, 
-                        "admin_mode": True,
-                        "auth_required": False
-                    }).encode())
+                    self.wfile.write(json.dumps({"authenticated": True}).encode())
                 elif ADMIN_PASSWORD is not None:
                     self._set_headers()
                     self.wfile.write(
                         json.dumps(
-                            {"authenticated": False, "auth_required": True, "admin_mode": True}
+                            {"authenticated": False, "auth_required": True}
                         ).encode()
                     )
                 else:
-                    # 没有设置管理员密码的情况
-                    # 检查是否有访客组，如果没有访客组，则视为管理员模式
-                    has_guest_groups = len(service_groups.get("groups", {})) > 0
                     self._set_headers()
-                    if has_guest_groups:
-                        # 有访客组，当前是访客模式
-                        self.wfile.write(
-                            json.dumps(
-                                {"authenticated": True, "auth_required": False, "admin_mode": False}
-                            ).encode()
-                        )
-                    else:
-                        # 没有访客组，默认管理员模式
-                        self.wfile.write(
-                            json.dumps(
-                                {"authenticated": True, "auth_required": False, "admin_mode": True}
-                            ).encode()
-                        )
+                    self.wfile.write(
+                        json.dumps(
+                            {"authenticated": True, "auth_required": False}
+                        ).encode()
+                    )
             elif path == "/api/iyuu/config":
                 # 获取IYUU配置
                 self._set_headers()
@@ -1558,8 +1519,7 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                 args = data["args"]
                 auto_restart = data.get("auto_restart", False)
                 remark = data.get("remark", "")
-                group_id = data.get("group_id", "")  # 获取分组ID
-                service_id = NatterManager.start_service(args, auto_restart, remark, group_id)
+                service_id = NatterManager.start_service(args, auto_restart, remark)
                 if service_id:
                     self._set_headers()
                     self.wfile.write(json.dumps({"service_id": service_id}).encode())
@@ -1950,35 +1910,6 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                     self._error(500, "从组中移除服务失败")
             else:
                 self._error(400, "缺少必要参数")
-        elif path == "/api/groups/move-service":
-            # 移动服务到指定组
-            if "service_id" in data:
-                service_id = data["service_id"]
-                target_group_id = data.get("group_id", "")  # 允许空字符串表示移到默认组
-                
-                with service_lock:
-                    if service_id in running_services:
-                        service = running_services[service_id]
-                        # 从原来的组中移除（如果有）
-                        if hasattr(service, 'group_id') and service.group_id:
-                            ServiceGroupManager.remove_service_from_group(service.group_id, service_id)
-                        
-                        # 设置新的组ID
-                        service.group_id = target_group_id
-                        
-                        # 添加到新组（如果指定了组）
-                        if target_group_id:
-                            ServiceGroupManager.add_service_to_group(target_group_id, service_id)
-                        
-                        # 保存服务配置
-                        NatterManager.save_services()
-                        
-                        self._set_headers()
-                        self.wfile.write(json.dumps({"success": True}).encode())
-                    else:
-                        self._error(404, "服务未找到")
-            else:
-                self._error(400, "缺少service_id参数")
         elif path == "/api/auth/unified-login":
             # 统一登录验证API
             if "password" in data:
@@ -2011,17 +1942,6 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                                 "group_name": group["name"],
                                 "group_description": group.get("description", ""),
                             }
-                        ).encode()
-                    )
-                    return
-
-                # 如果没有设置管理员密码且没有访客组，允许空密码或任意密码登录
-                if not ADMIN_PASSWORD and len(service_groups.get("groups", {})) == 0:
-                    # 无密码模式，直接允许访问管理界面
-                    self._set_headers()
-                    self.wfile.write(
-                        json.dumps(
-                            {"success": True, "user_type": "admin", "token": "no-auth"}
                         ).encode()
                     )
                     return
@@ -2404,7 +2324,8 @@ class ServiceGroupManager:
     @staticmethod
     def get_group_by_password(password):
         """根据密码获取访客组"""
-        for group_id, group_data in service_groups["groups"].items():
+        groups = ServiceGroupManager.list_groups()
+        for group_id, group_data in groups.items():
             if group_data.get("password") == password:
                 return group_id, group_data
         return None, None

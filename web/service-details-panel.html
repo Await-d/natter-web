@@ -2,7 +2,7 @@
  * @Author: Await
  * @Date: 2025-04-14 18:22:39
  * @LastEditors: Await
- * @LastEditTime: 2025-05-30 08:17:44
+ * @LastEditTime: 2025-05-30 10:34:54
  * @Description: 请填写简介
 -->
 <!-- 服务详情面板 -->
@@ -45,9 +45,6 @@
                 <button id="copy-address-btn" title="复制地址" class="btn-small">
                     <i class="fas fa-copy"></i> 复制
                 </button>
-                <button id="open-address-btn" title="打开地址" class="btn-small btn-info" style="display:none;">
-                    <i class="fas fa-external-link-alt"></i> 打开
-                </button>
             </div>
             <div class="status-item">
                 <span class="status-label">命令参数:</span>
@@ -64,20 +61,6 @@
             <div class="status-item">
                 <span class="status-label">WAN状态:</span>
                 <span id="wan-status" class="status-value">未知</span>
-            </div>
-
-            <!-- 服务分组设置区域 -->
-            <div class="status-item group-setting-area">
-                <span class="status-label">所属分组:</span>
-                <div class="group-setting">
-                    <span id="current-group-display">默认分组</span>
-                    <select id="service-group-select" style="display:none;">
-                        <option value="">默认分组</option>
-                    </select>
-                    <button id="edit-group-btn" class="btn-primary btn-small">修改分组</button>
-                    <button id="save-group-btn" class="btn-success btn-small" style="display:none;">保存</button>
-                    <button id="cancel-group-btn" class="btn-secondary btn-small" style="display:none;">取消</button>
-                </div>
             </div>
 
             <!-- 备注编辑区域 -->
@@ -99,7 +82,6 @@
                         自动滚动
                     </label>
                     <button id="clear-log-btn" title="清空日志" class="btn-small">清空日志</button>
-                    <button id="refresh-log-btn" title="刷新日志" class="btn-small btn-info">刷新日志</button>
                 </div>
             </div>
             <pre id="service-output" class="log-output"></pre>

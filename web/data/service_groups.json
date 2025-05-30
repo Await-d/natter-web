@@ -1,4 +1,13 @@
 {
-  "groups": {},
-  "default_group": null
+  "groups": {
+    "1748568557891": {
+      "id": "1748568557891",
+      "name": "测试分组",
+      "password": "test123",
+      "description": "",
+      "services": [],
+      "created_at": 1748568557.891623
+    }
+  },
+  "default_group": "1748568557891"
 }

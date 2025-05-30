@@ -1299,27 +1299,91 @@ input:checked + .slider:before {
 
 .service-remark-text {
     font-style: italic;
-    color: #888;
 }
 
-.service-remark-edit {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    width: 100%;
+/* 分组显示样式 */
+.service-group {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.service-remark-edit textarea {
-    width: 100%;
+.service-group-text {
+    font-weight: 500;
+    color: #1890ff;
+}
+
+/* 快速状态查看样式 */
+.service-quick-status {
+    background-color: #f9f9f9;
+    border-radius: 6px;
     padding: 8px;
-    border-radius: 4px;
-    border: 1px solid #d9d9d9;
-    resize: vertical;
+    margin-bottom: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    border: 1px solid #e8e8e8;
 }
 
-.service-remark-edit button {
-    align-self: flex-end;
-    padding: 4px 12px;
+.status-quick-item {
+    display: flex;
+    align-items: center;
+    font-size: 12px;
+    flex: 1;
+    min-width: 80px;
+}
+
+.status-quick-label {
+    font-weight: 500;
+    margin-right: 4px;
+    color: #666;
+}
+
+.status-quick-value {
+    font-weight: 500;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 11px;
+}
+
+.status-quick-value.lan-status,
+.status-quick-value.wan-status {
+    color: white;
+    background-color: #666;
+}
+
+.status-quick-value.lan-status.text-success,
+.status-quick-value.wan-status.text-success {
+    background-color: #28a745;
+}
+
+.status-quick-value.lan-status.text-danger,
+.status-quick-value.wan-status.text-danger {
+    background-color: #dc3545;
+}
+
+.status-quick-value.lan-status.text-warning,
+.status-quick-value.wan-status.text-warning {
+    background-color: #ffc107;
+    color: #333;
+}
+
+.status-quick-value.runtime {
+    color: #1890ff;
+    background-color: rgba(24, 144, 255, 0.1);
+}
+
+/* 快速状态按钮样式 */
+.service-quick-status-btn {
+    background-color: var(--info-color) !important;
+    color: white !important;
+}
+
+.service-quick-status-btn:hover {
+    background-color: #138496 !important;
 }
 
 /* IYUU推送设置面板样式 */
@@ -1497,372 +1561,48 @@ input:checked + .slider:before {
     font-size: 16px;
 }
 
-/* 状态弹窗样式 */
-.status-modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
-    opacity: 0;
-    visibility: hidden;
-    transition: all 0.3s ease;
-}
-
-.status-modal.show {
-    opacity: 1;
-    visibility: visible;
-}
-
-.status-modal-content {
-    background: white;
-    border-radius: 12px;
-    min-width: 500px;
-    max-width: 90vw;
-    max-height: 90vh;
-    overflow-y: auto;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-    transform: scale(0.8);
-    transition: transform 0.3s ease;
-}
-
-.status-modal.show .status-modal-content {
-    transform: scale(1);
-}
-
-.status-modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 20px;
-    border-bottom: 1px solid #e0e0e0;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+/* 状态徽章样式 */
+.status-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 500;
     color: white;
-    border-radius: 12px 12px 0 0;
+    background-color: #666;
 }
 
-.status-modal-header h3 {
-    margin: 0;
-    font-size: 1.2em;
+.status-badge.status-OPEN {
+    background-color: #28a745;
 }
 
-.close-modal-btn {
-    background: none;
-    border: none;
-    color: white;
-    font-size: 24px;
-    cursor: pointer;
-    padding: 0;
-    width: 30px;
-    height: 30px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    transition: background-color 0.3s;
+.status-badge.status-CLOSED {
+    background-color: #dc3545;
 }
 
-.close-modal-btn:hover {
-    background-color: rgba(255, 255, 255, 0.2);
-}
-
-.status-modal-body {
-    padding: 20px;
-}
-
-.quick-status-info {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.status-row {
-    display: flex;
-    align-items: center;
-    padding: 8px 0;
-    border-bottom: 1px solid #f0f0f0;
-}
-
-.status-row:last-child {
-    border-bottom: none;
-}
-
-.status-row .label {
-    font-weight: 600;
-    color: #555;
-    min-width: 80px;
-    margin-right: 15px;
-}
-
-.status-row .value {
-    flex: 1;
-    word-break: break-all;
-}
-
-.status-row .value.status-running {
-    color: #28a745;
-    font-weight: 600;
-}
-
-.status-row .value.status-stopped {
-    color: #dc3545;
-    font-weight: 600;
-}
-
-.status-row .value.status-open {
-    color: #28a745;
-    font-weight: 600;
-}
-
-.status-row .value.status-closed {
-    color: #dc3545;
-    font-weight: 600;
-}
-
-.status-row .value.status-unknown {
-    color: #ffc107;
-    font-weight: 600;
-}
-
-.status-modal-footer {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 20px;
-    border-top: 1px solid #e0e0e0;
-    background-color: #f8f9fa;
-    border-radius: 0 0 12px 12px;
-}
-
-/* 分组设置样式 */
-.group-setting-area {
-    background-color: #f8f9fa;
-    border-radius: 8px;
-    padding: 10px;
-    margin: 5px 0;
-}
-
-.group-setting {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-}
-
-.group-setting select {
-    min-width: 120px;
-    padding: 4px 8px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-}
-
-.group-setting span {
-    font-weight: 600;
-    color: #667eea;
-}
-
-/* 服务分组显示样式 */
-.service-group {
-    font-size: 0.9em;
-    color: #666;
-    margin: 5px 0;
-    padding: 4px 8px;
-    background-color: #f0f7ff;
-    border-radius: 4px;
-    border-left: 3px solid #667eea;
-}
-
-.service-group-text {
-    font-weight: 600;
-    color: #667eea;
-}
-
-/* 快速状态按钮样式 */
-.quick-status-btn {
-    background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
-    color: white;
-    border: none;
-    margin-left: 5px;
-}
-
-.quick-status-btn:hover {
-    background: linear-gradient(135deg, #138496 0%, #117a8b 100%);
-    transform: translateY(-1px);
-}
-
-/* 分组管理面板样式 */
-.groups-management {
-    padding: 20px;
-}
-
-.group-input-container {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 10px;
-}
-
-.group-input-container input {
-    flex: 1;
-    padding: 8px 12px;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-}
-
-.groups-list-container h3,
-.batch-operations h3 {
-    color: #667eea;
-    margin: 20px 0 10px 0;
-    padding-bottom: 8px;
-    border-bottom: 2px solid #e0e7ff;
-}
-
-.groups-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 20px;
-    margin: 20px 0;
-}
-
-.group-card {
-    background: white;
-    border: 1px solid #e0e0e0;
-    border-radius: 12px;
-    padding: 15px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    transition: all 0.3s ease;
-}
-
-.group-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-}
-
-.group-card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 10px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid #f0f0f0;
-}
-
-.group-name {
-    font-size: 1.1em;
-    font-weight: 600;
+.status-badge.status-UNKNOWN {
+    background-color: #ffc107;
     color: #333;
 }
 
-.group-service-count {
-    font-size: 0.9em;
-    color: #666;
-    background-color: #f0f7ff;
-    padding: 2px 8px;
-    border-radius: 12px;
-}
-
-.group-services-list {
-    margin: 10px 0;
-    max-height: 150px;
-    overflow-y: auto;
-}
-
-.group-service-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 5px 0;
-    border-bottom: 1px solid #f5f5f5;
-}
-
-.group-service-item:last-child {
-    border-bottom: none;
-}
-
-.group-actions {
-    display: flex;
-    gap: 8px;
-    margin-top: 10px;
-}
-
-.batch-operations {
-    background-color: #f8f9fa;
-    padding: 15px;
-    border-radius: 8px;
-    margin: 20px 0;
-}
-
-.batch-controls {
+/* 服务分组设置样式 */
+.service-group-edit {
     display: flex;
     align-items: center;
     gap: 10px;
-    flex-wrap: wrap;
-    margin-bottom: 10px;
+    width: 100%;
 }
 
-.batch-controls select {
-    min-width: 150px;
-    padding: 8px 12px;
-    border: 1px solid #ccc;
-    border-radius: 6px;
+.service-group-edit select {
+    flex: 1;
+    padding: 6px 12px;
+    border: 1px solid #d9d9d9;
+    border-radius: 4px;
+    background-color: white;
+    font-size: 14px;
 }
 
-.batch-controls span {
-    font-size: 1.5rem;
-    color: #667eea;
-    font-weight: bold;
-}
-
-.group-actions {
-    display: flex;
-    justify-content: center;
-    margin-top: 20px;
-}
-
-/* 打开地址按钮样式 */
-#open-address-btn {
-    margin-left: 8px;
-    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-}
-
-#open-address-btn:hover {
-    background: linear-gradient(135deg, #218838 0%, #1c7d6e 100%);
-}
-
-/* 响应式设计 */
-@media (max-width: 768px) {
-    .status-modal-content {
-        min-width: auto;
-        width: 95vw;
-        margin: 20px;
-    }
-    
-    .status-row {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 5px;
-    }
-    
-    .status-row .label {
-        min-width: auto;
-        margin-right: 0;
-    }
-    
-    .groups-list {
-        grid-template-columns: 1fr;
-    }
-    
-    .batch-controls {
-        flex-direction: column;
-        align-items: stretch;
-    }
-    
-    .group-setting {
-        flex-direction: column;
-        align-items: stretch;
-    }
+.service-group-edit button {
+    padding: 6px 12px;
+    white-space: nowrap;
 }
