@@ -744,6 +744,23 @@ function renderServicesList(services) {
         const remarkRow = card.querySelector('.service-remark');
         remarkRow.style.display = service.remark ? 'block' : 'none';
 
+        // 显示分组信息
+        const serviceGroupInfo = document.createElement('p');
+        serviceGroupInfo.className = 'service-group';
+        serviceGroupInfo.innerHTML = `分组: <span class="service-group-text">${service.group_name || '默认分组'}</span>`;
+        card.querySelector('.service-card-body').appendChild(serviceGroupInfo);
+
+        // 添加快速状态查看功能
+        const quickStatusBtn = document.createElement('button');
+        quickStatusBtn.className = 'btn btn-small btn-info quick-status-btn';
+        quickStatusBtn.innerHTML = '<span class="icon icon-eye"></span> 快速状态';
+        quickStatusBtn.title = '快速查看运行状态';
+        quickStatusBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            showQuickStatus(service);
+        });
+        card.querySelector('.service-card-actions').appendChild(quickStatusBtn);
+
         // 添加事件监听器
         card.querySelector('.service-detail-btn').addEventListener('click', () => {
             showServiceDetails(service.id);
@@ -1167,6 +1184,29 @@ function showServiceDetailsPanel(service) {
         debugRemarkArea.value = service.remark || '';
     }
 
+    // 设置分组显示
+    const currentGroupDisplay = document.getElementById('current-group-display');
+    if (currentGroupDisplay) {
+        currentGroupDisplay.textContent = service.group_name || '默认分组';
+    }
+
+    // 设置打开地址按钮
+    const openAddressBtn = document.getElementById('open-address-btn');
+    if (openAddressBtn && service.mapped_address && service.mapped_address !== '未映射') {
+        openAddressBtn.style.display = 'inline-block';
+        openAddressBtn.onclick = function () {
+            openServiceAddress(service.mapped_address);
+        };
+    } else if (openAddressBtn) {
+        openAddressBtn.style.display = 'none';
+    }
+
+    // 加载分组选择框
+    loadGroupsForServiceDetail(service.group_id);
+
+    // 添加分组设置按钮事件监听
+    setupGroupEditListeners(service.id);
+
     // 添加备注保存按钮事件监听
     replaceButtonAndAddListener('save-debug-remark-btn', function (event) {
         event.preventDefault();
@@ -1182,6 +1222,14 @@ function showServiceDetailsPanel(service) {
         event.preventDefault();
         pushServiceNow(service.id);
     });
+
+    // 添加刷新日志按钮事件监听
+    const refreshLogBtn = document.getElementById('refresh-log-btn');
+    if (refreshLogBtn) {
+        refreshLogBtn.onclick = function () {
+            loadServiceDetails(service.id);
+        };
+    }
 
     // 设置状态文本和样式
     serviceStatus.textContent = service.status;
@@ -1855,6 +1903,8 @@ function checkAuthRequired() {
         })
         .then(data => {
             const authRequired = data.auth_required;
+            const logoutBtn = document.getElementById('logout-btn');
+
             if (authRequired) {
                 // 如果需要认证但未认证，则重定向到登录页面
                 if (!isAuthenticated && !authToken) {
@@ -1865,20 +1915,21 @@ function checkAuthRequired() {
                     isAuthenticated = true;
 
                     // 显示登出按钮
-                    const logoutBtn = document.getElementById('logout-btn');
                     if (logoutBtn) {
-                        logoutBtn.style.display = 'block';
+                        logoutBtn.style.display = 'inline-flex';
                     }
 
                     showServicesList();
                 }
             } else {
-                // 不需要认证
+                // 不需要认证，但如果有管理员密码设置，仍需要显示退出按钮
                 isAuthenticated = true;
 
-                // 隐藏登出按钮，因为不需要认证
-                const logoutBtn = document.getElementById('logout-btn');
-                if (logoutBtn) {
+                // 检查是否有管理员密码设置，如果有则显示退出按钮
+                if (data.admin_mode && logoutBtn) {
+                    logoutBtn.style.display = 'inline-flex';
+                } else if (logoutBtn) {
+                    // 完全无密码模式才隐藏退出按钮
                     logoutBtn.style.display = 'none';
                 }
 
@@ -2934,4 +2985,253 @@ function loadGroupsForBatchOperations() {
         .catch(error => {
             console.error('加载分组列表出错:', error);
         });
+}
+
+// 加载分组到服务详情的选择框中
+function loadGroupsForServiceDetail(currentGroupId) {
+    const serviceGroupSelect = document.getElementById('service-group-select');
+    if (!serviceGroupSelect) return;
+
+    fetchWithAuth(API.groups)
+        .then(response => response.json())
+        .then(data => {
+            if (data.groups) {
+                serviceGroupSelect.innerHTML = '<option value="">默认分组</option>';
+
+                data.groups.forEach(group => {
+                    const option = document.createElement('option');
+                    option.value = group.id;
+                    option.textContent = group.name;
+                    if (group.id === currentGroupId) {
+                        option.selected = true;
+                    }
+                    serviceGroupSelect.appendChild(option);
+                });
+            }
+        })
+        .catch(error => {
+            console.error('加载分组列表出错:', error);
+        });
+}
+
+// 设置分组编辑监听器
+function setupGroupEditListeners(serviceId) {
+    const editGroupBtn = document.getElementById('edit-group-btn');
+    const saveGroupBtn = document.getElementById('save-group-btn');
+    const cancelGroupBtn = document.getElementById('cancel-group-btn');
+    const currentGroupDisplay = document.getElementById('current-group-display');
+    const serviceGroupSelect = document.getElementById('service-group-select');
+
+    if (editGroupBtn) {
+        editGroupBtn.onclick = function () {
+            // 显示编辑状态
+            currentGroupDisplay.style.display = 'none';
+            serviceGroupSelect.style.display = 'inline-block';
+            editGroupBtn.style.display = 'none';
+            saveGroupBtn.style.display = 'inline-block';
+            cancelGroupBtn.style.display = 'inline-block';
+        };
+    }
+
+    if (cancelGroupBtn) {
+        cancelGroupBtn.onclick = function () {
+            // 取消编辑状态
+            currentGroupDisplay.style.display = 'inline';
+            serviceGroupSelect.style.display = 'none';
+            editGroupBtn.style.display = 'inline-block';
+            saveGroupBtn.style.display = 'none';
+            cancelGroupBtn.style.display = 'none';
+        };
+    }
+
+    if (saveGroupBtn) {
+        saveGroupBtn.onclick = function () {
+            const newGroupId = serviceGroupSelect.value;
+            saveServiceGroup(serviceId, newGroupId);
+        };
+    }
+}
+
+// 保存服务分组设置
+function saveServiceGroup(serviceId, groupId) {
+    fetchWithAuth(API.moveService, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                service_id: serviceId,
+                group_id: groupId || ''
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification('服务分组设置成功', 'success');
+
+                // 更新显示
+                const currentGroupDisplay = document.getElementById('current-group-display');
+                const serviceGroupSelect = document.getElementById('service-group-select');
+                const selectedOption = serviceGroupSelect.options[serviceGroupSelect.selectedIndex];
+
+                if (currentGroupDisplay) {
+                    currentGroupDisplay.textContent = selectedOption.textContent;
+                }
+
+                // 退出编辑状态
+                const editGroupBtn = document.getElementById('edit-group-btn');
+                const saveGroupBtn = document.getElementById('save-group-btn');
+                const cancelGroupBtn = document.getElementById('cancel-group-btn');
+
+                currentGroupDisplay.style.display = 'inline';
+                serviceGroupSelect.style.display = 'none';
+                editGroupBtn.style.display = 'inline-block';
+                saveGroupBtn.style.display = 'none';
+                cancelGroupBtn.style.display = 'none';
+
+                // 刷新服务列表
+                loadServices();
+            } else {
+                showNotification('设置服务分组失败：' + (data.error || '未知错误'), 'error');
+            }
+        })
+        .catch(error => {
+            console.error('设置服务分组出错:', error);
+            showNotification('设置服务分组时发生错误', 'error');
+        });
+}
+
+// 打开服务地址
+function openServiceAddress(address) {
+    if (!address || address === '未映射' || address === '等待映射...') {
+        showNotification('地址无效，无法打开', 'warning');
+        return;
+    }
+
+    try {
+        let url = address;
+
+        // 如果地址不包含协议，根据端口判断协议
+        if (!url.includes('://')) {
+            // 检查是否是常见的HTTP端口
+            const port = url.split(':').pop();
+            const httpPorts = ['80', '8080', '3000', '8000', '9000'];
+            const httpsPorts = ['443', '8443'];
+
+            if (httpPorts.includes(port)) {
+                url = 'http://' + url;
+            } else if (httpsPorts.includes(port)) {
+                url = 'https://' + url;
+            } else {
+                // 默认使用HTTP
+                url = 'http://' + url;
+            }
+        }
+
+        // 在新窗口中打开
+        window.open(url, '_blank');
+        showNotification('已在新窗口中打开地址', 'success');
+    } catch (error) {
+        console.error('打开地址出错:', error);
+        showNotification('打开地址失败', 'error');
+    }
+}
+
+// 显示快速状态查看
+function showQuickStatus(service) {
+    // 创建状态弹窗
+    const statusModal = document.createElement('div');
+    statusModal.className = 'status-modal';
+    statusModal.innerHTML = `
+        <div class="status-modal-content">
+            <div class="status-modal-header">
+                <h3>服务运行状态</h3>
+                <button class="close-modal-btn">&times;</button>
+            </div>
+            <div class="status-modal-body">
+                <div class="quick-status-info">
+                    <div class="status-row">
+                        <span class="label">服务ID:</span>
+                        <span class="value">${service.id}</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="label">运行状态:</span>
+                        <span class="value status-${service.status === '运行中' ? 'running' : 'stopped'}">${service.status}</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="label">映射地址:</span>
+                        <span class="value">${service.mapped_address || '未映射'}</span>
+                        ${service.mapped_address && service.mapped_address !== '未映射' ? 
+                            `<button class="btn btn-small btn-info" onclick="copyToClipboard('${service.mapped_address}')">复制</button>` : ''}
+                    </div>
+                    <div class="status-row">
+                        <span class="label">NAT类型:</span>
+                        <span class="value">${service.nat_type || '检测中...'}</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="label">LAN状态:</span>
+                        <span class="value status-${service.lan_status === 'OPEN' ? 'open' : (service.lan_status === 'CLOSED' ? 'closed' : 'unknown')}">${service.lan_status || '检测中...'}</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="label">WAN状态:</span>
+                        <span class="value status-${service.wan_status === 'OPEN' ? 'open' : (service.wan_status === 'CLOSED' ? 'closed' : 'unknown')}">${service.wan_status || '检测中...'}</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="label">运行时间:</span>
+                        <span class="value">${service.start_time ? formatRuntime(Date.now() / 1000 - service.start_time) : 'N/A'}</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="label">所属分组:</span>
+                        <span class="value">${service.group_name || '默认分组'}</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="label">备注:</span>
+                        <span class="value">${service.remark || '无'}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="status-modal-footer">
+                <button class="btn btn-primary" onclick="showServiceDetails('${service.id}'); closeStatusModal();">查看详情</button>
+                <button class="btn btn-secondary close-modal-btn">关闭</button>
+            </div>
+        </div>
+    `;
+
+    // 添加到页面
+    document.body.appendChild(statusModal);
+
+    // 显示弹窗
+    setTimeout(() => {
+        statusModal.classList.add('show');
+    }, 10);
+
+    // 添加关闭事件
+    statusModal.querySelectorAll('.close-modal-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            closeStatusModal();
+        });
+    });
+
+    // 点击背景关闭
+    statusModal.addEventListener('click', (e) => {
+        if (e.target === statusModal) {
+            closeStatusModal();
+        }
+    });
+
+    // 保存引用以便关闭
+    window.currentStatusModal = statusModal;
+}
+
+// 关闭状态弹窗
+function closeStatusModal() {
+    if (window.currentStatusModal) {
+        window.currentStatusModal.classList.remove('show');
+        setTimeout(() => {
+            if (document.body.contains(window.currentStatusModal)) {
+                document.body.removeChild(window.currentStatusModal);
+            }
+            window.currentStatusModal = null;
+        }, 300);
+    }
 }
