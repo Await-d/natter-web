@@ -6,10 +6,10 @@
     ],
     "status": "运行中",
     "auto_restart": false,
-    "start_time": 1748580190.609896,
+    "start_time": 1748591305.112685,
     "remark": "测试服务",
     "local_port": 8080,
-    "remote_port": 47506
+    "remote_port": 47397
   },
   "1748580209639": {
     "args": [
@@ -18,8 +18,20 @@
     ],
     "status": "运行中",
     "auto_restart": false,
-    "start_time": 1748580209.6439376,
+    "start_time": 1748591305.1133015,
     "remark": "",
-    "local_port": 9090
+    "local_port": 9090,
+    "remote_port": 47403
+  },
+  "1748591427315": {
+    "args": [
+      "-p",
+      "8080"
+    ],
+    "status": "运行中",
+    "auto_restart": false,
+    "start_time": 1748591427.3170927,
+    "remark": "测试服务",
+    "local_port": 8080
   }
 }

@@ -33,7 +33,7 @@ let keepaliveInterval = document.getElementById('keepalive-interval');
 let notificationScript = document.getElementById('notification-script');
 let retryMode = document.getElementById('retry-mode');
 let quitOnChange = document.getElementById('quit-on-change');
-let autoRestart = document.getElementById('auto-restart');
+// let autoRestart = document.getElementById('auto-restart'); // 已废弃，现在使用new-service-auto-restart
 let serviceGroup = document.getElementById('service-group'); // 新建服务分组选择
 
 // 详情页元素
@@ -325,7 +325,7 @@ document.addEventListener('DOMContentLoaded', function () {
     notificationScript = document.getElementById('notification-script');
     retryMode = document.getElementById('retry-mode');
     quitOnChange = document.getElementById('quit-on-change');
-    autoRestart = document.getElementById('auto-restart');
+    // autoRestart = document.getElementById('auto-restart'); // 已废弃，现在使用new-service-auto-restart
     commandArgs = document.getElementById('command-args');
 
     // 按钮元素
@@ -991,7 +991,7 @@ function buildArgsFromBasicMode() {
 // 启动新服务
 function startNewService() {
     let args = [];
-    let auto_restart = autoRestart.checked;
+    let auto_restart = document.getElementById('new-service-auto-restart')?.checked || false;
     let remark = document.getElementById('service-remark')?.value || "";
     let group_id = serviceGroup?.value || "";
 
@@ -1032,6 +1032,10 @@ function startNewService() {
                 newServiceForm.reset();
                 // 手动清空 targetIp，因为 reset 可能对后面添加的字段无效
                 if (targetIp) targetIp.value = '';
+
+                // 确保自动重启复选框恢复默认状态（已选中）
+                const autoRestartCheckbox = document.getElementById('new-service-auto-restart');
+                if (autoRestartCheckbox) autoRestartCheckbox.checked = true;
 
                 // 重新加载分组选择框
                 loadGroupsForSelect();
