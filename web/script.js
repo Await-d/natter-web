@@ -977,11 +977,11 @@ function buildArgsFromBasicMode() {
         args.push('-e', notificationScript.value.trim());
     }
 
-    if (retryMode.checked) {
+    if (retryMode && retryMode.checked) {
         args.push('-r');
     }
 
-    if (quitOnChange.checked) {
+    if (quitOnChange && quitOnChange.checked) {
         args.push('-q');
     }
 
@@ -991,7 +991,7 @@ function buildArgsFromBasicMode() {
 // 启动新服务
 function startNewService() {
     let args = [];
-    let auto_restart = autoRestart.checked;
+    let auto_restart = autoRestart ? autoRestart.checked : false;
     let remark = document.getElementById('service-remark')?.value || "";
     let group_id = serviceGroup?.value || "";
 
@@ -1032,6 +1032,9 @@ function startNewService() {
                 newServiceForm.reset();
                 // 手动清空 targetIp，因为 reset 可能对后面添加的字段无效
                 if (targetIp) targetIp.value = '';
+
+                // 恢复自动重启checkbox的默认选中状态
+                if (autoRestart) autoRestart.checked = true;
 
                 // 重新加载分组选择框
                 loadGroupsForSelect();

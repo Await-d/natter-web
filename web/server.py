@@ -619,6 +619,7 @@ class NatterService:
         self.nat_type = "未知"
         self.auto_restart = False
         self.restart_thread = None
+        self.output_thread = None  # 添加输出线程引用
         self.local_port = None  # 添加本地端口属性
         self.remote_port = None  # 添加远程端口属性
         self.remark = remark  # 添加备注属性
@@ -696,10 +697,10 @@ class NatterService:
         self.start_time = time.time()
         self.status = "运行中"
 
-        # 启动线程捕获输出
-        t = threading.Thread(target=self._capture_output)
-        t.daemon = True
-        t.start()
+        # 启动线程捕获输出，并保存线程引用
+        self.output_thread = threading.Thread(target=self._capture_output)
+        self.output_thread.daemon = True
+        self.output_thread.start()
 
         # 发送启动推送 - 使用消息队列
         service_name = self.remark or f"服务 {self.service_id}"
@@ -715,12 +716,26 @@ class NatterService:
     def _capture_output(self):
         """捕获并解析Natter输出"""
         nftables_error_detected = False
+        line_count = 0
+        max_lines = 10000  # 增加限制以防止无限累积
 
-        for line in self.process.stdout:
-            self.output_lines.append(line.strip())
-            # 限制保存的日志行数为100行
-            if len(self.output_lines) > 100:
-                self.output_lines.pop(0)
+        try:
+            for line in self.process.stdout:
+                # 检查进程状态，如果已停止则退出
+                if self.process.poll() is not None:
+                    break
+                
+                self.output_lines.append(line.strip())
+                line_count += 1
+                
+                # 限制保存的日志行数，防止内存泄漏
+                if len(self.output_lines) > 100:
+                    self.output_lines.pop(0)
+                
+                # 防止无限循环，限制处理的总行数
+                if line_count > max_lines:
+                    print(f"服务 {self.service_id} 输出行数过多，停止捕获")
+                    break
 
             # 尝试提取映射地址
             if "<--Natter-->" in line:
@@ -817,6 +832,17 @@ class NatterService:
             if wan_match:
                 self.wan_status = wan_match.group(2).strip()
 
+        except Exception as e:
+            print(f"捕获输出时出错: {e}")
+            self.output_lines.append(f"输出捕获异常: {str(e)}")
+        finally:
+            # 确保stdout被正确关闭
+            try:
+                if self.process and self.process.stdout:
+                    self.process.stdout.close()
+            except:
+                pass
+
         # 进程结束后更新状态
         self.status = "已停止"
 
@@ -833,6 +859,14 @@ class NatterService:
 
         # 如果启用了自动重启，且不是由于nftables错误导致的退出，则重新启动服务
         if self.auto_restart and not nftables_error_detected:
+            # 清理旧的重启线程
+            if self.restart_thread and self.restart_thread.is_alive():
+                print(f"等待旧的重启线程结束...")
+                try:
+                    self.restart_thread.join(timeout=2)  # 等待最多2秒
+                except:
+                    pass
+            
             # 使用新线程进行重启，避免阻塞当前线程
             self.restart_thread = threading.Thread(target=self._restart_service)
             self.restart_thread.daemon = True
@@ -865,7 +899,7 @@ class NatterService:
                 parent.terminate()
 
                 # 给进程一些时间来终止
-                time.sleep(1)
+                time.sleep(2)  # 增加等待时间
 
                 # 如果进程仍在运行，强制终止
                 if self.process.poll() is None:
@@ -873,15 +907,44 @@ class NatterService:
                     for child in parent.children(recursive=True):
                         try:
                             child.kill()
-                        except:
-                            pass
+                        except Exception as e:
+                            print(f"强制终止子进程失败: {e}")
                     parent.kill()
-            except:
-                # 如果psutil不可用，使用常规方法
-                self.process.terminate()
+                    
+                # 再次等待确保进程完全结束
                 time.sleep(1)
-                if self.process.poll() is None:
-                    self.process.kill()
+                    
+            except Exception as e:
+                print(f"使用psutil终止进程失败: {e}")
+                # 如果psutil不可用，使用常规方法
+                try:
+                    self.process.terminate()
+                    time.sleep(2)
+                    if self.process.poll() is None:
+                        self.process.kill()
+                        time.sleep(1)
+                except Exception as e2:
+                    print(f"常规方法终止进程失败: {e2}")
+            
+            # 清理输出流
+            try:
+                if self.process.stdout:
+                    self.process.stdout.close()
+            except:
+                pass
+                
+            # 等待并清理线程
+            if self.restart_thread and self.restart_thread.is_alive():
+                try:
+                    self.restart_thread.join(timeout=2)
+                except:
+                    pass
+                    
+            if self.output_thread and self.output_thread.is_alive():
+                try:
+                    self.output_thread.join(timeout=2)
+                except:
+                    pass
 
             self.status = "已停止"
 
@@ -2713,9 +2776,71 @@ class ServiceGroupManager:
         return None, None
 
 
+# 资源清理和监控功能
+def periodic_cleanup():
+    """定期清理资源，防止泄漏"""
+    def cleanup_worker():
+        while True:
+            try:
+                time.sleep(3600)  # 每小时执行一次清理
+                
+                # 清理死掉的服务
+                dead_services = []
+                for service_id, service in services.items():
+                    if service.process and service.process.poll() is not None:
+                        # 进程已结束但状态未更新
+                        if service.status == "运行中":
+                            print(f"发现死掉的服务 {service_id}，清理中...")
+                            service.status = "已停止"
+                            dead_services.append(service_id)
+                
+                # 执行垃圾回收
+                import gc
+                collected = gc.collect()
+                print(f"垃圾回收清理了 {collected} 个对象")
+                
+                # 清理消息队列过多的消息
+                with message_lock:
+                    if len(message_queue) > 100:
+                        # 保留最新的50条消息
+                        message_queue[:] = message_queue[-50:]
+                        print(f"清理消息队列，保留最新50条消息")
+                
+                # 输出资源使用情况
+                thread_count = threading.active_count()
+                active_services = len([s for s in services.values() if s.status == '运行中'])
+                print(f"资源监控 - 活跃线程数: {thread_count}, 活跃服务数: {active_services}")
+                
+                # 如果有psutil，显示更详细的资源信息
+                try:
+                    import psutil
+                    process = psutil.Process()
+                    memory_mb = process.memory_info().rss / 1024 / 1024
+                    fd_count = process.num_fds() if hasattr(process, 'num_fds') else 'N/A'
+                    print(f"内存使用: {memory_mb:.1f}MB, 文件描述符: {fd_count}")
+                except:
+                    pass
+                
+            except Exception as e:
+                print(f"定期清理出错: {e}")
+    
+    cleanup_thread = threading.Thread(target=cleanup_worker, daemon=True)
+    cleanup_thread.start()
+
+# 改进信号处理
+def signal_handler(signum, frame):
+    print(f"\n收到信号 {signum}，开始优雅关闭...")
+    cleanup()
+    import sys
+    sys.exit(0)
+
 if __name__ == "__main__":
-    # 注册清理函数
-    signal.signal(signal.SIGINT, lambda sig, frame: (cleanup(), sys.exit(0)))
+    # 注册改进的信号处理函数
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+
+    # 启动定期清理
+    periodic_cleanup()
 
     # 显示系统信息
     print(f"Natter Web管理工具 v{VERSION} 正在启动...")

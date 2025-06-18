@@ -6,10 +6,10 @@
     ],
     "status": "运行中",
     "auto_restart": false,
-    "start_time": 1748580190.609896,
+    "start_time": 1750214129.855366,
     "remark": "测试服务",
     "local_port": 8080,
-    "remote_port": 47506
+    "remote_port": 11560
   },
   "1748580209639": {
     "args": [
@@ -18,8 +18,9 @@
     ],
     "status": "运行中",
     "auto_restart": false,
-    "start_time": 1748580209.6439376,
+    "start_time": 1750214129.8558247,
     "remark": "",
-    "local_port": 9090
+    "local_port": 9090,
+    "remote_port": 11559
   }
 }
