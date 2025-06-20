@@ -622,6 +622,8 @@ class NatterService:
         self.output_thread = None  # 添加输出线程引用
         self.local_port = None  # 添加本地端口属性
         self.remote_port = None  # 添加远程端口属性
+        self.bind_interface = "0.0.0.0"  # 绑定接口，默认为所有接口
+        self.bind_port = 0  # 绑定端口，默认为0（自动分配）
         self.remark = remark  # 添加备注属性
         self.last_mapped_address = None  # 记录上一次的映射地址，用于检测变更
 
@@ -635,6 +637,18 @@ class NatterService:
             for i, arg in enumerate(self.cmd_args):
                 if arg == "-p" and i + 1 < len(self.cmd_args):
                     self.local_port = int(self.cmd_args[i + 1])
+                    break
+
+            # 查找 -i 参数后面的绑定接口
+            for i, arg in enumerate(self.cmd_args):
+                if arg == "-i" and i + 1 < len(self.cmd_args):
+                    self.bind_interface = self.cmd_args[i + 1]
+                    break
+            
+            # 查找 -b 参数后面的绑定端口
+            for i, arg in enumerate(self.cmd_args):
+                if arg == "-b" and i + 1 < len(self.cmd_args):
+                    self.bind_port = int(self.cmd_args[i + 1])
                     break
 
             # 在映射地址中寻找远程端口
@@ -741,7 +755,21 @@ class NatterService:
             if "<--Natter-->" in line:
                 parts = line.split("<--Natter-->")
                 if len(parts) == 2:
+                    # 左侧是本地绑定地址，右侧是映射的外网地址
+                    local_address = parts[0].strip()
                     new_mapped_address = parts[1].strip()
+
+                    # 解析本地绑定地址信息
+                    try:
+                        if "://" in local_address:
+                            # 去掉协议前缀 (tcp:// 或 udp://)
+                            local_addr_part = local_address.split("://", 1)[1]
+                            if ":" in local_addr_part:
+                                bind_ip, bind_port_str = local_addr_part.rsplit(":", 1)
+                                self.bind_interface = bind_ip
+                                self.bind_port = int(bind_port_str)
+                    except Exception as e:
+                        print(f"解析本地绑定地址出错: {e}")
 
                     # 检查映射地址是否变更
                     if self.mapped_address != new_mapped_address:
@@ -993,6 +1021,10 @@ class NatterService:
             "nat_type": self.nat_type,
             "auto_restart": self.auto_restart,
             "remark": self.remark,
+            "local_port": self.local_port,
+            "remote_port": self.remote_port,
+            "bind_interface": self.bind_interface,
+            "bind_port": self.bind_port,
         }
 
     def to_dict(self):
