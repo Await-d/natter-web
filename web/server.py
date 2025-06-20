@@ -751,23 +751,39 @@ class NatterService:
                     print(f"服务 {self.service_id} 输出行数过多，停止捕获")
                     break
 
-            # 尝试提取映射地址
+            # 尝试提取映射地址 - 支持Natter v2.1.1的新格式
             if "<--Natter-->" in line:
                 parts = line.split("<--Natter-->")
                 if len(parts) == 2:
-                    # 左侧是本地绑定地址，右侧是映射的外网地址
-                    local_address = parts[0].strip()
-                    new_mapped_address = parts[1].strip()
-
-                    # 解析本地绑定地址信息
+                    left_part = parts[0].strip()  # 包含目标地址和绑定地址
+                    new_mapped_address = parts[1].strip()  # 映射的外网地址
+                    
+                    # 解析绑定地址信息 - 支持新的三段式格式
                     try:
-                        if "://" in local_address:
-                            # 去掉协议前缀 (tcp:// 或 udp://)
-                            local_addr_part = local_address.split("://", 1)[1]
-                            if ":" in local_addr_part:
-                                bind_ip, bind_port_str = local_addr_part.rsplit(":", 1)
-                                self.bind_interface = bind_ip
-                                self.bind_port = int(bind_port_str)
+                        # 查找是否有转发方法标识符（如 <--socket--> 或 <--iptables-->）
+                        if "-->" in left_part and "<--" in left_part:
+                            # 新格式：tcp://目标地址 <--转发方法--> tcp://绑定地址
+                            # 找到最后一个转发标识符的位置
+                            last_arrow_end = left_part.rfind("-->")
+                            if last_arrow_end != -1:
+                                # 提取绑定地址部分（在最后一个箭头之后）
+                                bind_address_part = left_part[last_arrow_end + 3:].strip()
+                                if "://" in bind_address_part:
+                                    # 去掉协议前缀 (tcp:// 或 udp://)
+                                    local_addr_part = bind_address_part.split("://", 1)[1]
+                                    if ":" in local_addr_part:
+                                        bind_ip, bind_port_str = local_addr_part.rsplit(":", 1)
+                                        self.bind_interface = bind_ip
+                                        self.bind_port = int(bind_port_str)
+                                        print(f"解析到绑定地址: {bind_ip}:{bind_port_str}")
+                        else:
+                            # 旧格式：直接从left_part解析
+                            if "://" in left_part:
+                                local_addr_part = left_part.split("://", 1)[1]
+                                if ":" in local_addr_part:
+                                    bind_ip, bind_port_str = local_addr_part.rsplit(":", 1)
+                                    self.bind_interface = bind_ip
+                                    self.bind_port = int(bind_port_str)
                     except Exception as e:
                         print(f"解析本地绑定地址出错: {e}")
 
@@ -776,15 +792,24 @@ class NatterService:
                         # 记录旧地址用于推送消息
                         old_address = self.mapped_address or "无"
 
-                        # 更新地址
-                        self.mapped_address = new_mapped_address
+                        # 更新地址 - 去掉协议前缀，只保存IP:Port格式
+                        if "://" in new_mapped_address:
+                            self.mapped_address = new_mapped_address.split("://", 1)[1]
+                        else:
+                            self.mapped_address = new_mapped_address
 
                         # 解析远程端口
                         try:
                             if self.mapped_address and ":" in self.mapped_address:
-                                addr_parts = self.mapped_address.split(":")
+                                # 去掉协议前缀
+                                addr_to_parse = self.mapped_address
+                                if "://" in addr_to_parse:
+                                    addr_to_parse = addr_to_parse.split("://", 1)[1]
+                                
+                                addr_parts = addr_to_parse.split(":")
                                 if len(addr_parts) >= 2:
                                     self.remote_port = int(addr_parts[-1])
+                                    print(f"解析到映射地址: {addr_to_parse}, 远程端口: {self.remote_port}")
                         except Exception as e:
                             print(f"解析远程端口出错: {e}")
 
