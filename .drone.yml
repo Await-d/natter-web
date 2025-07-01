@@ -13,7 +13,7 @@ steps:
       - docker system prune -f --volumes || true
       - docker builder prune -f || true
       - echo "开始构建镜像..."
-      - docker build -t natter-web:latest ./web --no-cache --pull
+      - docker build -t natter-web:latest ./web --no-cache
       - docker stop natter-web-container || true
       - docker rm natter-web-container || true
       - >

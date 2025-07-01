@@ -1299,27 +1299,91 @@ input:checked + .slider:before {
 
 .service-remark-text {
     font-style: italic;
-    color: #888;
 }
 
-.service-remark-edit {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    width: 100%;
+/* 分组显示样式 */
+.service-group {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.service-remark-edit textarea {
-    width: 100%;
+.service-group-text {
+    font-weight: 500;
+    color: #1890ff;
+}
+
+/* 快速状态查看样式 */
+.service-quick-status {
+    background-color: #f9f9f9;
+    border-radius: 6px;
     padding: 8px;
-    border-radius: 4px;
-    border: 1px solid #d9d9d9;
-    resize: vertical;
+    margin-bottom: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    border: 1px solid #e8e8e8;
 }
 
-.service-remark-edit button {
-    align-self: flex-end;
-    padding: 4px 12px;
+.status-quick-item {
+    display: flex;
+    align-items: center;
+    font-size: 12px;
+    flex: 1;
+    min-width: 80px;
+}
+
+.status-quick-label {
+    font-weight: 500;
+    margin-right: 4px;
+    color: #666;
+}
+
+.status-quick-value {
+    font-weight: 500;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 11px;
+}
+
+.status-quick-value.lan-status,
+.status-quick-value.wan-status {
+    color: white;
+    background-color: #666;
+}
+
+.status-quick-value.lan-status.text-success,
+.status-quick-value.wan-status.text-success {
+    background-color: #28a745;
+}
+
+.status-quick-value.lan-status.text-danger,
+.status-quick-value.wan-status.text-danger {
+    background-color: #dc3545;
+}
+
+.status-quick-value.lan-status.text-warning,
+.status-quick-value.wan-status.text-warning {
+    background-color: #ffc107;
+    color: #333;
+}
+
+.status-quick-value.runtime {
+    color: #1890ff;
+    background-color: rgba(24, 144, 255, 0.1);
+}
+
+/* 快速状态按钮样式 */
+.service-quick-status-btn {
+    background-color: var(--info-color) !important;
+    color: white !important;
+}
+
+.service-quick-status-btn:hover {
+    background-color: #138496 !important;
 }
 
 /* IYUU推送设置面板样式 */
@@ -1495,4 +1559,50 @@ input:checked + .slider:before {
 
 .btn-guest i {
     font-size: 16px;
+}
+
+/* 状态徽章样式 */
+.status-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 500;
+    color: white;
+    background-color: #666;
+}
+
+.status-badge.status-OPEN {
+    background-color: #28a745;
+}
+
+.status-badge.status-CLOSED {
+    background-color: #dc3545;
+}
+
+.status-badge.status-UNKNOWN {
+    background-color: #ffc107;
+    color: #333;
+}
+
+/* 服务分组设置样式 */
+.service-group-edit {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+}
+
+.service-group-edit select {
+    flex: 1;
+    padding: 6px 12px;
+    border: 1px solid #d9d9d9;
+    border-radius: 4px;
+    background-color: white;
+    font-size: 14px;
+}
+
+.service-group-edit button {
+    padding: 6px 12px;
+    white-space: nowrap;
 }

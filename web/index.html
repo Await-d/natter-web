@@ -278,7 +278,7 @@
         /* 服务列表样式 */
         .services-list {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
             gap: 1.5rem;
             margin-bottom: 1.5rem;
         }
@@ -294,47 +294,224 @@
 
         .service-card {
             background: white;
-            border-radius: 15px;
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
             overflow: hidden;
             transition: all 0.3s ease;
             border: 1px solid var(--border-color);
+            position: relative;
         }
 
         .service-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
+            transform: translateY(-3px);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+            border-color: var(--primary-color);
         }
 
         .service-card-header {
-            background: linear-gradient(135deg, var(--light-color) 0%, #e9ecef 100%);
-            padding: 1.5rem;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            padding: 1.25rem;
             border-bottom: 1px solid var(--border-color);
         }
 
+        .service-title-section {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .service-title {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin: 0;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .service-remark-display {
+            flex: 1;
+            color: var(--dark-color);
+        }
+
+        .service-address-display {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin: 0;
+            font-size: 0.9rem;
+            color: var(--secondary-color);
+        }
+
+        .address-label {
+            font-weight: 500;
+            min-width: fit-content;
+        }
+
+        .service-address {
+            flex: 1;
+            font-family: 'Courier New', monospace;
+            background: rgba(0, 123, 255, 0.1);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            color: var(--primary-color);
+            font-weight: 500;
+        }
+
+        .btn-icon {
+            background: none;
+            border: none;
+            padding: 4px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.9rem;
+        }
+
+        .btn-icon:hover {
+            background: rgba(0, 0, 0, 0.1);
+            transform: scale(1.1);
+        }
+
         .service-card-body {
-            padding: 1.5rem;
+            padding: 1.25rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .service-metrics {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+        }
+
+        .metric-item {
+            text-align: center;
+            padding: 0.75rem 0.5rem;
+            background: var(--light-color);
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+        }
+
+        .metric-label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--secondary-color);
+            margin-bottom: 0.25rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .metric-value {
+            display: block;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--dark-color);
+        }
+
+        .service-info {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .info-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .info-label {
+            font-weight: 500;
+            color: var(--secondary-color);
+            min-width: fit-content;
+        }
+
+        .service-group-text,
+        .service-cmd-text {
+            flex: 1;
+            color: var(--dark-color);
+            word-break: break-all;
+        }
+
+        .service-cmd-text {
+            font-family: 'Courier New', monospace;
+            background: rgba(108, 117, 125, 0.1);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
+
+        .service-card-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin-top: 0.5rem;
+        }
+
+        .action-group {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .primary-actions {
+            justify-content: flex-start;
+        }
+
+        .danger-actions {
+            justify-content: flex-end;
+        }
+
+        .btn-sm {
+            padding: 0.5rem 0.75rem;
+            font-size: 0.85rem;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            border: 1px solid transparent;
+        }
+
+        .btn-outline-danger {
+            background: transparent;
+            border-color: var(--danger-color);
+            color: var(--danger-color);
+        }
+
+        .btn-outline-danger:hover {
+            background: var(--danger-color);
+            color: white;
         }
 
         .service-status {
-            display: inline-block;
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 12px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.75rem;
             font-weight: 600;
-            margin-left: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         .service-status-running {
-            background: rgba(40, 167, 69, 0.1);
+            background: rgba(40, 167, 69, 0.15);
             color: var(--success-color);
             border: 1px solid var(--success-color);
         }
 
         .service-status-stopped {
-            background: rgba(220, 53, 69, 0.1);
+            background: rgba(220, 53, 69, 0.15);
             color: var(--danger-color);
             border: 1px solid var(--danger-color);
+        }
+
+        .service-status-unknown {
+            background: rgba(108, 117, 125, 0.15);
+            color: var(--secondary-color);
+            border: 1px solid var(--secondary-color);
         }
 
         /* 服务详情页样式 */
@@ -411,6 +588,390 @@
             font-size: 13px;
             white-space: pre-wrap;
             border: 1px solid var(--border-color);
+        }
+
+        /* 新的服务详情样式 */
+        .service-details-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.5rem;
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+            color: white;
+            border-radius: 15px;
+            margin-bottom: 2rem;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .service-details-header h2 {
+            margin: 0;
+            font-size: 1.8rem;
+            font-weight: 600;
+        }
+
+        .service-id-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 8px 16px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+        }
+
+        .service-id-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .service-id-value {
+            font-weight: 600;
+            font-family: monospace;
+        }
+
+        .service-details-content {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        .detail-section {
+            background: white;
+            border-radius: 15px;
+            padding: 1.5rem;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+        }
+
+        .section-title {
+            margin: 0 0 1.5rem 0;
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--dark-color);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--light-color);
+        }
+
+        /* 基本信息网格 */
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .detail-item {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .detail-item label {
+            font-weight: 600;
+            color: var(--secondary-color);
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .address-text {
+            font-family: monospace;
+            background: var(--light-color);
+            padding: 8px 12px;
+            border-radius: 8px;
+            word-break: break-all;
+            color: var(--dark-color);
+            font-weight: 600;
+            border: 1px solid var(--border-color);
+        }
+
+        .cmd-text {
+            background: var(--light-color);
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            display: block;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        /* 配置网格 */
+        .config-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .config-item {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .config-item label {
+            font-weight: 600;
+            color: var(--secondary-color);
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .input-with-action {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+        }
+
+        .input-with-action .form-control {
+            flex: 1;
+        }
+
+        .address-with-action {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .address-with-action .address-text {
+            flex: 1;
+        }
+
+        .toggle-with-status {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .toggle-status {
+            font-weight: 500;
+            color: var(--secondary-color);
+        }
+
+        .toggle-status.status-enabled {
+            color: var(--success-color);
+        }
+
+        .toggle-status.status-disabled {
+            color: var(--secondary-color);
+        }
+
+        /* 状态卡片网格 */
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .status-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: var(--light-color);
+            padding: 1rem;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            transition: all 0.3s ease;
+        }
+
+        .status-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        .status-icon {
+            font-size: 1.5rem;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: white;
+            border-radius: 50%;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .status-content {
+            flex: 1;
+        }
+
+        .status-content .status-label {
+            font-size: 0.9rem;
+            color: var(--secondary-color);
+            margin-bottom: 4px;
+            font-weight: 500;
+        }
+
+        .status-content .status-value {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--dark-color);
+        }
+
+        /* 推送操作 */
+        .push-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .help-text {
+            color: var(--secondary-color);
+            font-size: 0.85rem;
+            margin-left: 8px;
+        }
+
+        /* 日志容器 */
+        .log-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .log-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            color: var(--secondary-color);
+        }
+
+        .checkbox-label input[type="checkbox"] {
+            display: none;
+        }
+
+        .checkmark {
+            width: 18px;
+            height: 18px;
+            border: 2px solid var(--border-color);
+            border-radius: 4px;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .checkbox-label input[type="checkbox"]:checked+.checkmark {
+            background: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+
+        .checkbox-label input[type="checkbox"]:checked+.checkmark::after {
+            content: '✓';
+            position: absolute;
+            top: -2px;
+            left: 2px;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        /* 服务操作按钮 */
+        .service-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.5rem;
+            background: var(--light-color);
+            border-radius: 15px;
+            border: 1px solid var(--border-color);
+            margin-top: 2rem;
+        }
+
+        .action-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .primary-actions .btn {
+            min-width: 120px;
+        }
+
+        .secondary-actions .btn {
+            min-width: 140px;
+        }
+
+        .nav-actions .btn {
+            min-width: 120px;
+        }
+
+        /* 按钮轮廓样式 */
+        .btn-outline {
+            background: transparent;
+            border: 2px solid var(--border-color);
+            color: var(--secondary-color);
+        }
+
+        .btn-outline:hover {
+            background: var(--border-color);
+            color: var(--dark-color);
+        }
+
+        .btn-outline-danger {
+            background: transparent;
+            border: 2px solid var(--danger-color);
+            color: var(--danger-color);
+        }
+
+        .btn-outline-danger:hover {
+            background: var(--danger-color);
+            color: white;
+        }
+
+        .copy-btn {
+            white-space: nowrap;
+        }
+
+        /* 响应式优化 */
+        @media (max-width: 768px) {
+            .service-details-header {
+                flex-direction: column;
+                gap: 1rem;
+                text-align: center;
+            }
+
+            .detail-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .status-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .service-actions {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .action-group {
+                justify-content: center;
+            }
+
+            .input-with-action,
+            .address-with-action {
+                flex-direction: column;
+                align-items: stretch;
+            }
         }
 
         /* 操作按钮区域 */
@@ -779,6 +1340,121 @@
             justify-content: flex-end;
         }
 
+        /* 分组密码显示样式 */
+        .group-password-section {
+            margin: 1rem 0;
+            padding: 0.75rem;
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .password-display {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .password-label {
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--secondary-color);
+        }
+
+        .password-field {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .password-value {
+            flex: 1;
+            font-family: monospace;
+            background: var(--light-color);
+            padding: 6px 10px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            font-size: 0.9rem;
+            color: var(--dark-color);
+            min-height: 32px;
+            display: flex;
+            align-items: center;
+        }
+
+        .password-value.visible {
+            color: var(--primary-color);
+            font-weight: 500;
+        }
+
+        .password-toggle-btn {
+            background: var(--light-color);
+            border: 1px solid var(--border-color);
+            padding: 6px 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.9rem;
+        }
+
+        .password-toggle-btn:hover {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        /* 修改密码对话框样式 */
+        .password-edit-dialog {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1001;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .password-edit-dialog.active {
+            display: flex;
+        }
+
+        .password-edit-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        .password-edit-content h3 {
+            margin: 0 0 1.5rem 0;
+            color: var(--dark-color);
+        }
+
+        .current-password-display {
+            background: var(--light-color);
+            padding: 0.75rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .current-password-display label {
+            font-size: 0.9rem;
+            color: var(--secondary-color);
+            margin-bottom: 0.5rem;
+            display: block;
+        }
+
+        .current-password-display .password-text {
+            font-family: monospace;
+            color: var(--primary-color);
+            font-weight: 500;
+        }
+
         .batch-operations {
             background: var(--light-color);
             border-radius: 12px;
@@ -788,20 +1464,173 @@
 
         .batch-controls {
             display: flex;
-            align-items: center;
-            gap: 10px;
+            align-items: flex-start;
+            gap: 20px;
             flex-wrap: wrap;
+            margin-bottom: 1rem;
+        }
+
+        .batch-select-container {
+            flex: 1;
+            min-width: 200px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .batch-select-container label {
+            font-weight: 600;
+            color: var(--dark-color);
+            font-size: 0.9rem;
+        }
+
+        .batch-select-container select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            background: white;
+            font-size: 0.9rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .batch-select-container select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+        }
+
+        .source-services-preview,
+        .target-services-info {
+            min-height: 60px;
+            padding: 8px 12px;
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 0.85rem;
+            color: var(--secondary-color);
+        }
+
+        .services-preview-list {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .service-preview-item {
+            padding: 4px 8px;
+            background: var(--light-color);
+            border-radius: 4px;
+            font-size: 0.8rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .service-preview-address {
+            font-weight: 500;
+            color: var(--dark-color);
+        }
+
+        .service-preview-status {
+            font-size: 0.75rem;
+            padding: 2px 6px;
+            border-radius: 3px;
+            background: var(--border-color);
+            color: var(--secondary-color);
+        }
+
+        .batch-arrow {
+            font-size: 1.8rem;
+            color: var(--primary-color);
+            font-weight: bold;
+            align-self: center;
+            margin-top: 20px;
+        }
+
+        .batch-action-area {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .batch-preview {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 8px 12px;
+            text-align: center;
+        }
+
+        .preview-summary {
+            font-size: 0.9rem;
+            color: var(--secondary-color);
         }
 
         .batch-controls select {
-            flex: 1;
-            min-width: 150px;
+            flex: unset;
+            min-width: unset;
         }
 
-        .batch-controls span {
-            font-size: 1.5rem;
-            color: var(--primary-color);
-            font-weight: bold;
+        /* 空服务列表样式 */
+        .empty-services-message {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 3rem 2rem;
+            background: white;
+            border-radius: 20px;
+            border: 2px dashed var(--border-color);
+            color: var(--secondary-color);
+            font-size: 1.1rem;
+            font-weight: 500;
+        }
+
+        .empty-services-message::before {
+            content: "📋";
+            display: block;
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        /* 状态颜色设置 */
+        .metric-value.status-good {
+            color: var(--success-color) !important;
+        }
+
+        .metric-value.status-warning {
+            color: var(--warning-color) !important;
+        }
+
+        .metric-value.status-error {
+            color: var(--danger-color) !important;
+        }
+
+        .metric-value.status-info {
+            color: var(--info-color) !important;
+        }
+
+        /* 按钮尺寸优化 */
+        .btn-info {
+            background-color: var(--info-color);
+            border-color: var(--info-color);
+            color: white;
+        }
+
+        .btn-info:hover {
+            background-color: #138496;
+            border-color: #117a8b;
+        }
+
+        .btn-warning {
+            background-color: var(--warning-color);
+            border-color: var(--warning-color);
+            color: #212529;
+        }
+
+        .btn-warning:hover {
+            background-color: #e0a800;
+            border-color: #d39e00;
         }
     </style>
 </head>
@@ -809,7 +1638,7 @@
 <body>
     <!-- Logo区域 -->
     <div class="logo-section">
-        <img src="await-logo.svg" alt="Await Logo" style="display: none;" onerror="this.style.display='none';">
+        <img src="await-logo.svg" alt="Await Logo" onerror="this.style.display='none';">
     </div>
 
     <div class="container">
@@ -889,6 +1718,14 @@
                                     <option value="">默认分组</option>
                                 </select>
                                 <small>选择服务所属的分组，便于组织管理</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="new-service-auto-restart">
+                                    <input type="checkbox" id="new-service-auto-restart" checked>
+                                    启用自动重启
+                                </label>
+                                <small>当服务异常退出时自动重新启动</small>
                             </div>
 
                             <div class="form-group">
@@ -1009,6 +1846,22 @@
                                 </label>
                                 <small>启用持续重试机制</small>
                             </div>
+
+                            <div class="form-group">
+                                <label for="quit-on-change">
+                                    <input type="checkbox" id="quit-on-change">
+                                    映射地址变更时退出
+                                </label>
+                                <small>当映射地址发生变化时自动退出程序</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="auto-restart">
+                                    <input type="checkbox" id="auto-restart" checked>
+                                    启用自动重启
+                                </label>
+                                <small>服务停止时自动重新启动</small>
+                            </div>
                         </div>
                     </div>
 
@@ -1031,100 +1884,176 @@
             </section>
 
             <section class="card" id="service-details-panel" style="display:none;">
-                <h2>服务详情 <span id="service-id"></span></h2>
-                <div class="service-details">
-                    <div class="detail-row">
-                        <label>服务ID:</label>
-                        <span id="service-id"></span>
+                <div class="service-details-header">
+                    <h2>服务详情</h2>
+                    <div class="service-id-badge">
+                        <span class="service-id-label">ID:</span>
+                        <span id="service-id" class="service-id-value"></span>
                     </div>
-                    <div class="detail-row">
-                        <label>状态:</label>
-                        <span id="service-status"></span>
+                </div>
+
+                <div class="service-details-content">
+                    <!-- 基本信息 -->
+                    <div class="detail-section">
+                        <h3 class="section-title">📊 基本信息</h3>
+                        <div class="detail-grid">
+                            <div class="detail-item">
+                                <label>状态</label>
+                                <span id="service-status" class="status-badge"></span>
+                            </div>
+                            <div class="detail-item">
+                                <label>运行时间</label>
+                                <span id="service-runtime"></span>
+                            </div>
+                            <div class="detail-item">
+                                <label>映射地址</label>
+                                <div class="address-with-action">
+                                    <span id="service-mapped-address" class="address-text"></span>
+                                    <button id="copy-address-btn" class="btn btn-sm btn-outline copy-btn">
+                                        <span class="icon icon-copy"></span>
+                                        复制
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="detail-item">
+                                <label>命令参数</label>
+                                <code id="service-cmd-args" class="cmd-text"></code>
+                            </div>
+                        </div>
                     </div>
-                    <div class="detail-row">
-                        <label>映射地址:</label>
-                        <div class="service-address-detail">
-                            <span id="service-mapped-address"></span>
-                            <button id="copy-address-btn" class="btn copy-address-btn">
-                                <span class="icon icon-copy"></span>
-                                复制地址
+
+                    <!-- 配置管理 -->
+                    <div class="detail-section">
+                        <h3 class="section-title">⚙️ 配置管理</h3>
+                        <div class="config-grid">
+                            <div class="config-item">
+                                <label>服务备注</label>
+                                <div class="input-with-action">
+                                    <textarea id="remark-debug-area" placeholder="请输入备注" rows="2"
+                                        class="form-control"></textarea>
+                                    <button id="save-debug-remark-btn" class="btn btn-sm btn-primary">
+                                        <span class="icon">💾</span>
+                                        保存
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="config-item">
+                                <label>服务分组</label>
+                                <div class="input-with-action">
+                                    <select id="service-group-select" class="form-control">
+                                        <option value="">默认分组</option>
+                                    </select>
+                                    <button id="save-service-group-btn" class="btn btn-sm btn-primary">
+                                        <span class="icon">📁</span>
+                                        更改
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="config-item">
+                                <label>自动重启</label>
+                                <div class="toggle-with-status">
+                                    <label class="switch">
+                                        <input type="checkbox" id="auto-restart-toggle">
+                                        <span class="slider"></span>
+                                    </label>
+                                    <span id="auto-restart-status" class="toggle-status">已禁用</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 网络状态 -->
+                    <div class="detail-section">
+                        <h3 class="section-title">🌐 网络状态</h3>
+                        <div class="status-grid">
+                            <div class="status-card">
+                                <div class="status-icon">🏠</div>
+                                <div class="status-content">
+                                    <div class="status-label">LAN可用性</div>
+                                    <div id="lan-status" class="status-value">检测中</div>
+                                </div>
+                            </div>
+                            <div class="status-card">
+                                <div class="status-icon">🌍</div>
+                                <div class="status-content">
+                                    <div class="status-label">WAN可用性</div>
+                                    <div id="wan-status" class="status-value">检测中</div>
+                                </div>
+                            </div>
+                            <div class="status-card">
+                                <div class="status-icon">🔌</div>
+                                <div class="status-content">
+                                    <div class="status-label">NAT类型</div>
+                                    <div id="nat-type" class="status-value">检测中</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 推送操作 -->
+                    <div class="detail-section">
+                        <h3 class="section-title">📢 推送操作</h3>
+                        <div class="push-actions">
+                            <button id="push-service-now" class="btn btn-sm btn-info">
+                                <span class="icon">📤</span>
+                                推送此服务状态
                             </button>
+                            <small class="help-text">将此服务的状态信息推送到IYUU</small>
                         </div>
                     </div>
-                    <div class="detail-row">
-                        <label>运行时间:</label>
-                        <span id="service-runtime"></span>
-                    </div>
-                    <div class="detail-row">
-                        <label>命令参数:</label>
-                        <span id="service-cmd-args"></span>
-                    </div>
-                    <div class="detail-row">
-                        <label>备注:</label>
-                        <div class="service-remark-edit">
-                            <textarea id="remark-debug-area" placeholder="请输入备注" rows="2"
-                                class="form-control"></textarea>
-                            <button id="save-debug-remark-btn" class="btn btn-sm btn-primary">保存备注</button>
-                        </div>
-                    </div>
-                    <div class="detail-row">
-                        <label>LAN状态:</label>
-                        <span id="lan-status"></span>
-                    </div>
-                    <div class="detail-row">
-                        <label>WAN状态:</label>
-                        <span id="wan-status"></span>
-                    </div>
-                    <div class="detail-row">
-                        <label>NAT类型:</label>
-                        <span id="nat-type"></span>
-                    </div>
-                    <div class="detail-row">
-                        <label>自动重启:</label>
-                        <div class="auto-restart-toggle">
-                            <label class="switch">
-                                <input type="checkbox" id="auto-restart-toggle">
-                                <span class="slider round"></span>
-                            </label>
-                            <span id="auto-restart-status">已禁用</span>
+
+                    <!-- 日志输出 -->
+                    <div class="detail-section">
+                        <h3 class="section-title">📋 输出日志</h3>
+                        <div class="log-container">
+                            <pre id="service-output" class="output-log"></pre>
+                            <div class="log-controls">
+                                <button id="clear-log-btn" class="btn btn-sm btn-secondary">
+                                    <span class="icon">🗑️</span>
+                                    清空日志
+                                </button>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="auto-scroll" checked>
+                                    <span class="checkmark"></span>
+                                    自动滚动
+                                </label>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="status-panel">
-                    <div class="status-item">
-                        <div class="status-label">LAN可用性</div>
-                        <div id="lan-status" class="status-value">检测中</div>
+                <!-- 操作按钮区域 -->
+                <div class="service-actions">
+                    <div class="action-group primary-actions">
+                        <button id="refresh-service-btn" class="btn btn-secondary">
+                            <span class="icon">🔄</span>
+                            刷新
+                        </button>
+                        <button id="restart-service-btn" class="btn btn-warning">
+                            <span class="icon">⚡</span>
+                            重启服务
+                        </button>
+                        <button id="stop-service-btn" class="btn btn-danger">
+                            <span class="icon">⏹️</span>
+                            停止服务
+                        </button>
                     </div>
-                    <div class="status-item">
-                        <div class="status-label">WAN可用性</div>
-                        <div id="wan-status" class="status-value">检测中</div>
+                    <div class="action-group secondary-actions">
+                        <button id="save-as-template-btn" class="btn btn-info">
+                            <span class="icon">💾</span>
+                            保存为模板
+                        </button>
+                        <button id="delete-service-btn" class="btn btn-outline-danger">
+                            <span class="icon">🗑️</span>
+                            删除服务
+                        </button>
                     </div>
-                    <div class="status-item">
-                        <div class="status-label">NAT类型</div>
-                        <div id="nat-type" class="status-value">检测中</div>
+                    <div class="action-group nav-actions">
+                        <button id="back-to-list-btn" class="btn btn-secondary">
+                            <span class="icon">⬅️</span>
+                            返回列表
+                        </button>
                     </div>
-                </div>
-
-                <div class="output-container">
-                    <h3>输出日志</h3>
-                    <pre id="service-output" class="output-log"></pre>
-                    <div class="log-controls">
-                        <button id="clear-log-btn" class="btn-secondary">清空日志</button>
-                        <label for="auto-scroll">
-                            <input type="checkbox" id="auto-scroll" checked>
-                            自动滚动
-                        </label>
-                    </div>
-                </div>
-
-                <div class="action-buttons">
-                    <button id="refresh-service-btn" class="btn-secondary">刷新</button>
-                    <button id="restart-service-btn" class="btn-warning">重启服务</button>
-                    <button id="stop-service-btn" class="btn-danger">停止服务</button>
-                    <button id="delete-service-btn" class="btn-danger">删除服务</button>
-                    <button id="save-as-template-btn" class="btn-info">保存为模板</button>
-                    <button id="back-to-list-btn" class="btn-secondary">返回列表</button>
                 </div>
             </section>
 
@@ -1182,10 +2111,12 @@
                     <div class="form-group">
                         <label for="new-group-name">新建分组:</label>
                         <div class="group-input-container">
-                            <input type="text" id="new-group-name" placeholder="输入分组名称">
+                            <input type="text" id="new-group-name" placeholder="输入分组名称" style="margin-bottom: 10px;">
+                            <input type="password" id="new-group-password" placeholder="输入分组密码（访客使用）"
+                                style="margin-bottom: 10px;">
                             <button id="add-group-btn" class="btn btn-primary">添加分组</button>
                         </div>
-                        <small>为服务创建分组，便于管理和组织</small>
+                        <small>为服务创建分组，便于管理和组织。密码用于访客登录该分组。</small>
                     </div>
 
                     <div class="groups-list-container">
@@ -1201,16 +2132,36 @@
                     <div class="batch-operations">
                         <h3>批量操作</h3>
                         <div class="batch-controls">
-                            <select id="batch-source-group">
-                                <option value="">选择源分组...</option>
-                            </select>
-                            <span>→</span>
-                            <select id="batch-target-group">
-                                <option value="">选择目标分组...</option>
-                            </select>
-                            <button id="batch-move-btn" class="btn btn-warning">批量移动</button>
+                            <div class="batch-select-container">
+                                <label for="batch-source-group">源分组</label>
+                                <select id="batch-source-group">
+                                    <option value="">选择源分组...</option>
+                                </select>
+                                <div class="source-services-preview" id="source-services-preview">
+                                    <small>请先选择源分组</small>
+                                </div>
+                            </div>
+                            <div class="batch-arrow">→</div>
+                            <div class="batch-select-container">
+                                <label for="batch-target-group">目标分组</label>
+                                <select id="batch-target-group">
+                                    <option value="">选择目标分组...</option>
+                                </select>
+                                <div class="target-services-info" id="target-services-info">
+                                    <small>请先选择目标分组</small>
+                                </div>
+                            </div>
                         </div>
-                        <small>将服务从一个分组批量移动到另一个分组</small>
+                        <div class="batch-action-area">
+                            <button id="batch-move-btn" class="btn btn-warning" disabled>批量移动</button>
+                            <div class="batch-preview" id="batch-preview" style="display: none;">
+                                <div class="preview-summary">
+                                    <strong>预览：</strong>
+                                    <span id="preview-text">将要移动 0 个服务</span>
+                                </div>
+                            </div>
+                        </div>
+                        <small>将服务从一个分组批量移动到另一个分组。选择分组后将显示包含的服务列表。</small>
                     </div>
 
                     <div class="group-actions">
@@ -1305,30 +2256,66 @@
     <template id="service-card-template">
         <div class="service-card" data-id="">
             <div class="service-card-header">
-                <h3 class="service-mapped-address">未知地址</h3>
-                <span class="service-status">未知</span>
+                <div class="service-title-section">
+                    <h3 class="service-title">
+                        <span class="service-remark-display">服务名称</span>
+                        <span class="service-status service-status-unknown">未知</span>
+                    </h3>
+                    <p class="service-address-display">
+                        <span class="address-label">📍 映射地址：</span>
+                        <span class="service-address">未映射</span>
+                        <button class="btn-icon copy-address-btn" title="复制地址">📋</button>
+                        <button class="btn-icon quick-jump-btn" title="在新窗口打开地址" style="display: none;">🔗</button>
+                    </p>
+                </div>
             </div>
             <div class="service-card-body">
-                <div class="service-address-container">
-                    <span class="service-address-label">映射地址：</span>
-                    <span class="service-address">未映射</span>
-                    <button class="copy-address-btn" title="复制地址">
-                        <span class="icon icon-copy"></span>
-                        复制地址
-                    </button>
+                <div class="service-metrics">
+                    <div class="metric-item">
+                        <span class="metric-label">LAN</span>
+                        <span class="metric-value lan-status">检测中</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-label">WAN</span>
+                        <span class="metric-value wan-status">检测中</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-label">运行时间</span>
+                        <span class="metric-value runtime">计算中</span>
+                    </div>
                 </div>
-                <p class="service-cmd">命令: <span class="service-cmd-text">未知</span></p>
-                <p class="service-remark">备注: <span class="service-remark-text">无</span></p>
+
+                <div class="service-info">
+                    <div class="info-row">
+                        <span class="info-label">🏷️ 分组：</span>
+                        <span class="service-group-text">默认分组</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">💻 命令：</span>
+                        <span class="service-cmd-text">未知</span>
+                    </div>
+                </div>
+
                 <div class="service-card-actions">
-                    <button class="btn btn-secondary service-detail-btn" data-service-id="{{id}}">
-                        <span class="icon icon-info"></span> 详情
-                    </button>
-                    <button class="btn btn-danger service-stop-btn" data-service-id="{{id}}">
-                        <span class="icon icon-stop"></span> 停止
-                    </button>
-                    <button class="btn btn-danger service-delete-btn" data-service-id="{{id}}">
-                        <span class="icon icon-trash"></span> 删除
-                    </button>
+                    <div class="action-group primary-actions">
+                        <button class="btn btn-sm btn-primary service-detail-btn" title="查看详情">
+                            ℹ️ 详情
+                        </button>
+                        <button class="btn btn-sm btn-info service-quick-status-btn" title="快速查看运行状态">
+                            📊 状态
+                        </button>
+                        <button class="btn btn-sm btn-warning service-restart-btn" title="快速重启服务">
+                            🔄 重启
+                        </button>
+                    </div>
+                    <div class="action-group danger-actions">
+                        <button class="btn btn-sm btn-danger service-stop-btn" title="停止服务">
+                            ⏹️ 停止
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger service-delete-btn" title="删除服务">
+                            🗑️ 删除
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1359,10 +2346,21 @@
                 <span class="group-name">分组名称</span>
                 <span class="group-service-count">0 个服务</span>
             </div>
+            <div class="group-password-section">
+                <div class="password-display">
+                    <label class="password-label">访客密码:</label>
+                    <div class="password-field">
+                        <span class="password-value" data-password="">••••••••</span>
+                        <button class="btn-icon password-toggle-btn" title="显示/隐藏密码">👁️</button>
+                    </div>
+                </div>
+            </div>
             <div class="group-services-list">
                 <!-- 服务列表将通过JavaScript动态添加 -->
             </div>
             <div class="group-actions">
+                <button class="btn btn-small btn-info view-password-btn">查看密码</button>
+                <button class="btn btn-small btn-secondary edit-password-btn">修改密码</button>
                 <button class="btn btn-small btn-warning rename-group-btn">重命名</button>
                 <button class="btn btn-small btn-danger delete-group-btn">删除分组</button>
             </div>
@@ -1384,6 +2382,34 @@
             <div class="dialog-buttons">
                 <button id="confirm-save-template" class="btn btn-primary">保存</button>
                 <button id="cancel-save-template" class="btn btn-secondary">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 修改分组密码对话框 -->
+    <div id="edit-group-password-dialog" class="password-edit-dialog">
+        <div class="password-edit-content">
+            <h3>修改分组密码</h3>
+            <div class="form-group">
+                <label>分组名称:</label>
+                <div id="editing-group-name" class="current-password-display">
+                    <span class="group-name-text">分组名称</span>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>当前密码:</label>
+                <div class="current-password-display">
+                    <span id="current-password-text" class="password-text">当前密码</span>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="new-group-password-input">新密码:</label>
+                <input type="password" id="new-group-password-input" placeholder="输入新的访客密码">
+                <small>访客将使用此密码登录到该分组</small>
+            </div>
+            <div class="dialog-buttons">
+                <button id="confirm-edit-password" class="btn btn-primary">确认修改</button>
+                <button id="cancel-edit-password" class="btn btn-secondary">取消</button>
             </div>
         </div>
     </div>

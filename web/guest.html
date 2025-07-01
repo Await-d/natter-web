@@ -17,8 +17,9 @@
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             display: flex;
+            flex-direction: column;
             align-items: center;
-            justify-content: center;
+            justify-content: flex-start;
             line-height: 1.5;
             color: #333;
         }
@@ -27,6 +28,10 @@
             width: 100%;
             max-width: 1200px;
             padding: 0 20px;
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .guest-card {
@@ -35,10 +40,11 @@
             border: none;
             border-radius: 20px;
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-            padding: 40px;
-            max-width: 500px;
+            padding: 0;
+            max-width: 900px;
             width: 100%;
             margin: 20px auto;
+            overflow: hidden;
         }
 
         .text-center {
@@ -365,18 +371,116 @@
 
         /* 响应式设计 */
         @media (max-width: 768px) {
+            body {
+                justify-content: flex-start;
+                padding: 10px;
+            }
+
+            .container {
+                align-items: flex-start;
+                padding: 0 10px;
+            }
+
+            .logo-section {
+                margin: 5px 0;
+            }
+
             .guest-card {
-                padding: 20px;
+                padding: 0;
                 margin: 10px;
+                max-width: none;
+                border-radius: 15px;
             }
 
-            .d-flex {
+            .guest-header {
+                padding: 1.5rem 1rem;
+            }
+
+            .guest-header h1 {
+                font-size: 1.5rem;
+            }
+
+            .guest-content {
+                padding: 1rem;
+            }
+
+            .address-info {
                 flex-direction: column;
-                gap: 10px;
+                align-items: flex-start;
+                gap: 8px;
             }
 
-            .justify-content-between {
-                justify-content: stretch;
+            .address-value {
+                min-width: 100%;
+                flex: none;
+                padding: 12px;
+                font-size: 14px;
+            }
+
+            .btn-copy {
+                width: 100%;
+                padding: 10px;
+                font-size: 14px;
+            }
+
+            .info-row {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.5rem;
+            }
+
+            .service-item {
+                padding: 1rem;
+                margin-bottom: 0.75rem;
+            }
+
+            .service-header h5 {
+                font-size: 1rem;
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.5rem;
+            }
+
+            .logout-btn {
+                font-size: 12px;
+                padding: 6px 12px;
+            }
+
+            /* 增大触摸目标 */
+            .btn {
+                min-height: 44px;
+                padding: 12px 20px;
+            }
+
+            .btn-refresh {
+                width: 100%;
+                justify-content: center;
+            }
+
+            /* 移动端快速操作按钮优化 */
+            .quick-actions {
+                bottom: 15px;
+                right: 15px;
+                gap: 8px;
+            }
+
+            .quick-btn {
+                width: 45px;
+                height: 45px;
+                font-size: 18px;
+            }
+
+            .service-nav {
+                margin-bottom: 0.5rem;
+            }
+
+            .service-nav-container {
+                padding: 0 0.5rem;
+            }
+
+            .quick-links-content {
+                padding: 1.5rem;
+                margin: 10px;
             }
         }
 
@@ -562,9 +666,11 @@
         .address-value {
             font-family: 'Courier New', monospace;
             background: #f8f9fa;
-            padding: 4px 8px;
-            border-radius: 4px;
+            padding: 8px 12px;
+            border-radius: 6px;
             border: 1px solid #e1e5e9;
+            flex: 1;
+            min-width: 200px;
         }
 
         .btn-copy {
@@ -662,10 +768,196 @@
         .notification.info {
             background: #17a2b8;
         }
+
+        /* 快速跳转功能样式 */
+        .quick-actions {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 1000;
+        }
+
+        .quick-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: none;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .quick-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn-back-to-top {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .btn-refresh-quick {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        }
+
+        .btn-menu {
+            background: linear-gradient(135deg, #ffc107 0%, #ff8c00 100%);
+        }
+
+        /* 服务快速导航 */
+        .service-nav {
+            position: sticky;
+            top: 0;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid #e1e5e9;
+            padding: 10px 0;
+            margin-bottom: 1rem;
+            z-index: 100;
+        }
+
+        .service-nav-container {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding: 0 1rem;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .service-nav-container::-webkit-scrollbar {
+            display: none;
+        }
+
+        .service-nav-item {
+            flex-shrink: 0;
+            padding: 6px 12px;
+            background: #f8f9fa;
+            border: 1px solid #e1e5e9;
+            border-radius: 20px;
+            font-size: 12px;
+            color: #495057;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .service-nav-item:hover,
+        .service-nav-item.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        /* 快速链接模态框 */
+        .quick-links-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+
+        .quick-links-content {
+            background: white;
+            border-radius: 15px;
+            padding: 2rem;
+            max-width: 400px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .quick-links-header {
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .quick-link-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            border: 1px solid #e1e5e9;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .quick-link-item:hover {
+            background: #f8f9fa;
+            border-color: #667eea;
+        }
+
+        .quick-link-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #667eea;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+            font-size: 16px;
+        }
+
+        .quick-link-info {
+            flex: 1;
+        }
+
+        .quick-link-title {
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+
+        .quick-link-desc {
+            font-size: 12px;
+            color: #666;
+        }
+
+        /* Logo区域样式 */
+        .logo-section {
+            width: 100%;
+            text-align: center;
+            margin: 10px 0;
+            flex-shrink: 0;
+        }
+
+        .logo-section img {
+            height: 48px;
+            max-width: 90vw;
+            filter: drop-shadow(0 2px 8px rgba(0, 230, 195, 0.3));
+            transition: all 0.3s ease;
+        }
+
+        .logo-section img:hover {
+            transform: scale(1.05);
+            filter: drop-shadow(0 4px 12px rgba(0, 230, 195, 0.5));
+        }
     </style>
 </head>
 
 <body>
+    <!-- Logo区域 -->
+    <div class="logo-section">
+        <img src="await-logo.svg" alt="Await Logo" onerror="this.style.display='none';">
+    </div>
+
     <div class="container">
         <div class="guest-card fade-in">
             <div class="guest-header">
@@ -679,6 +971,13 @@
             </div>
 
             <div class="guest-content">
+                <!-- 服务快速导航 -->
+                <div class="service-nav" id="service-nav" style="display: none;">
+                    <div class="service-nav-container" id="service-nav-container">
+                        <!-- 服务导航项将通过JavaScript动态生成 -->
+                    </div>
+                </div>
+
                 <div class="services-section">
                     <div class="section-header">
                         <h3>📋 服务列表</h3>
@@ -706,6 +1005,35 @@
                             <span class="icon icon-refresh"></span>刷新
                         </button>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 快速操作按钮 -->
+        <div class="quick-actions">
+            <button class="quick-btn btn-menu" onclick="showQuickLinks()" title="快速链接">
+                ⚡
+            </button>
+            <button class="quick-btn btn-refresh-quick" onclick="refreshServices()" title="刷新服务">
+                🔄
+            </button>
+            <button class="quick-btn btn-back-to-top" onclick="scrollToTop()" title="返回顶部">
+                ⬆️
+            </button>
+        </div>
+
+        <!-- 快速链接模态框 -->
+        <div class="quick-links-modal" id="quick-links-modal" onclick="hideQuickLinks()">
+            <div class="quick-links-content" onclick="event.stopPropagation()">
+                <div class="quick-links-header">
+                    <h4>🚀 快速链接</h4>
+                    <p style="margin: 0; color: #666; font-size: 14px;">选择要访问的服务</p>
+                </div>
+                <div id="quick-links-list">
+                    <!-- 快速链接项将通过JavaScript动态生成 -->
+                </div>
+                <div style="text-align: center; margin-top: 1rem;">
+                    <button class="btn btn-outline-secondary" onclick="hideQuickLinks()">关闭</button>
                 </div>
             </div>
         </div>
@@ -752,11 +1080,11 @@
                 const response = await fetch(`/api/guest/services?group_id=${currentGroupId}`);
                 const result = await response.json();
 
-                if (result.success) {
+                if (response.ok && result.services) {
                     displayServices(result.services || []);
                     updateLastUpdateTime();
                 } else {
-                    showError(result.message || '加载服务列表失败');
+                    showError(result.error || '加载服务列表失败');
                 }
             } catch (error) {
                 console.error('加载服务列表失败:', error);
@@ -777,16 +1105,17 @@
                         <p>此分组暂无服务</p>
                     </div>
                 `;
+                hideServiceNav();
                 return;
             }
 
             let html = '';
-            services.forEach(service => {
+            services.forEach((service, index) => {
                 const statusClass = service.status === '运行中' ? 'status-running' : 'status-stopped';
                 const statusIcon = service.status === '运行中' ? '🟢' : '🔴';
 
                 html += `
-                    <div class="service-item">
+                    <div class="service-item" id="service-${service.id}">
                         <div class="service-header">
                             <h5>
                                 ${statusIcon} ${service.remark || `服务 ${service.id}`}
@@ -799,7 +1128,7 @@
                                 <div class="address-info">
                                     <strong>🔗 访问地址:</strong> 
                                     <span class="address-value">${service.mapped_address}</span>
-                                    <button class="btn btn-small btn-copy" onclick="copyAddress('${service.mapped_address}')">
+                                    <button class="btn btn-small btn-copy" onclick="copyAddress('${service.mapped_address.replace(/'/g, "\\'")}')">
                                         📋 复制
                                     </button>
                                 </div>
@@ -822,6 +1151,145 @@
             });
 
             servicesList.innerHTML = html;
+
+            // 生成服务导航
+            generateServiceNav(services);
+            // 缓存服务数据用于快速链接
+            window.cachedServices = services;
+        }
+
+        // 生成服务快速导航
+        function generateServiceNav(services) {
+            const serviceNav = document.getElementById('service-nav');
+            const serviceNavContainer = document.getElementById('service-nav-container');
+
+            if (services.length <= 3) {
+                hideServiceNav();
+                return;
+            }
+
+            let navHtml = '';
+            services.forEach((service, index) => {
+                const serviceName = service.remark || `服务 ${service.id}`;
+                const shortName = serviceName.length > 10 ? serviceName.substring(0, 10) + '...' : serviceName;
+                const statusIcon = service.status === '运行中' ? '🟢' : '🔴';
+
+                navHtml += `
+                    <div class="service-nav-item" onclick="scrollToService('${service.id}')" title="${serviceName}">
+                        ${statusIcon} ${shortName}
+                    </div>
+                `;
+            });
+
+            serviceNavContainer.innerHTML = navHtml;
+            serviceNav.style.display = 'block';
+        }
+
+        // 隐藏服务导航
+        function hideServiceNav() {
+            const serviceNav = document.getElementById('service-nav');
+            serviceNav.style.display = 'none';
+        }
+
+        // 滚动到指定服务
+        function scrollToService(serviceId) {
+            const serviceElement = document.getElementById(`service-${serviceId}`);
+            if (serviceElement) {
+                // 高亮当前导航项
+                document.querySelectorAll('.service-nav-item').forEach(item => {
+                    item.classList.remove('active');
+                });
+                event.target.classList.add('active');
+
+                // 滚动到服务项
+                serviceElement.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'center'
+                });
+
+                // 短暂高亮服务项
+                serviceElement.style.transform = 'scale(1.02)';
+                serviceElement.style.boxShadow = '0 8px 25px rgba(102, 126, 234, 0.3)';
+                setTimeout(() => {
+                    serviceElement.style.transform = '';
+                    serviceElement.style.boxShadow = '';
+                }, 1000);
+            }
+        }
+
+        // 返回顶部
+        function scrollToTop() {
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+        }
+
+        // 显示快速链接模态框
+        function showQuickLinks() {
+            const modal = document.getElementById('quick-links-modal');
+            const quickLinksList = document.getElementById('quick-links-list');
+
+            if (!window.cachedServices || window.cachedServices.length === 0) {
+                quickLinksList.innerHTML = `
+                    <div style="text-align: center; padding: 2rem; color: #666;">
+                        <p>暂无可用的服务链接</p>
+                    </div>
+                `;
+            } else {
+                let quickLinksHtml = '';
+                window.cachedServices.forEach(service => {
+                    const serviceName = service.remark || `服务 ${service.id}`;
+                    const statusIcon = service.status === '运行中' ? '🟢' : '🔴';
+                    const hasAddress = service.mapped_address && service.mapped_address !== '无';
+
+                    quickLinksHtml += `
+                        <div class="quick-link-item" onclick="${hasAddress ? `openServiceLink('${service.mapped_address}')` : ''}">
+                            <div class="quick-link-icon">
+                                ${statusIcon}
+                            </div>
+                            <div class="quick-link-info">
+                                <div class="quick-link-title">${serviceName}</div>
+                                <div class="quick-link-desc">
+                                    ${hasAddress ? service.mapped_address : '等待分配地址...'}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                quickLinksList.innerHTML = quickLinksHtml;
+            }
+
+            modal.style.display = 'flex';
+            setTimeout(() => {
+                modal.style.opacity = '1';
+            }, 10);
+        }
+
+        // 隐藏快速链接模态框
+        function hideQuickLinks() {
+            const modal = document.getElementById('quick-links-modal');
+            modal.style.opacity = '0';
+            setTimeout(() => {
+                modal.style.display = 'none';
+            }, 300);
+        }
+
+        // 打开服务链接
+        function openServiceLink(address) {
+            // 处理不同协议的地址
+            let url = address;
+            if (address.startsWith('tcp://')) {
+                // TCP地址转换为HTTP
+                url = address.replace('tcp://', 'http://');
+            } else if (!address.startsWith('http://') && !address.startsWith('https://')) {
+                // 如果没有协议，默认添加http://
+                url = 'http://' + address;
+            }
+
+            window.open(url, '_blank');
+            hideQuickLinks();
+            showNotification('正在打开服务链接...', 'info');
         }
 
         // 显示加载状态
