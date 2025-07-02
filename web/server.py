@@ -644,7 +644,7 @@ class NatterService:
                 if arg == "-i" and i + 1 < len(self.cmd_args):
                     self.bind_interface = self.cmd_args[i + 1]
                     break
-            
+
             # 查找 -b 参数后面的绑定端口
             for i, arg in enumerate(self.cmd_args):
                 if arg == "-b" and i + 1 < len(self.cmd_args):
@@ -738,152 +738,166 @@ class NatterService:
                 # 检查进程状态，如果已停止则退出
                 if self.process.poll() is not None:
                     break
-                
+
                 self.output_lines.append(line.strip())
                 line_count += 1
-                
+
                 # 限制保存的日志行数，防止内存泄漏
                 if len(self.output_lines) > 100:
                     self.output_lines.pop(0)
-                
+
                 # 防止无限循环，限制处理的总行数
                 if line_count > max_lines:
                     print(f"服务 {self.service_id} 输出行数过多，停止捕获")
                     break
 
-            # 尝试提取映射地址 - 支持Natter v2.1.1的新格式
-            if "<--Natter-->" in line:
-                parts = line.split("<--Natter-->")
-                if len(parts) == 2:
-                    left_part = parts[0].strip()  # 包含目标地址和绑定地址
-                    new_mapped_address = parts[1].strip()  # 映射的外网地址
-                    
-                    # 解析绑定地址信息 - 支持新的三段式格式
-                    try:
-                        # 查找是否有转发方法标识符（如 <--socket--> 或 <--iptables-->）
-                        if "-->" in left_part and "<--" in left_part:
-                            # 新格式：tcp://目标地址 <--转发方法--> tcp://绑定地址
-                            # 找到最后一个转发标识符的位置
-                            last_arrow_end = left_part.rfind("-->")
-                            if last_arrow_end != -1:
-                                # 提取绑定地址部分（在最后一个箭头之后）
-                                bind_address_part = left_part[last_arrow_end + 3:].strip()
-                                if "://" in bind_address_part:
-                                    # 去掉协议前缀 (tcp:// 或 udp://)
-                                    local_addr_part = bind_address_part.split("://", 1)[1]
+                # 尝试提取映射地址 - 支持Natter v2.1.1的新格式
+                if "<--Natter-->" in line:
+                    parts = line.split("<--Natter-->")
+                    if len(parts) == 2:
+                        left_part = parts[0].strip()  # 包含目标地址和绑定地址
+                        new_mapped_address = parts[1].strip()  # 映射的外网地址
+
+                        # 解析绑定地址信息 - 支持新的三段式格式
+                        try:
+                            # 查找是否有转发方法标识符（如 <--socket--> 或 <--iptables-->）
+                            if "-->" in left_part and "<--" in left_part:
+                                # 新格式：tcp://目标地址 <--转发方法--> tcp://绑定地址
+                                # 找到最后一个转发标识符的位置
+                                last_arrow_end = left_part.rfind("-->")
+                                if last_arrow_end != -1:
+                                    # 提取绑定地址部分（在最后一个箭头之后）
+                                    bind_address_part = left_part[
+                                        last_arrow_end + 3 :
+                                    ].strip()
+                                    if "://" in bind_address_part:
+                                        # 去掉协议前缀 (tcp:// 或 udp://)
+                                        local_addr_part = bind_address_part.split(
+                                            "://", 1
+                                        )[1]
+                                        if ":" in local_addr_part:
+                                            bind_ip, bind_port_str = (
+                                                local_addr_part.rsplit(":", 1)
+                                            )
+                                            self.bind_interface = bind_ip
+                                            self.bind_port = int(bind_port_str)
+                                            print(
+                                                f"解析到绑定地址: {bind_ip}:{bind_port_str}"
+                                            )
+                            else:
+                                # 旧格式：直接从left_part解析
+                                if "://" in left_part:
+                                    local_addr_part = left_part.split("://", 1)[1]
                                     if ":" in local_addr_part:
-                                        bind_ip, bind_port_str = local_addr_part.rsplit(":", 1)
+                                        bind_ip, bind_port_str = local_addr_part.rsplit(
+                                            ":", 1
+                                        )
                                         self.bind_interface = bind_ip
                                         self.bind_port = int(bind_port_str)
-                                        print(f"解析到绑定地址: {bind_ip}:{bind_port_str}")
-                        else:
-                            # 旧格式：直接从left_part解析
-                            if "://" in left_part:
-                                local_addr_part = left_part.split("://", 1)[1]
-                                if ":" in local_addr_part:
-                                    bind_ip, bind_port_str = local_addr_part.rsplit(":", 1)
-                                    self.bind_interface = bind_ip
-                                    self.bind_port = int(bind_port_str)
-                    except Exception as e:
-                        print(f"解析本地绑定地址出错: {e}")
-
-                    # 检查映射地址是否变更
-                    if self.mapped_address != new_mapped_address:
-                        # 记录旧地址用于推送消息
-                        old_address = self.mapped_address or "无"
-
-                        # 更新地址 - 去掉协议前缀，只保存IP:Port格式
-                        if "://" in new_mapped_address:
-                            self.mapped_address = new_mapped_address.split("://", 1)[1]
-                        else:
-                            self.mapped_address = new_mapped_address
-
-                        # 解析远程端口
-                        try:
-                            if self.mapped_address and ":" in self.mapped_address:
-                                # 去掉协议前缀
-                                addr_to_parse = self.mapped_address
-                                if "://" in addr_to_parse:
-                                    addr_to_parse = addr_to_parse.split("://", 1)[1]
-                                
-                                addr_parts = addr_to_parse.split(":")
-                                if len(addr_parts) >= 2:
-                                    self.remote_port = int(addr_parts[-1])
-                                    print(f"解析到映射地址: {addr_to_parse}, 远程端口: {self.remote_port}")
                         except Exception as e:
-                            print(f"解析远程端口出错: {e}")
+                            print(f"解析本地绑定地址出错: {e}")
 
-                        # 发送映射地址变更推送 - 使用消息队列
-                        service_name = self.remark or f"服务 {self.service_id}"
-                        local_port = self.local_port or "未知"
+                        # 检查映射地址是否变更
+                        if self.mapped_address != new_mapped_address:
+                            # 记录旧地址用于推送消息
+                            old_address = self.mapped_address or "无"
 
-                        # 仅在非首次获取地址时发送变更消息
-                        if old_address != "无":
-                            queue_message(
-                                "地址变更",
-                                f"[地址变更] {service_name}",
-                                f"服务映射地址已变更\n服务ID: {self.service_id}\n服务备注: {self.remark or '无'}\n本地端口: {local_port}\n\n旧地址: {old_address}\n新地址: {self.mapped_address}\n变更时间: {time.strftime('%Y-%m-%d %H:%M:%S')}",
-                            )
-                        else:
-                            # 首次获取地址时发送通知
-                            queue_message(
-                                "地址分配",
-                                f"[地址分配] {service_name}",
-                                f"服务获取到映射地址\n服务ID: {self.service_id}\n服务备注: {self.remark or '无'}\n本地端口: {local_port}\n映射地址: {self.mapped_address}\n获取时间: {time.strftime('%Y-%m-%d %H:%M:%S')}",
-                            )
+                            # 更新地址 - 去掉协议前缀，只保存IP:Port格式
+                            if "://" in new_mapped_address:
+                                self.mapped_address = new_mapped_address.split(
+                                    "://", 1
+                                )[1]
+                            else:
+                                self.mapped_address = new_mapped_address
 
-            # 检测nftables错误
-            if "nftables" in line and "not available" in line:
-                nftables_error_detected = True
-                self.output_lines.append(
-                    "⚠️ 检测到nftables不可用错误！Docker容器可能缺少所需权限或内核支持。"
-                )
-                self.output_lines.append(
-                    "💡 建议：尝试使用其他转发方法，如'socket'（内置）或'iptables'。"
-                )
-                self.output_lines.append(
-                    "📋 步骤：停止此服务，重新创建服务并在'转发方法'中选择'socket'或'iptables'。"
-                )
+                            # 解析远程端口
+                            try:
+                                if self.mapped_address and ":" in self.mapped_address:
+                                    # 去掉协议前缀
+                                    addr_to_parse = self.mapped_address
+                                    if "://" in addr_to_parse:
+                                        addr_to_parse = addr_to_parse.split("://", 1)[1]
 
-                # 发送错误推送 - 使用消息队列
-                service_name = self.remark or f"服务 {self.service_id}"
-                queue_message(
-                    "错误",
-                    f"[错误] {service_name}",
-                    f"服务出现错误\n错误类型: nftables不可用\n服务ID: {self.service_id}\n\n建议：尝试使用其他转发方法，如'socket'（内置）或'iptables'。\n步骤：停止此服务，重新创建服务并在'转发方法'中选择'socket'或'iptables'。",
-                )
+                                    addr_parts = addr_to_parse.split(":")
+                                    if len(addr_parts) >= 2:
+                                        self.remote_port = int(addr_parts[-1])
+                                        print(
+                                            f"解析到映射地址: {addr_to_parse}, 远程端口: {self.remote_port}"
+                                        )
+                            except Exception as e:
+                                print(f"解析远程端口出错: {e}")
 
-            # 检测pcap初始化错误
-            if "pcap initialization failed" in line:
-                self.output_lines.append(
-                    "⚠️ 检测到pcap初始化错误！这通常与nftables功能有关。"
-                )
-                self.output_lines.append(
-                    "💡 建议：尝试使用其他转发方法，如'socket'（内置）或'iptables'。"
-                )
+                            # 发送映射地址变更推送 - 使用消息队列
+                            service_name = self.remark or f"服务 {self.service_id}"
+                            local_port = self.local_port or "未知"
 
-                # 发送错误推送 - 使用消息队列
-                service_name = self.remark or f"服务 {self.service_id}"
-                queue_message(
-                    "错误",
-                    f"[错误] {service_name}",
-                    f"服务出现错误\n错误类型: pcap初始化失败\n服务ID: {self.service_id}\n\n建议：尝试使用其他转发方法，如'socket'（内置）或'iptables'。",
-                )
+                            # 仅在非首次获取地址时发送变更消息
+                            if old_address != "无":
+                                queue_message(
+                                    "地址变更",
+                                    f"[地址变更] {service_name}",
+                                    f"服务映射地址已变更\n服务ID: {self.service_id}\n服务备注: {self.remark or '无'}\n本地端口: {local_port}\n\n旧地址: {old_address}\n新地址: {self.mapped_address}\n变更时间: {time.strftime('%Y-%m-%d %H:%M:%S')}",
+                                )
+                            else:
+                                # 首次获取地址时发送通知
+                                queue_message(
+                                    "地址分配",
+                                    f"[地址分配] {service_name}",
+                                    f"服务获取到映射地址\n服务ID: {self.service_id}\n服务备注: {self.remark or '无'}\n本地端口: {local_port}\n映射地址: {self.mapped_address}\n获取时间: {time.strftime('%Y-%m-%d %H:%M:%S')}",
+                                )
 
-            # 提取NAT类型
-            nat_match = NAT_TYPE_PATTERN.search(line)
-            if nat_match:
-                self.nat_type = nat_match.group(1).strip()
+                # 检测nftables错误
+                if "nftables" in line and "not available" in line:
+                    nftables_error_detected = True
+                    self.output_lines.append(
+                        "⚠️ 检测到nftables不可用错误！Docker容器可能缺少所需权限或内核支持。"
+                    )
+                    self.output_lines.append(
+                        "💡 建议：尝试使用其他转发方法，如'socket'（内置）或'iptables'。"
+                    )
+                    self.output_lines.append(
+                        "📋 步骤：停止此服务，重新创建服务并在'转发方法'中选择'socket'或'iptables'。"
+                    )
 
-            # 提取LAN状态
-            lan_match = LAN_STATUS_PATTERN.search(line)
-            if lan_match:
-                self.lan_status = lan_match.group(2).strip()
+                    # 发送错误推送 - 使用消息队列
+                    service_name = self.remark or f"服务 {self.service_id}"
+                    queue_message(
+                        "错误",
+                        f"[错误] {service_name}",
+                        f"服务出现错误\n错误类型: nftables不可用\n服务ID: {self.service_id}\n\n建议：尝试使用其他转发方法，如'socket'（内置）或'iptables'。\n步骤：停止此服务，重新创建服务并在'转发方法'中选择'socket'或'iptables'。",
+                    )
 
-            # 提取WAN状态
-            wan_match = WAN_STATUS_PATTERN.search(line)
-            if wan_match:
-                self.wan_status = wan_match.group(2).strip()
+                # 检测pcap初始化错误
+                if "pcap initialization failed" in line:
+                    self.output_lines.append(
+                        "⚠️ 检测到pcap初始化错误！这通常与nftables功能有关。"
+                    )
+                    self.output_lines.append(
+                        "💡 建议：尝试使用其他转发方法，如'socket'（内置）或'iptables'。"
+                    )
+
+                    # 发送错误推送 - 使用消息队列
+                    service_name = self.remark or f"服务 {self.service_id}"
+                    queue_message(
+                        "错误",
+                        f"[错误] {service_name}",
+                        f"服务出现错误\n错误类型: pcap初始化失败\n服务ID: {self.service_id}\n\n建议：尝试使用其他转发方法，如'socket'（内置）或'iptables'。",
+                    )
+
+                # 提取NAT类型
+                nat_match = NAT_TYPE_PATTERN.search(line)
+                if nat_match:
+                    self.nat_type = nat_match.group(1).strip()
+
+                # 提取LAN状态
+                lan_match = LAN_STATUS_PATTERN.search(line)
+                if lan_match:
+                    self.lan_status = lan_match.group(2).strip()
+
+                # 提取WAN状态
+                wan_match = WAN_STATUS_PATTERN.search(line)
+                if wan_match:
+                    self.wan_status = wan_match.group(2).strip()
 
         except Exception as e:
             print(f"捕获输出时出错: {e}")
@@ -919,7 +933,7 @@ class NatterService:
                     self.restart_thread.join(timeout=2)  # 等待最多2秒
                 except:
                     pass
-            
+
             # 使用新线程进行重启，避免阻塞当前线程
             self.restart_thread = threading.Thread(target=self._restart_service)
             self.restart_thread.daemon = True
@@ -963,10 +977,10 @@ class NatterService:
                         except Exception as e:
                             print(f"强制终止子进程失败: {e}")
                     parent.kill()
-                    
+
                 # 再次等待确保进程完全结束
                 time.sleep(1)
-                    
+
             except Exception as e:
                 print(f"使用psutil终止进程失败: {e}")
                 # 如果psutil不可用，使用常规方法
@@ -978,21 +992,21 @@ class NatterService:
                         time.sleep(1)
                 except Exception as e2:
                     print(f"常规方法终止进程失败: {e2}")
-            
+
             # 清理输出流
             try:
                 if self.process.stdout:
                     self.process.stdout.close()
             except:
                 pass
-                
+
             # 等待并清理线程
             if self.restart_thread and self.restart_thread.is_alive():
                 try:
                     self.restart_thread.join(timeout=2)
                 except:
                     pass
-                    
+
             if self.output_thread and self.output_thread.is_alive():
                 try:
                     self.output_thread.join(timeout=2)
@@ -1215,12 +1229,16 @@ class NatterManager:
         with service_lock:
             if service_id in running_services:
                 service_info = running_services[service_id].get_info()
-                
+
                 # 添加分组信息（和list_services方法保持一致）
-                group_id, group_info = ServiceGroupManager.get_group_by_service(service_id)
+                group_id, group_info = ServiceGroupManager.get_group_by_service(
+                    service_id
+                )
                 service_info["group_id"] = group_id
-                service_info["group_name"] = group_info.get("name") if group_info else "默认分组"
-                
+                service_info["group_name"] = (
+                    group_info.get("name") if group_info else "默认分组"
+                )
+
                 return service_info
         return None
 
@@ -1231,12 +1249,16 @@ class NatterManager:
         with service_lock:
             for service_id in running_services:
                 service_info = running_services[service_id].get_info()
-                
+
                 # 添加分组信息
-                group_id, group_info = ServiceGroupManager.get_group_by_service(service_id)
+                group_id, group_info = ServiceGroupManager.get_group_by_service(
+                    service_id
+                )
                 service_info["group_id"] = group_id
-                service_info["group_name"] = group_info.get("name") if group_info else "默认分组"
-                
+                service_info["group_name"] = (
+                    group_info.get("name") if group_info else "默认分组"
+                )
+
                 services.append(service_info)
         return services
 
@@ -1545,10 +1567,14 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                 # 检查认证状态
                 if self._authenticate_token():
                     self._set_headers()
-                    self.wfile.write(json.dumps({
-                        "authenticated": True, 
-                        "auth_required": ADMIN_PASSWORD is not None
-                    }).encode())
+                    self.wfile.write(
+                        json.dumps(
+                            {
+                                "authenticated": True,
+                                "auth_required": ADMIN_PASSWORD is not None,
+                            }
+                        ).encode()
+                    )
                 elif ADMIN_PASSWORD is not None:
                     self._set_headers()
                     self.wfile.write(
@@ -1622,21 +1648,23 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
             elif path == "/api/groups":
                 # 获取服务组列表
                 self._set_headers()
-                
+
                 # 检查是否为已认证用户（包括token和基本认证）
                 is_authenticated = self._authenticate() or self._authenticate_token()
-                
+
                 if is_authenticated:
                     # 已认证用户可以看到包含密码的完整分组信息
                     groups = ServiceGroupManager.list_groups()
                 else:
                     # 未认证用户只能看到基本分组信息（不含密码）
                     groups = ServiceGroupManager.list_groups_without_password()
-                
+
                 self.wfile.write(json.dumps({"groups": groups}).encode())
             elif path == "/api/groups/services":
                 # 根据组ID获取服务列表
-                group_id = query_params.get("group_id", [""])[0]  # 默认为空字符串（默认分组）
+                group_id = query_params.get("group_id", [""])[
+                    0
+                ]  # 默认为空字符串（默认分组）
                 services = ServiceGroupManager.get_services_by_group(group_id)
                 self._set_headers()
                 self.wfile.write(json.dumps({"services": services}).encode())
@@ -1644,14 +1672,18 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                 # 移动服务到指定分组
                 if "service_id" in query_params:
                     service_id = query_params["service_id"][0]
-                    new_group_id = query_params.get("group_id", "")  # 空字符串表示默认分组
-                    
+                    new_group_id = query_params.get(
+                        "group_id", ""
+                    )  # 空字符串表示默认分组
+
                     # 首先从当前分组中移除服务
                     ServiceGroupManager.remove_service_from_all_groups(service_id)
-                    
+
                     # 如果目标分组不是默认分组，则添加到新分组
                     if new_group_id:
-                        if ServiceGroupManager.add_service_to_group(new_group_id, service_id):
+                        if ServiceGroupManager.add_service_to_group(
+                            new_group_id, service_id
+                        ):
                             self._set_headers()
                             self.wfile.write(json.dumps({"success": True}).encode())
                         else:
@@ -1664,49 +1696,61 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                     self._error(400, "缺少service_id参数")
             elif path == "/api/groups/batch-move":
                 # 批量移动服务
-                if "source_group_id" in query_params and "target_group_id" in query_params:
-                    source_group_id = query_params["source_group_id"][0] or ""  # 空字符串表示默认分组
+                if (
+                    "source_group_id" in query_params
+                    and "target_group_id" in query_params
+                ):
+                    source_group_id = (
+                        query_params["source_group_id"][0] or ""
+                    )  # 空字符串表示默认分组
                     target_group_id = query_params["target_group_id"][0] or ""
-                    
+
                     # 获取源分组中的所有服务
-                    services = ServiceGroupManager.get_services_in_group(source_group_id)
+                    services = ServiceGroupManager.get_services_in_group(
+                        source_group_id
+                    )
                     moved_count = 0
-                    
+
                     for service in services:
                         service_id = service.get("id")
                         if service_id:
                             # 从源分组中移除
                             if source_group_id:
-                                ServiceGroupManager.remove_service_from_group(source_group_id, service_id)
-                            
+                                ServiceGroupManager.remove_service_from_group(
+                                    source_group_id, service_id
+                                )
+
                             # 添加到目标分组
                             if target_group_id:
-                                ServiceGroupManager.add_service_to_group(target_group_id, service_id)
-                            
+                                ServiceGroupManager.add_service_to_group(
+                                    target_group_id, service_id
+                                )
+
                             moved_count += 1
-                    
+
                     self._set_headers()
-                    self.wfile.write(json.dumps({
-                        "success": True, 
-                        "moved_count": moved_count
-                    }).encode())
+                    self.wfile.write(
+                        json.dumps(
+                            {"success": True, "moved_count": moved_count}
+                        ).encode()
+                    )
                 else:
                     self._error(400, "缺少必要参数")
             elif path == "/api/auth/unified-login":
                 # 统一登录验证API
                 password = None
-                
+
                 # 首先尝试从JSON body获取密码（POST请求）
-                if self.command == 'POST':
+                if self.command == "POST":
                     try:
-                        content_length = int(self.headers.get('Content-Length', 0))
+                        content_length = int(self.headers.get("Content-Length", 0))
                         if content_length > 0:
                             post_data = self.rfile.read(content_length)
-                            data = json.loads(post_data.decode('utf-8'))
-                            password = data.get('password')
+                            data = json.loads(post_data.decode("utf-8"))
+                            password = data.get("password")
                     except Exception as e:
                         print(f"解析POST数据出错: {e}")
-                
+
                 # 如果POST没有获取到密码，尝试从查询参数获取（GET请求）
                 if not password and "password" in query_params:
                     password = query_params["password"][0]
@@ -1726,7 +1770,9 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                         return
 
                     # 检查是否是访客组密码
-                    group_id, group = ServiceGroupManager.get_group_by_password(password)
+                    group_id, group = ServiceGroupManager.get_group_by_password(
+                        password
+                    )
                     if group:
                         # 访客登录
                         self._set_headers()
@@ -1784,18 +1830,20 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                     # 生成新的Bearer token并存储在auth_tokens中
                     token = secrets.token_urlsafe(32)
                     auth_tokens[token] = time.time()
-                    
+
                     self._set_headers()
                     # 为了向后兼容，同时返回Bearer token和旧的base64 token
                     auth_string = f"user:{ADMIN_PASSWORD}"
                     auth_token_legacy = base64.b64encode(auth_string.encode()).decode()
-                    
+
                     self.wfile.write(
-                        json.dumps({
-                            "success": True, 
-                            "token": token,  # 新的Bearer token
-                            "legacy_token": auth_token_legacy  # 旧的base64 token（向后兼容）
-                        }).encode()
+                        json.dumps(
+                            {
+                                "success": True,
+                                "token": token,  # 新的Bearer token
+                                "legacy_token": auth_token_legacy,  # 旧的base64 token（向后兼容）
+                            }
+                        ).encode()
                     )
                 else:
                     self._error(401, "密码错误")
@@ -1807,7 +1855,7 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
         elif path == "/api/auth/unified-login":
             if "password" in data:
                 password = data["password"]
-                
+
                 # 首先检查是否是管理员密码
                 if ADMIN_PASSWORD and password == ADMIN_PASSWORD:
                     # 管理员登录
@@ -1851,13 +1899,13 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                 auto_restart = data.get("auto_restart", False)
                 remark = data.get("remark", "")
                 group_id = data.get("group_id", "")  # 获取分组ID
-                
+
                 service_id = NatterManager.start_service(args, auto_restart, remark)
                 if service_id:
                     # 如果指定了分组，将服务添加到该分组
                     if group_id:
                         ServiceGroupManager.add_service_to_group(group_id, service_id)
-                    
+
                     self._set_headers()
                     self.wfile.write(json.dumps({"service_id": service_id}).encode())
                 else:
@@ -2252,13 +2300,15 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
             if "service_id" in data:
                 service_id = data["service_id"]
                 new_group_id = data.get("group_id", "")  # 空字符串表示默认分组
-                
+
                 # 首先从当前分组中移除服务
                 ServiceGroupManager.remove_service_from_all_groups(service_id)
-                
+
                 # 如果目标分组不是默认分组，则添加到新分组
                 if new_group_id:
-                    if ServiceGroupManager.add_service_to_group(new_group_id, service_id):
+                    if ServiceGroupManager.add_service_to_group(
+                        new_group_id, service_id
+                    ):
                         self._set_headers()
                         self.wfile.write(json.dumps({"success": True}).encode())
                     else:
@@ -2272,34 +2322,41 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
         elif path == "/api/groups/batch-move":
             # 批量移动服务
             if "source_group_id" in data and "target_group_id" in data:
-                source_group_id = data.get("source_group_id", "")  # 空字符串表示默认分组
+                source_group_id = data.get(
+                    "source_group_id", ""
+                )  # 空字符串表示默认分组
                 target_group_id = data.get("target_group_id", "")
-                
+
                 # 获取源分组中的所有服务
                 services = ServiceGroupManager.get_services_in_group(source_group_id)
                 moved_count = 0
-                
+
                 for service in services:
                     service_id = service.get("id")
                     if service_id:
                         # 从源分组中移除
                         if source_group_id:
-                            ServiceGroupManager.remove_service_from_group(source_group_id, service_id)
+                            ServiceGroupManager.remove_service_from_group(
+                                source_group_id, service_id
+                            )
                         else:
                             # 从默认分组移动，需要先从所有分组中移除
-                            ServiceGroupManager.remove_service_from_all_groups(service_id)
-                        
+                            ServiceGroupManager.remove_service_from_all_groups(
+                                service_id
+                            )
+
                         # 添加到目标分组
                         if target_group_id:
-                            ServiceGroupManager.add_service_to_group(target_group_id, service_id)
-                        
+                            ServiceGroupManager.add_service_to_group(
+                                target_group_id, service_id
+                            )
+
                         moved_count += 1
-                
+
                 self._set_headers()
-                self.wfile.write(json.dumps({
-                    "success": True, 
-                    "moved_count": moved_count
-                }).encode())
+                self.wfile.write(
+                    json.dumps({"success": True, "moved_count": moved_count}).encode()
+                )
             else:
                 self._error(400, "缺少必要参数")
         else:
@@ -2685,13 +2742,13 @@ class ServiceGroupManager:
     def get_services_by_group(group_id):
         """获取指定组的服务列表"""
         services = []
-        
+
         if group_id == "":
             # 默认分组：返回所有不在任何具名分组中的服务
             all_grouped_services = set()
             for group in service_groups["groups"].values():
                 all_grouped_services.update(group["services"])
-            
+
             for service_id in running_services:
                 if service_id not in all_grouped_services:
                     service_info = running_services[service_id].get_info()
@@ -2769,13 +2826,13 @@ class ServiceGroupManager:
     def get_services_in_group(group_id):
         """获取指定组的服务列表"""
         services = []
-        
+
         if group_id == "":
             # 默认分组：返回所有不在任何具名分组中的服务
             all_grouped_services = set()
             for group in service_groups["groups"].values():
                 all_grouped_services.update(group["services"])
-            
+
             for service_id in running_services:
                 if service_id not in all_grouped_services:
                     service_info = running_services[service_id].get_info()
@@ -2836,11 +2893,12 @@ class ServiceGroupManager:
 # 资源清理和监控功能
 def periodic_cleanup():
     """定期清理资源，防止泄漏"""
+
     def cleanup_worker():
         while True:
             try:
                 time.sleep(3600)  # 每小时执行一次清理
-                
+
                 # 清理死掉的服务
                 dead_services = []
                 for service_id, service in services.items():
@@ -2850,46 +2908,57 @@ def periodic_cleanup():
                             print(f"发现死掉的服务 {service_id}，清理中...")
                             service.status = "已停止"
                             dead_services.append(service_id)
-                
+
                 # 执行垃圾回收
                 import gc
+
                 collected = gc.collect()
                 print(f"垃圾回收清理了 {collected} 个对象")
-                
+
                 # 清理消息队列过多的消息
                 with message_lock:
                     if len(message_queue) > 100:
                         # 保留最新的50条消息
                         message_queue[:] = message_queue[-50:]
                         print(f"清理消息队列，保留最新50条消息")
-                
+
                 # 输出资源使用情况
                 thread_count = threading.active_count()
-                active_services = len([s for s in services.values() if s.status == '运行中'])
-                print(f"资源监控 - 活跃线程数: {thread_count}, 活跃服务数: {active_services}")
-                
+                active_services = len(
+                    [s for s in services.values() if s.status == "运行中"]
+                )
+                print(
+                    f"资源监控 - 活跃线程数: {thread_count}, 活跃服务数: {active_services}"
+                )
+
                 # 如果有psutil，显示更详细的资源信息
                 try:
                     import psutil
+
                     process = psutil.Process()
                     memory_mb = process.memory_info().rss / 1024 / 1024
-                    fd_count = process.num_fds() if hasattr(process, 'num_fds') else 'N/A'
+                    fd_count = (
+                        process.num_fds() if hasattr(process, "num_fds") else "N/A"
+                    )
                     print(f"内存使用: {memory_mb:.1f}MB, 文件描述符: {fd_count}")
                 except:
                     pass
-                
+
             except Exception as e:
                 print(f"定期清理出错: {e}")
-    
+
     cleanup_thread = threading.Thread(target=cleanup_worker, daemon=True)
     cleanup_thread.start()
+
 
 # 改进信号处理
 def signal_handler(signum, frame):
     print(f"\n收到信号 {signum}，开始优雅关闭...")
     cleanup()
     import sys
+
     sys.exit(0)
+
 
 if __name__ == "__main__":
     # 注册改进的信号处理函数
