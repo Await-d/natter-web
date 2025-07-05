@@ -1,0 +1,9 @@
+{
+  "tokens": [],
+  "enabled": true,
+  "schedule": {
+    "enabled": false,
+    "times": ["08:00"],
+    "message": "Natter服务状态日报"
+  }
+}
