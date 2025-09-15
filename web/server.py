@@ -14,6 +14,10 @@ import requests  # 添加requests模块用于HTTP请求
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 from collections import deque  # 添加队列用于消息批量发送
+import hashlib  # 用于WebSocket握手
+import struct  # 用于WebSocket帧处理
+import select  # 用于stdio协议
+import socketserver  # 用于TCP服务器
 
 import psutil
 import secrets
@@ -81,6 +85,24 @@ ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD") or "zd2580"  # 默认密码zd2
 auth_tokens = {}  # token -> 过期时间戳
 AUTH_TOKEN_EXPIRE = 24 * 60 * 60  # token有效期24小时
 
+# MCP服务配置
+MCP_ENABLED = os.environ.get("MCP_ENABLED", "true").lower() == "true"
+MCP_TIMEOUT = int(os.environ.get("MCP_TIMEOUT", "30"))  # MCP请求超时时间(秒)
+MCP_MAX_CONNECTIONS = int(os.environ.get("MCP_MAX_CONNECTIONS", "10"))  # 最大并发连接数
+
+# MCP协议配置
+MCP_WEBSOCKET_ENABLED = os.environ.get("MCP_WEBSOCKET_ENABLED", "true").lower() == "true"
+MCP_WEBSOCKET_PORT = int(os.environ.get("MCP_WEBSOCKET_PORT", "8081"))
+MCP_STDIO_ENABLED = os.environ.get("MCP_STDIO_ENABLED", "true").lower() == "true"
+MCP_TCP_ENABLED = os.environ.get("MCP_TCP_ENABLED", "true").lower() == "true"
+MCP_TCP_PORT = int(os.environ.get("MCP_TCP_PORT", "8082"))
+MCP_SSE_ENABLED = os.environ.get("MCP_SSE_ENABLED", "true").lower() == "true"
+
+# MCP客户端连接管理
+mcp_connections = {}  # connection_id -> connection_info
+mcp_subscriptions = {}  # connection_id -> subscription_list
+mcp_connection_lock = threading.RLock()
+
 
 # 修改添加消息到推送队列函数
 def queue_message(category, title, content, important=False):
@@ -105,6 +127,18 @@ def queue_message(category, title, content, important=False):
                 "important": important,  # 是否为重要消息
             }
         )
+
+        # 同时向MCP客户端发送通知
+        if MCP_ENABLED:
+            try:
+                MCPNotificationManager.notify_subscribers("service_status", {
+                    "category": category,
+                    "title": title,
+                    "content": content,
+                    "important": important
+                })
+            except Exception as e:
+                print(f"MCP通知发送失败: {e}")
 
         # 如果消息标记为重要，或满足特定条件，考虑立即发送
         should_send_now = important or len(message_queue) >= 10
@@ -603,6 +637,917 @@ def schedule_daily_notification():
         target=check_and_send_notification, daemon=True
     )
     notification_thread.start()
+
+
+# WebSocket协议处理类
+class MCPWebSocketHandler:
+    """WebSocket协议的MCP处理器"""
+
+    def __init__(self, socket, address):
+        self.socket = socket
+        self.address = address
+        self.connection_id = secrets.token_hex(8)
+        self.authenticated = False
+        self.user_role = None
+        self.protocol = MCPProtocol()
+
+    def generate_websocket_key(self, key):
+        """生成WebSocket接受key"""
+        magic = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+        combined = key + magic
+        return base64.b64encode(hashlib.sha1(combined.encode()).digest()).decode()
+
+    def send_frame(self, data):
+        """发送WebSocket帧"""
+        if isinstance(data, str):
+            data = data.encode('utf-8')
+
+        payload_length = len(data)
+
+        # 构建帧头
+        frame = bytearray()
+        frame.append(0x81)  # FIN=1, opcode=text
+
+        if payload_length < 126:
+            frame.append(payload_length)
+        elif payload_length < 65536:
+            frame.append(126)
+            frame.extend(struct.pack('>H', payload_length))
+        else:
+            frame.append(127)
+            frame.extend(struct.pack('>Q', payload_length))
+
+        frame.extend(data)
+
+        try:
+            self.socket.send(frame)
+            return True
+        except Exception as e:
+            print(f"WebSocket发送失败 {self.connection_id}: {e}")
+            return False
+
+    def receive_frame(self):
+        """接收WebSocket帧"""
+        try:
+            # 读取帧头
+            frame_start = self.socket.recv(2)
+            if len(frame_start) != 2:
+                return None
+
+            fin = (frame_start[0] & 0x80) != 0
+            opcode = frame_start[0] & 0x0F
+            masked = (frame_start[1] & 0x80) != 0
+            payload_length = frame_start[1] & 0x7F
+
+            # 读取扩展长度
+            if payload_length == 126:
+                length_data = self.socket.recv(2)
+                payload_length = struct.unpack('>H', length_data)[0]
+            elif payload_length == 127:
+                length_data = self.socket.recv(8)
+                payload_length = struct.unpack('>Q', length_data)[0]
+
+            # 读取掩码
+            mask = None
+            if masked:
+                mask = self.socket.recv(4)
+
+            # 读取载荷数据
+            payload = self.socket.recv(payload_length)
+
+            # 解掩码
+            if masked and mask:
+                payload = bytearray(payload)
+                for i in range(len(payload)):
+                    payload[i] ^= mask[i % 4]
+                payload = bytes(payload)
+
+            if opcode == 0x8:  # 关闭帧
+                return None
+            elif opcode == 0x1:  # 文本帧
+                return payload.decode('utf-8')
+
+            return None
+
+        except Exception as e:
+            print(f"WebSocket接收失败 {self.connection_id}: {e}")
+            return None
+
+    def handle_websocket_handshake(self, request_data):
+        """处理WebSocket握手"""
+        lines = request_data.decode('utf-8').split('\r\n')
+        headers = {}
+
+        for line in lines[1:]:
+            if ':' in line:
+                key, value = line.split(':', 1)
+                headers[key.strip().lower()] = value.strip()
+
+        websocket_key = headers.get('sec-websocket-key')
+        if not websocket_key:
+            return False
+
+        accept_key = self.generate_websocket_key(websocket_key)
+
+        response = (
+            "HTTP/1.1 101 Switching Protocols\r\n"
+            "Upgrade: websocket\r\n"
+            "Connection: Upgrade\r\n"
+            f"Sec-WebSocket-Accept: {accept_key}\r\n"
+            "\r\n"
+        ).encode('utf-8')
+
+        try:
+            self.socket.send(response)
+            return True
+        except Exception as e:
+            print(f"WebSocket握手失败 {self.connection_id}: {e}")
+            return False
+
+    def authenticate_websocket_message(self, message_data):
+        """认证WebSocket消息"""
+        try:
+            data = json.loads(message_data)
+
+            # 检查是否包含认证信息
+            auth = data.get('auth', {})
+            password = auth.get('password')
+
+            if not password:
+                return False, "guest"  # 默认guest权限
+
+            # 验证密码
+            if password == ADMIN_PASSWORD:
+                return True, "admin"
+            else:
+                # 检查是否是guest组密码
+                for group_id, group_info in service_groups.get("groups", {}).items():
+                    if group_info.get("password") == password:
+                        return True, "guest"
+
+                return False, None
+
+        except Exception as e:
+            print(f"WebSocket认证解析失败 {self.connection_id}: {e}")
+            return False, None
+
+    def handle_connection(self):
+        """处理WebSocket连接"""
+        try:
+            # 接收握手请求
+            request_data = self.socket.recv(4096)
+            if not self.handle_websocket_handshake(request_data):
+                return
+
+            print(f"WebSocket连接建立: {self.connection_id} from {self.address}")
+
+            # 注册连接
+            with mcp_connection_lock:
+                mcp_connections[self.connection_id] = {
+                    "type": "websocket",
+                    "handler": self,
+                    "created": time.time(),
+                    "authenticated": False,
+                    "user_role": None
+                }
+
+            # 处理消息循环
+            while True:
+                message = self.receive_frame()
+                if message is None:
+                    break
+
+                try:
+                    # 解析消息
+                    data = json.loads(message)
+
+                    # 如果未认证，先进行认证
+                    if not self.authenticated:
+                        success, role = self.authenticate_websocket_message(message)
+                        if success:
+                            self.authenticated = True
+                            self.user_role = role
+
+                            with mcp_connection_lock:
+                                mcp_connections[self.connection_id]["authenticated"] = True
+                                mcp_connections[self.connection_id]["user_role"] = role
+
+                            # 发送认证成功响应
+                            auth_response = {
+                                "success": True,
+                                "connection_id": self.connection_id,
+                                "user_role": role,
+                                "message": "WebSocket认证成功"
+                            }
+                            self.send_frame(json.dumps(auth_response))
+                            continue
+                        else:
+                            # 认证失败
+                            auth_response = {
+                                "success": False,
+                                "error": "认证失败",
+                                "message": "密码无效"
+                            }
+                            self.send_frame(json.dumps(auth_response))
+                            break
+
+                    # 处理MCP消息
+                    if 'message' in data:
+                        mcp_message = data['message']
+                        response = self.protocol.handle_message(mcp_message, self.connection_id, self.user_role)
+                        self.send_frame(json.dumps(response))
+                    else:
+                        # 直接的MCP消息
+                        response = self.protocol.handle_message(data, self.connection_id, self.user_role)
+                        self.send_frame(json.dumps(response))
+
+                except json.JSONDecodeError:
+                    error_response = {
+                        "jsonrpc": "2.0",
+                        "error": {"code": -32700, "message": "Parse error"},
+                        "id": None
+                    }
+                    self.send_frame(json.dumps(error_response))
+                except Exception as e:
+                    print(f"WebSocket消息处理错误 {self.connection_id}: {e}")
+                    error_response = {
+                        "jsonrpc": "2.0",
+                        "error": {"code": -32603, "message": f"Internal error: {str(e)}"},
+                        "id": None
+                    }
+                    self.send_frame(json.dumps(error_response))
+
+        except Exception as e:
+            print(f"WebSocket连接错误 {self.connection_id}: {e}")
+        finally:
+            # 清理连接
+            with mcp_connection_lock:
+                mcp_connections.pop(self.connection_id, None)
+                mcp_subscriptions.pop(self.connection_id, None)
+
+            try:
+                self.socket.close()
+            except:
+                pass
+
+            print(f"WebSocket连接关闭: {self.connection_id}")
+
+
+# MCP协议处理核心类
+class MCPProtocol:
+    """MCP (Model Context Protocol) 协议处理器"""
+
+    def __init__(self):
+        self.version = "2024-11-05"
+        self.protocol_version = "2024-11-05"
+        self.implementation = {
+            "name": "natter-web-mcp",
+            "version": "1.0.0"
+        }
+
+    def handle_message(self, message, connection_id=None):
+        """处理MCP消息"""
+        try:
+            if not isinstance(message, dict):
+                message = json.loads(message) if isinstance(message, str) else message
+
+            # 验证MCP消息基本结构
+            if "jsonrpc" not in message or message["jsonrpc"] != "2.0":
+                return self._create_error_response(
+                    message.get("id"), -32600, "Invalid Request", "Missing or invalid jsonrpc version"
+                )
+
+            method = message.get("method")
+            request_id = message.get("id")
+            params = message.get("params", {})
+
+            # 处理不同的MCP方法
+            if method == "initialize":
+                return self._handle_initialize(request_id, params, connection_id)
+            elif method == "notifications/initialized":
+                return self._handle_initialized(connection_id)
+            elif method == "tools/list":
+                return self._handle_tools_list(request_id, params, connection_id)
+            elif method == "tools/call":
+                return self._handle_tools_call(request_id, params, connection_id)
+            elif method == "notifications/subscribe":
+                return self._handle_subscribe(request_id, params, connection_id)
+            elif method == "ping":
+                return self._handle_ping(request_id)
+            else:
+                return self._create_error_response(
+                    request_id, -32601, "Method not found", f"Unknown method: {method}"
+                )
+
+        except json.JSONDecodeError as e:
+            return self._create_error_response(
+                None, -32700, "Parse error", f"Invalid JSON: {str(e)}"
+            )
+        except Exception as e:
+            print(f"MCP协议处理错误: {e}")
+            return self._create_error_response(
+                message.get("id") if isinstance(message, dict) else None,
+                -32603, "Internal error", str(e)
+            )
+
+    def _handle_initialize(self, request_id, params, connection_id):
+        """处理初始化握手"""
+        client_info = params.get("clientInfo", {})
+        protocol_version = params.get("protocolVersion", "2024-11-05")
+
+        # 记录连接信息
+        if connection_id:
+            with mcp_connection_lock:
+                mcp_connections[connection_id] = {
+                    "client_info": client_info,
+                    "protocol_version": protocol_version,
+                    "authenticated": False,
+                    "user_role": None,
+                    "connected_at": time.time()
+                }
+
+        return self._create_success_response(request_id, {
+            "protocolVersion": self.protocol_version,
+            "serverInfo": self.implementation,
+            "capabilities": {
+                "tools": {
+                    "listChanged": True
+                },
+                "notifications": {
+                    "subscribe": True
+                }
+            }
+        })
+
+    def _handle_initialized(self, connection_id):
+        """处理初始化完成通知"""
+        print(f"MCP客户端 {connection_id} 初始化完成")
+        return None  # 不需要响应
+
+    def _handle_tools_list(self, request_id, params, connection_id):
+        """处理工具列表请求"""
+        user_role = self._get_user_role(connection_id)
+        if not user_role:
+            return self._create_error_response(
+                request_id, -32002, "Unauthorized", "Authentication required"
+            )
+
+        # 获取可用工具列表
+        tools = MCPToolRegistry.get_available_tools(user_role)
+
+        return self._create_success_response(request_id, {
+            "tools": tools
+        })
+
+    def _handle_tools_call(self, request_id, params, connection_id):
+        """处理工具调用请求"""
+        user_role = self._get_user_role(connection_id)
+        if not user_role:
+            return self._create_error_response(
+                request_id, -32002, "Unauthorized", "Authentication required"
+            )
+
+        tool_name = params.get("name")
+        arguments = params.get("arguments", {})
+
+        if not tool_name:
+            return self._create_error_response(
+                request_id, -32602, "Invalid params", "Missing tool name"
+            )
+
+        # 执行工具调用
+        try:
+            result = MCPToolRegistry.execute_tool(tool_name, arguments, user_role, connection_id)
+            return self._create_success_response(request_id, result)
+        except Exception as e:
+            return self._create_error_response(
+                request_id, -32603, "Tool execution error", str(e)
+            )
+
+    def _handle_subscribe(self, request_id, params, connection_id):
+        """处理订阅请求"""
+        if not connection_id:
+            return self._create_error_response(
+                request_id, -32602, "Invalid params", "Connection ID required"
+            )
+
+        subscription_type = params.get("type", "service_status")
+
+        with mcp_connection_lock:
+            if connection_id not in mcp_subscriptions:
+                mcp_subscriptions[connection_id] = []
+            if subscription_type not in mcp_subscriptions[connection_id]:
+                mcp_subscriptions[connection_id].append(subscription_type)
+
+        return self._create_success_response(request_id, {
+            "subscribed": subscription_type
+        })
+
+    def _handle_ping(self, request_id):
+        """处理ping请求"""
+        return self._create_success_response(request_id, {
+            "pong": True,
+            "timestamp": time.time()
+        })
+
+    def _get_user_role(self, connection_id):
+        """获取用户角色"""
+        if not connection_id:
+            return None
+
+        with mcp_connection_lock:
+            conn_info = mcp_connections.get(connection_id)
+            if conn_info and conn_info.get("authenticated"):
+                return conn_info.get("user_role")
+
+        return None
+
+    def _create_success_response(self, request_id, result):
+        """创建成功响应"""
+        return {
+            "jsonrpc": "2.0",
+            "id": request_id,
+            "result": result
+        }
+
+    def _create_error_response(self, request_id, code, message, data=None):
+        """创建错误响应"""
+        error = {
+            "code": code,
+            "message": message
+        }
+        if data:
+            error["data"] = data
+
+        return {
+            "jsonrpc": "2.0",
+            "id": request_id,
+            "error": error
+        }
+
+
+# MCP工具注册和管理系统
+class MCPToolRegistry:
+    """MCP工具注册表和管理器"""
+
+    _tools = {}  # 工具名称 -> 工具信息
+    _handlers = {}  # 工具名称 -> 处理函数
+    _permissions = {}  # 工具名称 -> 所需权限
+
+    @classmethod
+    def register_tool(cls, name, description, input_schema, handler, required_role="guest"):
+        """注册MCP工具"""
+        cls._tools[name] = {
+            "name": name,
+            "description": description,
+            "inputSchema": input_schema
+        }
+        cls._handlers[name] = handler
+        cls._permissions[name] = required_role
+        print(f"注册MCP工具: {name}")
+
+    @classmethod
+    def get_available_tools(cls, user_role):
+        """获取用户可用的工具列表"""
+        available_tools = []
+
+        for tool_name, tool_info in cls._tools.items():
+            required_role = cls._permissions.get(tool_name, "guest")
+
+            # 检查用户权限
+            if cls._check_permission(user_role, required_role):
+                available_tools.append(tool_info)
+
+        return available_tools
+
+    @classmethod
+    def execute_tool(cls, tool_name, arguments, user_role, connection_id):
+        """执行工具调用"""
+        if tool_name not in cls._tools:
+            raise Exception(f"Unknown tool: {tool_name}")
+
+        # 检查权限
+        required_role = cls._permissions.get(tool_name, "guest")
+        if not cls._check_permission(user_role, required_role):
+            raise Exception(f"Insufficient permissions for tool: {tool_name}")
+
+        # 获取处理函数
+        handler = cls._handlers.get(tool_name)
+        if not handler:
+            raise Exception(f"No handler for tool: {tool_name}")
+
+        # 执行工具
+        try:
+            result = handler(arguments, user_role, connection_id)
+
+            # 记录工具调用
+            print(f"MCP工具调用: {tool_name} by {user_role} from {connection_id}")
+
+            # 格式化MCP响应
+            if isinstance(result, dict) and "content" in result:
+                return result
+            else:
+                return {
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": str(result) if result is not None else "操作完成"
+                        }
+                    ]
+                }
+        except Exception as e:
+            print(f"MCP工具执行错误 {tool_name}: {e}")
+            raise
+
+    @classmethod
+    def _check_permission(cls, user_role, required_role):
+        """检查用户权限"""
+        if required_role == "guest":
+            return user_role in ["admin", "guest"]
+        elif required_role == "admin":
+            return user_role == "admin"
+        return False
+
+    @classmethod
+    def initialize_tools(cls):
+        """初始化所有工具"""
+        # 这个方法将在稍后由MCPServiceTools调用来注册具体工具
+        print("MCP工具注册表已初始化")
+
+
+# MCP通知管理器
+class MCPNotificationManager:
+    """MCP客户端通知管理器"""
+
+    @staticmethod
+    def notify_subscribers(event_type, data):
+        """向订阅的MCP客户端发送通知"""
+        try:
+            with mcp_connection_lock:
+                if not mcp_subscriptions:
+                    return
+
+                # 构建通知消息
+                notification = {
+                    "jsonrpc": "2.0",
+                    "method": "notifications/message",
+                    "params": {
+                        "type": event_type,
+                        "data": data,
+                        "timestamp": time.time()
+                    }
+                }
+
+                # 发送给所有订阅此类型事件的客户端
+                for connection_id, subscription_types in mcp_subscriptions.items():
+                    if event_type in subscription_types or "all" in subscription_types:
+                        # 获取连接信息
+                        connection_info = mcp_connections.get(connection_id)
+                        if not connection_info:
+                            continue
+
+                        connection_type = connection_info.get("type")
+                        handler = connection_info.get("handler")
+
+                        try:
+                            # 根据连接类型发送通知
+                            if connection_type == "websocket" and handler:
+                                # WebSocket通知
+                                handler.send_frame(json.dumps(notification))
+                                print(f"MCP WebSocket通知发送到 {connection_id}: {event_type}")
+
+                            elif connection_type == "tcp" and handler:
+                                # TCP通知
+                                handler.send_message(json.dumps(notification))
+                                print(f"MCP TCP通知发送到 {connection_id}: {event_type}")
+
+                            elif connection_type == "sse" and handler:
+                                # SSE通知
+                                handler._send_sse_event("notification", {
+                                    "type": event_type,
+                                    "data": data,
+                                    "timestamp": time.time()
+                                })
+                                print(f"MCP SSE通知发送到 {connection_id}: {event_type}")
+
+                            elif connection_type == "stdio":
+                                # stdio通知（输出到stdout）
+                                print(json.dumps(notification), flush=True)
+                                print(f"MCP stdio通知发送到 {connection_id}: {event_type}")
+
+                            else:
+                                print(f"MCP未知连接类型 {connection_id}: {connection_type}")
+
+                        except Exception as e:
+                            print(f"MCP通知发送失败 {connection_id}: {e}")
+                            # 如果发送失败，可能连接已断开，清理连接
+                            mcp_connections.pop(connection_id, None)
+                            mcp_subscriptions.pop(connection_id, None)
+
+        except Exception as e:
+            print(f"MCP通知发送失败: {e}")
+
+    @staticmethod
+    def integrate_with_existing_notifications():
+        """集成到现有的通知系统中"""
+        # 这个方法会修改现有的queue_message函数以支持MCP通知
+        pass
+
+
+# WebSocket服务器
+class MCPWebSocketServer:
+    """MCP WebSocket服务器"""
+
+    def __init__(self, port=MCP_WEBSOCKET_PORT):
+        self.port = port
+        self.server_socket = None
+        self.running = False
+
+    def start_server(self):
+        """启动WebSocket服务器"""
+        if not MCP_WEBSOCKET_ENABLED:
+            return
+
+        try:
+            self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            self.server_socket.bind(('0.0.0.0', self.port))
+            self.server_socket.listen(5)
+            self.running = True
+
+            print(f"MCP WebSocket服务器启动在端口 {self.port}")
+
+            while self.running:
+                try:
+                    client_socket, address = self.server_socket.accept()
+                    handler = MCPWebSocketHandler(client_socket, address)
+
+                    # 在新线程中处理连接
+                    thread = threading.Thread(target=handler.handle_connection, daemon=True)
+                    thread.start()
+
+                except Exception as e:
+                    if self.running:
+                        print(f"WebSocket连接处理错误: {e}")
+
+        except Exception as e:
+            print(f"WebSocket服务器启动失败: {e}")
+        finally:
+            if self.server_socket:
+                self.server_socket.close()
+
+    def stop_server(self):
+        """停止WebSocket服务器"""
+        self.running = False
+        if self.server_socket:
+            self.server_socket.close()
+
+
+# TCP直连协议处理器
+class MCPTCPHandler(socketserver.BaseRequestHandler):
+    """MCP TCP协议处理器"""
+
+    def handle(self):
+        connection_id = secrets.token_hex(8)
+        client_address = self.client_address
+        authenticated = False
+        user_role = None
+        protocol = MCPProtocol()
+
+        print(f"MCP TCP连接建立: {connection_id} from {client_address}")
+
+        try:
+            # 注册连接
+            with mcp_connection_lock:
+                mcp_connections[connection_id] = {
+                    "type": "tcp",
+                    "handler": self,
+                    "created": time.time(),
+                    "authenticated": False,
+                    "user_role": None
+                }
+
+            while True:
+                try:
+                    # 接收消息长度
+                    length_data = self.request.recv(4)
+                    if not length_data:
+                        break
+
+                    message_length = struct.unpack('>I', length_data)[0]
+
+                    # 接收消息内容
+                    message_data = b''
+                    while len(message_data) < message_length:
+                        chunk = self.request.recv(message_length - len(message_data))
+                        if not chunk:
+                            break
+                        message_data += chunk
+
+                    if len(message_data) != message_length:
+                        break
+
+                    message = message_data.decode('utf-8')
+                    data = json.loads(message)
+
+                    # 如果未认证，先进行认证
+                    if not authenticated:
+                        auth = data.get('auth', {})
+                        password = auth.get('password')
+
+                        if password == ADMIN_PASSWORD:
+                            authenticated = True
+                            user_role = "admin"
+                        elif password:
+                            # 检查guest组密码
+                            for group_id, group_info in service_groups.get("groups", {}).items():
+                                if group_info.get("password") == password:
+                                    authenticated = True
+                                    user_role = "guest"
+                                    break
+
+                        if authenticated:
+                            with mcp_connection_lock:
+                                mcp_connections[connection_id]["authenticated"] = True
+                                mcp_connections[connection_id]["user_role"] = user_role
+
+                            auth_response = {
+                                "success": True,
+                                "connection_id": connection_id,
+                                "user_role": user_role
+                            }
+                            self.send_message(json.dumps(auth_response))
+                            continue
+                        else:
+                            auth_response = {"success": False, "error": "认证失败"}
+                            self.send_message(json.dumps(auth_response))
+                            break
+
+                    # 处理MCP消息
+                    if 'message' in data:
+                        mcp_message = data['message']
+                        response = protocol.handle_message(mcp_message, connection_id, user_role)
+                        self.send_message(json.dumps(response))
+                    else:
+                        response = protocol.handle_message(data, connection_id, user_role)
+                        self.send_message(json.dumps(response))
+
+                except json.JSONDecodeError:
+                    error_response = {
+                        "jsonrpc": "2.0",
+                        "error": {"code": -32700, "message": "Parse error"},
+                        "id": None
+                    }
+                    self.send_message(json.dumps(error_response))
+                except Exception as e:
+                    print(f"TCP消息处理错误 {connection_id}: {e}")
+                    break
+
+        except Exception as e:
+            print(f"TCP连接错误 {connection_id}: {e}")
+        finally:
+            # 清理连接
+            with mcp_connection_lock:
+                mcp_connections.pop(connection_id, None)
+                mcp_subscriptions.pop(connection_id, None)
+
+            print(f"MCP TCP连接关闭: {connection_id}")
+
+    def send_message(self, message):
+        """发送TCP消息"""
+        try:
+            message_bytes = message.encode('utf-8')
+            length = struct.pack('>I', len(message_bytes))
+            self.request.send(length + message_bytes)
+        except Exception as e:
+            print(f"TCP消息发送失败: {e}")
+
+
+# TCP服务器
+class MCPTCPServer:
+    """MCP TCP服务器"""
+
+    def __init__(self, port=MCP_TCP_PORT):
+        self.port = port
+        self.server = None
+
+    def start_server(self):
+        """启动TCP服务器"""
+        if not MCP_TCP_ENABLED:
+            return
+
+        try:
+            self.server = socketserver.ThreadingTCPServer(('0.0.0.0', self.port), MCPTCPHandler)
+            print(f"MCP TCP服务器启动在端口 {self.port}")
+            self.server.serve_forever()
+        except Exception as e:
+            print(f"TCP服务器启动失败: {e}")
+
+    def stop_server(self):
+        """停止TCP服务器"""
+        if self.server:
+            self.server.shutdown()
+            self.server.server_close()
+
+
+# stdio协议处理器
+class MCPStdioHandler:
+    """MCP stdio协议处理器"""
+
+    def __init__(self):
+        self.protocol = MCPProtocol()
+        self.authenticated = False
+        self.user_role = None
+        self.connection_id = secrets.token_hex(8)
+
+    def start_stdio_server(self):
+        """启动stdio服务器模式"""
+        if not MCP_STDIO_ENABLED:
+            return
+
+        print(f"MCP stdio服务器启动，连接ID: {self.connection_id}")
+
+        # 注册连接
+        with mcp_connection_lock:
+            mcp_connections[self.connection_id] = {
+                "type": "stdio",
+                "handler": self,
+                "created": time.time(),
+                "authenticated": False,
+                "user_role": None
+            }
+
+        try:
+            while True:
+                try:
+                    # 从stdin读取一行
+                    if select.select([sys.stdin], [], [], 0.1)[0]:
+                        line = sys.stdin.readline().strip()
+                        if not line:
+                            break
+
+                        # 解析JSON消息
+                        data = json.loads(line)
+
+                        # 如果未认证，先进行认证
+                        if not self.authenticated:
+                            auth = data.get('auth', {})
+                            password = auth.get('password')
+
+                            if password == ADMIN_PASSWORD:
+                                self.authenticated = True
+                                self.user_role = "admin"
+                            elif password:
+                                # 检查guest组密码
+                                for group_id, group_info in service_groups.get("groups", {}).items():
+                                    if group_info.get("password") == password:
+                                        self.authenticated = True
+                                        self.user_role = "guest"
+                                        break
+
+                            if self.authenticated:
+                                with mcp_connection_lock:
+                                    mcp_connections[self.connection_id]["authenticated"] = True
+                                    mcp_connections[self.connection_id]["user_role"] = self.user_role
+
+                                auth_response = {
+                                    "success": True,
+                                    "connection_id": self.connection_id,
+                                    "user_role": self.user_role
+                                }
+                                print(json.dumps(auth_response), flush=True)
+                                continue
+                            else:
+                                auth_response = {"success": False, "error": "认证失败"}
+                                print(json.dumps(auth_response), flush=True)
+                                break
+
+                        # 处理MCP消息
+                        if 'message' in data:
+                            mcp_message = data['message']
+                            response = self.protocol.handle_message(mcp_message, self.connection_id, self.user_role)
+                            print(json.dumps(response), flush=True)
+                        else:
+                            response = self.protocol.handle_message(data, self.connection_id, self.user_role)
+                            print(json.dumps(response), flush=True)
+
+                except json.JSONDecodeError:
+                    error_response = {
+                        "jsonrpc": "2.0",
+                        "error": {"code": -32700, "message": "Parse error"},
+                        "id": None
+                    }
+                    print(json.dumps(error_response), flush=True)
+                except Exception as e:
+                    print(f"stdio消息处理错误: {e}", file=sys.stderr)
+
+        except Exception as e:
+            print(f"stdio服务器错误: {e}", file=sys.stderr)
+        finally:
+            # 清理连接
+            with mcp_connection_lock:
+                mcp_connections.pop(self.connection_id, None)
+                mcp_subscriptions.pop(self.connection_id, None)
 
 
 class NatterService:
@@ -1408,6 +2353,162 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
 
         # Basic认证失败，返回False让token认证有机会执行
         return False
+
+    def _handle_mcp_sse(self, data):
+        """处理MCP Server-Sent Events连接"""
+        try:
+            # 验证认证
+            auth_result = self._authenticate_mcp_request(data)
+            if not auth_result["success"]:
+                self._error(401, auth_result["message"])
+                return
+
+            connection_id = auth_result["connection_id"]
+            user_role = auth_result["user_role"]
+
+            # 设置SSE响应头
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Connection", "keep-alive")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Headers", "Cache-Control")
+            self.end_headers()
+
+            # 注册SSE连接
+            with mcp_connection_lock:
+                mcp_connections[connection_id] = {
+                    "type": "sse",
+                    "handler": self,
+                    "created": time.time(),
+                    "authenticated": True,
+                    "user_role": user_role
+                }
+
+            # 发送初始连接成功事件
+            self._send_sse_event("connected", {
+                "connection_id": connection_id,
+                "user_role": user_role,
+                "message": "SSE连接建立成功"
+            })
+
+            # 订阅所有事件（SSE通常用于接收实时通知）
+            with mcp_connection_lock:
+                mcp_subscriptions[connection_id] = ["all"]
+
+            print(f"MCP SSE连接建立: {connection_id} ({user_role})")
+
+            # 保持连接活跃
+            try:
+                while True:
+                    # 每30秒发送心跳
+                    time.sleep(30)
+
+                    # 检查连接是否仍然存在
+                    with mcp_connection_lock:
+                        if connection_id not in mcp_connections:
+                            break
+
+                    # 发送心跳事件
+                    self._send_sse_event("heartbeat", {"timestamp": int(time.time())})
+
+            except Exception as e:
+                print(f"SSE连接维护错误 {connection_id}: {e}")
+
+        except Exception as e:
+            print(f"SSE连接处理错误: {e}")
+            self._error(500, f"SSE connection error: {str(e)}")
+        finally:
+            # 清理连接
+            with mcp_connection_lock:
+                mcp_connections.pop(connection_id, None)
+                mcp_subscriptions.pop(connection_id, None)
+
+            print(f"MCP SSE连接关闭: {connection_id}")
+
+    def _send_sse_event(self, event_type, data):
+        """发送SSE事件"""
+        try:
+            event_data = f"event: {event_type}\n"
+            event_data += f"data: {json.dumps(data)}\n\n"
+            self.wfile.write(event_data.encode('utf-8'))
+            self.wfile.flush()
+        except Exception as e:
+            print(f"SSE事件发送失败: {e}")
+
+    def _authenticate_mcp_request(self, data):
+        """验证MCP请求的认证信息"""
+        try:
+            # 检查连接数限制
+            with mcp_connection_lock:
+                if len(mcp_connections) >= MCP_MAX_CONNECTIONS:
+                    return {"success": False, "message": "MCP connection limit exceeded"}
+
+            # 优先检查Authorization头中的token
+            auth_header = self.headers.get("Authorization", "")
+            if auth_header.startswith("Bearer "):
+                token = auth_header[7:]
+                if token in auth_tokens:
+                    if time.time() - auth_tokens[token] < AUTH_TOKEN_EXPIRE:
+                        return {
+                            "success": True,
+                            "user_role": "admin",  # token用户默认为admin
+                            "connection_id": f"token_{token[:8]}"
+                        }
+                    else:
+                        del auth_tokens[token]
+
+            # 检查Basic认证
+            if auth_header.startswith("Basic "):
+                try:
+                    auth_decoded = base64.b64decode(auth_header[6:]).decode("utf-8")
+                    username, password = auth_decoded.split(":", 1)
+
+                    if password == ADMIN_PASSWORD:
+                        return {
+                            "success": True,
+                            "user_role": "admin",
+                            "connection_id": f"basic_admin_{int(time.time())}"
+                        }
+
+                    # 检查是否是访客组密码
+                    for group_id, group_info in service_groups.get("groups", {}).items():
+                        if group_info.get("password") == password:
+                            return {
+                                "success": True,
+                                "user_role": "guest",
+                                "connection_id": f"guest_{group_id}_{int(time.time())}",
+                                "group_id": group_id
+                            }
+                except Exception as e:
+                    print(f"MCP认证解析错误: {e}")
+
+            # 检查请求数据中的认证信息
+            auth_info = data.get("auth")
+            if auth_info:
+                password = auth_info.get("password")
+                if password == ADMIN_PASSWORD:
+                    return {
+                        "success": True,
+                        "user_role": "admin",
+                        "connection_id": f"data_admin_{int(time.time())}"
+                    }
+
+                # 检查访客组密码
+                for group_id, group_info in service_groups.get("groups", {}).items():
+                    if group_info.get("password") == password:
+                        return {
+                            "success": True,
+                            "user_role": "guest",
+                            "connection_id": f"data_guest_{group_id}_{int(time.time())}",
+                            "group_id": group_id
+                        }
+
+            return {"success": False, "message": "Authentication required"}
+
+        except Exception as e:
+            print(f"MCP认证处理错误: {e}")
+            return {"success": False, "message": "Authentication error"}
 
     def do_OPTIONS(self):
         self._set_headers()
@@ -2359,6 +3460,66 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                 )
             else:
                 self._error(400, "缺少必要参数")
+        elif path == "/api/mcp":
+            # MCP协议端点处理
+            if not MCP_ENABLED:
+                self._error(503, "MCP service is disabled")
+                return
+
+            try:
+                # 验证认证
+                auth_result = self._authenticate_mcp_request(data)
+                if not auth_result["success"]:
+                    self._error(401, auth_result["message"])
+                    return
+
+                user_role = auth_result["user_role"]
+                connection_id = auth_result.get("connection_id", f"conn_{int(time.time())}")
+
+                # 如果是认证请求，处理认证逻辑
+                if "authenticate" in data:
+                    # 更新连接信息中的认证状态
+                    with mcp_connection_lock:
+                        if connection_id in mcp_connections:
+                            mcp_connections[connection_id]["authenticated"] = True
+                            mcp_connections[connection_id]["user_role"] = user_role
+
+                    self._set_headers()
+                    self.wfile.write(json.dumps({
+                        "success": True,
+                        "user_role": user_role,
+                        "connection_id": connection_id
+                    }).encode())
+                    return
+
+                # 处理MCP协议消息
+                mcp_message = data.get("message")
+                if not mcp_message:
+                    self._error(400, "Missing MCP message")
+                    return
+
+                # 创建MCP协议处理器并处理消息
+                mcp_protocol = MCPProtocol()
+                response = mcp_protocol.handle_message(mcp_message, connection_id)
+
+                if response:
+                    self._set_headers()
+                    self.wfile.write(json.dumps(response).encode())
+                else:
+                    # 某些通知消息可能不需要响应
+                    self._set_headers()
+                    self.wfile.write(json.dumps({"acknowledged": True}).encode())
+
+            except Exception as e:
+                print(f"MCP端点处理错误: {e}")
+                self._error(500, f"MCP processing error: {str(e)}")
+        elif path == "/api/mcp/sse":
+            # MCP Server-Sent Events端点
+            if not MCP_ENABLED or not MCP_SSE_ENABLED:
+                self._error(503, "MCP SSE service is disabled")
+                return
+
+            self._handle_mcp_sse(data)
         else:
             self._error(404, "Not found")
 
@@ -2617,6 +3778,314 @@ def save_iyuu_config():
     except Exception as e:
         print(f"保存IYUU配置失败: {e}")
         return False
+
+
+# MCP服务管理工具类
+class MCPServiceTools:
+    """MCP服务管理相关工具实现"""
+
+    @staticmethod
+    def initialize():
+        """注册所有服务管理工具"""
+        # 注册服务列表工具
+        MCPToolRegistry.register_tool(
+            name="natter/list_services",
+            description="获取当前所有Natter服务的列表和状态信息",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "filter": {
+                        "type": "string",
+                        "enum": ["all", "running", "stopped"],
+                        "description": "过滤服务状态",
+                        "default": "all"
+                    },
+                    "group": {
+                        "type": "string",
+                        "description": "服务组过滤（仅访客用户需要）"
+                    }
+                }
+            },
+            handler=MCPServiceTools._handle_list_services,
+            required_role="guest"
+        )
+
+        # 注册服务状态查询工具
+        MCPToolRegistry.register_tool(
+            name="natter/get_service_status",
+            description="获取指定服务的详细状态信息",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "service_id": {
+                        "type": "string",
+                        "description": "服务ID"
+                    }
+                },
+                "required": ["service_id"]
+            },
+            handler=MCPServiceTools._handle_get_service_status,
+            required_role="guest"
+        )
+
+        # 注册启动服务工具
+        MCPToolRegistry.register_tool(
+            name="natter/start_service",
+            description="启动一个新的Natter服务",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "local_port": {
+                        "type": "integer",
+                        "description": "本地端口号"
+                    },
+                    "keep_alive": {
+                        "type": "integer",
+                        "description": "保持连接时间（秒）",
+                        "default": 30
+                    },
+                    "remark": {
+                        "type": "string",
+                        "description": "服务备注"
+                    }
+                },
+                "required": ["local_port"]
+            },
+            handler=MCPServiceTools._handle_start_service,
+            required_role="admin"
+        )
+
+        # 注册停止服务工具
+        MCPToolRegistry.register_tool(
+            name="natter/stop_service",
+            description="停止指定的Natter服务",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "service_id": {
+                        "type": "string",
+                        "description": "要停止的服务ID"
+                    }
+                },
+                "required": ["service_id"]
+            },
+            handler=MCPServiceTools._handle_stop_service,
+            required_role="admin"
+        )
+
+        # 注册重启服务工具
+        MCPToolRegistry.register_tool(
+            name="natter/restart_service",
+            description="重启指定的Natter服务",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "service_id": {
+                        "type": "string",
+                        "description": "要重启的服务ID"
+                    }
+                },
+                "required": ["service_id"]
+            },
+            handler=MCPServiceTools._handle_restart_service,
+            required_role="admin"
+        )
+
+        print("MCP服务管理工具已注册")
+
+    @staticmethod
+    def _handle_list_services(arguments, user_role, connection_id):
+        """处理服务列表请求"""
+        try:
+            filter_type = arguments.get("filter", "all")
+            group_filter = arguments.get("group")
+
+            with service_lock:
+                services_list = []
+                for service_id, service in running_services.items():
+                    # 获取服务状态
+                    status_info = service.get_status()
+
+                    # 应用状态过滤
+                    if filter_type == "running" and not status_info.get("is_running", False):
+                        continue
+                    elif filter_type == "stopped" and status_info.get("is_running", False):
+                        continue
+
+                    # 应用组过滤（访客用户）
+                    if user_role == "guest" and group_filter:
+                        # 这里可以集成ServiceGroupManager的权限检查
+                        # 暂时简化处理
+                        pass
+
+                    service_info = {
+                        "id": service_id,
+                        "status": "running" if status_info.get("is_running") else "stopped",
+                        "mapped_address": status_info.get("mapped_address", ""),
+                        "local_port": status_info.get("local_port", 0),
+                        "remark": status_info.get("remark", ""),
+                        "start_time": status_info.get("start_time", ""),
+                        "cpu_percent": status_info.get("cpu_percent", 0),
+                        "memory_mb": status_info.get("memory_mb", 0)
+                    }
+                    services_list.append(service_info)
+
+                return {
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": f"找到 {len(services_list)} 个服务:\n" +
+                                   "\n".join([f"- {s['id']}: {s['status']} ({s['mapped_address']})"
+                                            for s in services_list])
+                        }
+                    ],
+                    "services": services_list
+                }
+
+        except Exception as e:
+            raise Exception(f"获取服务列表失败: {str(e)}")
+
+    @staticmethod
+    def _handle_get_service_status(arguments, user_role, connection_id):
+        """处理服务状态查询请求"""
+        try:
+            service_id = arguments.get("service_id")
+            if not service_id:
+                raise Exception("服务ID不能为空")
+
+            with service_lock:
+                service = running_services.get(service_id)
+                if not service:
+                    raise Exception(f"服务 {service_id} 不存在")
+
+                status_info = service.get_status()
+
+                return {
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": f"服务 {service_id} 状态信息:\n" +
+                                   f"状态: {('运行中' if status_info.get('is_running') else '已停止')}\n" +
+                                   f"映射地址: {status_info.get('mapped_address', '无')}\n" +
+                                   f"本地端口: {status_info.get('local_port', 0)}\n" +
+                                   f"CPU使用率: {status_info.get('cpu_percent', 0):.1f}%\n" +
+                                   f"内存使用: {status_info.get('memory_mb', 0):.1f}MB"
+                        }
+                    ],
+                    "service_status": status_info
+                }
+
+        except Exception as e:
+            raise Exception(f"获取服务状态失败: {str(e)}")
+
+    @staticmethod
+    def _handle_start_service(arguments, user_role, connection_id):
+        """处理启动服务请求"""
+        try:
+            local_port = arguments.get("local_port")
+            keep_alive = arguments.get("keep_alive", 30)
+            remark = arguments.get("remark", "")
+
+            if not local_port:
+                raise Exception("本地端口号不能为空")
+
+            # 构建启动参数
+            cmd_args = ["-k", str(keep_alive), "-p", str(local_port)]
+
+            # 生成服务ID
+            service_id = f"service_{local_port}_{int(time.time())}"
+
+            # 创建并启动服务
+            service = NatterService(service_id, cmd_args, remark)
+
+            with service_lock:
+                running_services[service_id] = service
+
+            # 启动服务
+            result = service.start()
+
+            if result.get("success", False):
+                return {
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": f"服务 {service_id} 启动成功\n" +
+                                   f"本地端口: {local_port}\n" +
+                                   f"保持连接: {keep_alive}秒"
+                        }
+                    ],
+                    "service_id": service_id,
+                    "result": result
+                }
+            else:
+                raise Exception(result.get("message", "启动失败"))
+
+        except Exception as e:
+            raise Exception(f"启动服务失败: {str(e)}")
+
+    @staticmethod
+    def _handle_stop_service(arguments, user_role, connection_id):
+        """处理停止服务请求"""
+        try:
+            service_id = arguments.get("service_id")
+            if not service_id:
+                raise Exception("服务ID不能为空")
+
+            with service_lock:
+                service = running_services.get(service_id)
+                if not service:
+                    raise Exception(f"服务 {service_id} 不存在")
+
+                # 停止服务
+                result = service.stop()
+
+                # 从运行列表中移除
+                if result.get("success", False):
+                    del running_services[service_id]
+
+                return {
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": f"服务 {service_id} " +
+                                   ("停止成功" if result.get("success", False) else "停止失败")
+                        }
+                    ],
+                    "result": result
+                }
+
+        except Exception as e:
+            raise Exception(f"停止服务失败: {str(e)}")
+
+    @staticmethod
+    def _handle_restart_service(arguments, user_role, connection_id):
+        """处理重启服务请求"""
+        try:
+            service_id = arguments.get("service_id")
+            if not service_id:
+                raise Exception("服务ID不能为空")
+
+            with service_lock:
+                service = running_services.get(service_id)
+                if not service:
+                    raise Exception(f"服务 {service_id} 不存在")
+
+                # 重启服务
+                result = service.restart()
+
+                return {
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": f"服务 {service_id} " +
+                                   ("重启成功" if result.get("success", False) else "重启失败")
+                        }
+                    ],
+                    "result": result
+                }
+
+        except Exception as e:
+            raise Exception(f"重启服务失败: {str(e)}")
 
 
 class ServiceGroupManager:
@@ -3006,6 +4475,49 @@ if __name__ == "__main__":
 
     # 恢复之前运行的服务
     NatterManager.load_services()
+
+    # 初始化MCP服务
+    if MCP_ENABLED:
+        print(f"MCP服务: 启用 (最大连接数: {MCP_MAX_CONNECTIONS})")
+        MCPToolRegistry.initialize_tools()
+        MCPServiceTools.initialize()
+
+        # 启动多协议服务器
+        mcp_servers = []
+
+        # 启动WebSocket服务器
+        if MCP_WEBSOCKET_ENABLED:
+            websocket_server = MCPWebSocketServer(MCP_WEBSOCKET_PORT)
+            websocket_thread = threading.Thread(target=websocket_server.start_server, daemon=True)
+            websocket_thread.start()
+            mcp_servers.append(("WebSocket", MCP_WEBSOCKET_PORT))
+            print(f"MCP WebSocket服务器: 启用 (端口: {MCP_WEBSOCKET_PORT})")
+
+        # 启动TCP服务器
+        if MCP_TCP_ENABLED:
+            tcp_server = MCPTCPServer(MCP_TCP_PORT)
+            tcp_thread = threading.Thread(target=tcp_server.start_server, daemon=True)
+            tcp_thread.start()
+            mcp_servers.append(("TCP", MCP_TCP_PORT))
+            print(f"MCP TCP服务器: 启用 (端口: {MCP_TCP_PORT})")
+
+        # stdio服务器（仅在特定模式下启动）
+        if MCP_STDIO_ENABLED and "--mcp-stdio" in sys.argv:
+            print("MCP stdio服务器: 启用")
+            stdio_handler = MCPStdioHandler()
+            stdio_thread = threading.Thread(target=stdio_handler.start_stdio_server, daemon=True)
+            stdio_thread.start()
+            mcp_servers.append(("stdio", "stdin/stdout"))
+
+        # SSE通过HTTP服务器处理，无需单独启动
+        if MCP_SSE_ENABLED:
+            print(f"MCP SSE服务器: 启用 (路径: /api/mcp/sse)")
+            mcp_servers.append(("SSE", "/api/mcp/sse"))
+
+        print(f"MCP协议支持: HTTP, {', '.join([s[0] for s in mcp_servers])}")
+
+    else:
+        print("MCP服务: 禁用")
 
     # 启动Web服务器
     run_server(port)
