@@ -1,0 +1,21 @@
+{
+  "id": "approval_1757939310937_51og1fnz5",
+  "title": "Ultrathink Product Vision - steering/product.md",
+  "filePath": ".spec-workflow/steering/product.md",
+  "type": "document",
+  "status": "needs-revision",
+  "createdAt": "2025-09-15T12:28:30.937Z",
+  "category": "steering",
+  "categoryName": "steering",
+  "response": "Feedback Summary (1 comments):\n\nGeneral Comments:\n1. 创建中文描述\n\n",
+  "annotations": "{\n  \"decision\": \"needs-revision\",\n  \"comments\": [\n    {\n      \"type\": \"general\",\n      \"comment\": \"创建中文描述\",\n      \"timestamp\": \"2025-09-15T12:29:30.003Z\",\n      \"id\": \"comment_1757939370004_991vrgph3\"\n    }\n  ],\n  \"summary\": \"Feedback Summary (1 comments):\\n\\nGeneral Comments:\\n1. 创建中文描述\\n\\n\",\n  \"timestamp\": \"2025-09-15T12:29:33.489Z\"\n}",
+  "respondedAt": "2025-09-15T12:29:32.403Z",
+  "comments": [
+    {
+      "type": "general",
+      "comment": "创建中文描述",
+      "timestamp": "2025-09-15T12:29:30.003Z",
+      "id": "comment_1757939370004_991vrgph3"
+    }
+  ]
+}

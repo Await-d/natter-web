@@ -1,0 +1,21 @@
+{
+  "id": "approval_1757939998161_aqpmov0js",
+  "title": "MCP Service Requirements Document",
+  "filePath": ".spec-workflow/specs/mcp-service/requirements.md",
+  "type": "document",
+  "status": "needs-revision",
+  "createdAt": "2025-09-15T12:39:58.161Z",
+  "category": "spec",
+  "categoryName": "mcp-service",
+  "response": "Feedback Summary (1 comments):\n\nGeneral Comments:\n1. 使用中文描述\n\n",
+  "annotations": "{\n  \"decision\": \"needs-revision\",\n  \"comments\": [\n    {\n      \"type\": \"general\",\n      \"comment\": \"使用中文描述\",\n      \"timestamp\": \"2025-09-15T12:40:22.066Z\",\n      \"id\": \"comment_1757940022066_3v3gyp1bk\"\n    }\n  ],\n  \"summary\": \"Feedback Summary (1 comments):\\n\\nGeneral Comments:\\n1. 使用中文描述\\n\\n\",\n  \"timestamp\": \"2025-09-15T12:40:51.922Z\"\n}",
+  "respondedAt": "2025-09-15T12:40:50.812Z",
+  "comments": [
+    {
+      "type": "general",
+      "comment": "使用中文描述",
+      "timestamp": "2025-09-15T12:40:22.066Z",
+      "id": "comment_1757940022066_3v3gyp1bk"
+    }
+  ]
+}
