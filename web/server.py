@@ -2316,6 +2316,13 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+        # 对JavaScript文件添加缓存控制
+        if content_type == "application/javascript":
+            self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+            self.send_header("Pragma", "no-cache")
+            self.send_header("Expires", "0")
+
         self.end_headers()
 
     def _authenticate_token(self):
