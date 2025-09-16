@@ -184,4 +184,4 @@ docker logs -f natter-web
 
 ## 📄 许可证
 
-本项目基于开源许可证发布，详情请查看 LICENSE 文件。 
+本项目基于开源许可证发布，详情请查看 LICENSE 文件。 测试GitHub Actions自动发布流水线
