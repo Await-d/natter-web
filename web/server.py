@@ -4600,6 +4600,7 @@ if __name__ == "__main__":
     print(f"Python版本: {sys.version}")
     print(f"Natter路径: {NATTER_PATH}")
     print(f"数据目录: {DATA_DIR}")
+    print("自动添加保活间隔: 30秒")
 
     # 加载IYUU配置
     load_iyuu_config()
