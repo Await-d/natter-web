@@ -16,7 +16,46 @@ Natter Web管理工具为Natter网络穿透工具提供了直观的图形界面�
 
 无论您是在家庭网络中搭建私人服务，还是需要在复杂网络环境中部署多个应用，Natter Web管理工具都能为您提供简单而强大的解决方案。
 
-## 功能
+## 🚀 快速开始
+
+### 立即体验
+
+**使用Docker（推荐）：**
+
+```bash
+# 一键启动Natter Web管理工具
+docker run -d --name natter-web \
+  --network host \
+  --cap-add NET_ADMIN \
+  -v "$(pwd)/data:/app/data" \
+  await2719/natter-web:latest
+
+# 访问管理界面
+echo "🌐 访问地址: http://localhost:8080"
+echo "🔐 管理员密码: zd2580"
+```
+
+**从源码运行：**
+
+```bash
+# 安装依赖
+pip install psutil requests
+
+# 启动服务
+cd web && python server.py
+
+# 访问管理界面
+echo "🌐 访问地址: http://localhost:8080"
+```
+
+### 基础使用流程
+
+1. **启动服务** → 访问Web界面 → 输入管理员密码
+2. **添加服务** → 配置目标端口和转发方式 → 启动Natter服务
+3. **监控状态** → 查看映射地址和服务状态 → 测试连接可用性
+4. **高级功能** → 配置IYUU推送、访客系统、模板管理等
+
+## 功能特性
 
 - 启动新的Natter服务
 - 监控运行中的服务状态
@@ -31,6 +70,61 @@ Natter Web管理工具为Natter网络穿透工具提供了直观的图形界面�
 - NAT类型检测与显示
 - IYUU消息推送支持（服务状态通知）
 - 自定义定时状态报告
+- **🔌 MCP服务支持** - 提供标准化API接口，支持外部工具集成
+
+## 🔌 MCP (Model Context Protocol) 支持
+
+Natter Web 内置了完整的 MCP 服务支持，为 AI 工具和外部系统提供标准化的编程接口：
+
+### 支持的传输协议
+
+- **HTTP** - RESTful API接口 (`POST /api/mcp`)
+- **WebSocket** - 实时双向通信 (`ws://localhost:8081`)
+- **TCP** - 原生TCP直连 (`tcp://localhost:8082`)
+- **SSE** - 服务器推送事件 (`GET /api/mcp/sse`)
+- **stdio** - 标准输入输出接口
+
+### 可用的MCP工具
+
+- `natter/list_services` - 列出所有Natter服务
+- `natter/get_service_status` - 获取服务详细状态
+- `natter/start_service` - 启动新的Natter服务
+- `natter/stop_service` - 停止指定的服务
+- `natter/restart_service` - 重启服务
+
+### 认证方式
+
+支持多种认证方式，适应不同的使用场景：
+
+```bash
+# HTTP Basic认证
+Authorization: Basic <base64(username:password)>
+
+# Bearer Token认证
+Authorization: Bearer <your_token>
+
+# 请求体认证
+{
+  "auth": {"password": "your_password"},
+  "message": {...}
+}
+```
+
+### 快速试用
+
+```bash
+# 查看MCP服务状态
+curl -s -H "Authorization: Basic OnpkMjU4MA==" \
+  http://localhost:8080/api/mcp/status | jq .
+
+# 列出所有服务
+curl -s -H "Authorization: Basic OnpkMjU4MA==" \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":"1","method":"tools/call","params":{"name":"natter/list_services","arguments":{}}}' \
+  http://localhost:8080/api/mcp | jq .
+```
+
+详细的MCP使用文档和示例请访问：`http://localhost:8080/mcp_examples/`
 
 ## 安装依赖
 
@@ -60,30 +154,96 @@ http://localhost:8080
 
 ### 方法二：使用Docker（推荐）
 
-我们提供了Docker支持，方便在容器中运行Natter Web管理工具：
+我们提供了官方Docker镜像，支持多架构（amd64/arm64），可以快速部署：
+
+#### 🚀 快速部署
+
+**使用官方镜像（推荐）：**
 
 ```bash
-# 使用默认配置运行
+# 快速启动（默认8080端口）
+docker run -d --name natter-web \
+  --network host \
+  --cap-add NET_ADMIN \
+  -v "$(pwd)/data:/app/data" \
+  await2719/natter-web:latest
+
+# 自定义端口部署
+docker run -d --name natter-web \
+  --network host \
+  --cap-add NET_ADMIN \
+  -e WEB_PORT=9090 \
+  -v "$(pwd)/data:/app/data" \
+  await2719/natter-web:latest
+```
+
+**使用Docker Compose：**
+
+创建 `docker-compose.yml` 文件：
+
+```yaml
+version: '3'
+services:
+  natter-web:
+    image: await2719/natter-web:latest
+    container_name: natter-web
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+    environment:
+      - WEB_PORT=8080              # Web端口
+      - ADMIN_PASSWORD=zd2580      # 管理员密码
+      - GUEST_ENABLED=true         # 启用访客系统
+      - IYUU_ENABLED=true          # 启用IYUU推送
+    volumes:
+      - ./data:/app/data           # 数据持久化
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${WEB_PORT:-8080}/api/version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+```
+
+然后运行：
+
+```bash
 docker-compose up -d
-
-# 或指定自定义Web端口
-WEB_PORT=9090 docker-compose up -d
 ```
 
-您也可以通过直接运行Docker容器来指定Web端口：
+#### 🐳 可用的Docker镜像标签
 
 ```bash
-# 使用默认8080端口
-docker run -d --name natter-web --network host -v ./data:/app/data nattertool/natter-web
+# 最新版本
+await2719/natter-web:latest
 
-# 或指定自定义Web端口
-docker run -d --name natter-web --network host -e WEB_PORT=9090 -v ./data:/app/data nattertool/natter-web
+# 特定版本
+await2719/natter-web:v1.0.8
+await2719/natter-web:1.0.8
 
-# 或通过命令行参数指定Web端口
-docker run -d --name natter-web --network host -v ./data:/app/data nattertool/natter-web 9090
+# 开发版本
+await2719/natter-web:dev
 ```
 
-详细的Docker使用说明请参阅[Docker文档](./web/DOCKER.md)。
+#### 📝 环境变量配置
+
+| 变量名 | 默认值 | 说明 |
+|--------|-------|------|
+| `WEB_PORT` | `8080` | Web服务端口 |
+| `ADMIN_PASSWORD` | `zd2580` | 管理员密码 |
+| `GUEST_ENABLED` | `true` | 是否启用访客系统 |
+| `IYUU_ENABLED` | `true` | 是否启用IYUU推送 |
+| `DATA_DIR` | `/app/data` | 数据存储目录 |
+| `NATTER_PATH` | `/app/natter/natter.py` | Natter路径 |
+
+#### ⚠️ 重要说明
+
+1. **网络模式**：必须使用 `--network host` 以确保Natter能正确检测网络接口
+2. **权限**：需要 `--cap-add NET_ADMIN` 以使用iptables等网络功能
+3. **数据持久化**：必须挂载 `/app/data` 目录，否则重启后数据会丢失
+4. **平台支持**：支持 Linux amd64/arm64，Windows/macOS功能可能受限
+
+详细的Docker使用说明和故障排除请参阅 [Docker部署指南](./web/DOCKER.md)。
 
 ## 服务管理说明
 
@@ -185,6 +345,31 @@ Natter Web管理工具支持通过IYUU推送接收服务状态通知：
 4. 启用自动重启功能可能导致在某些情况下（如网络问题）持续重启循环
 
 ## 版本历史
+
+### V1.0.8 (2025-09-16)
+
+- 🔌 **MCP (Model Context Protocol) 服务集成**
+  - 完整实现MCP 2024-11-05规范，支持5种传输协议
+  - 提供5个Natter管理工具：列出、查询、启动、停止、重启服务
+  - 支持HTTP、WebSocket、TCP、SSE、stdio多种连接方式
+  - 灵活的认证机制：Basic、Bearer Token、请求体认证
+- 🎨 **前端MCP状态显示**
+  - 新增MCP服务状态面板，实时显示协议信息
+  - 显示连接数、可用工具数量和服务状态
+  - 集成MCP使用文档和示例页面
+- 🚀 **GitHub Actions自动化**
+  - 完整的CI/CD流水线：自动版本管理、Docker构建、发布
+  - 多架构Docker镜像支持 (amd64/arm64)
+  - 智能变更检测和版本号同步
+  - PR代码质量检查：Black、isort、Flake8
+- 🐳 **官方Docker镜像**
+  - 发布到Docker Hub: `await2719/natter-web`
+  - 支持多架构部署和自动健康检查
+  - 优化的容器配置和环境变量支持
+- 🔧 **生产环境优化**
+  - 修复前端缓存问题，确保更新正确加载
+  - 改进静态文件服务和编码处理
+  - 增强错误处理和用户体验
 
 ### V1.0.7 (2025-05-30)
 

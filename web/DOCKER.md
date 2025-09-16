@@ -1,6 +1,6 @@
-# Natter Web管理工具 - Docker版本
+# Natter Web管理工具 - Docker部署指南
 
-本文档介绍如何使用Docker来部署和运行Natter Web管理工具。
+本文档介绍如何使用Docker来部署和运行Natter Web管理工具。我们提供官方Docker镜像，支持多架构（amd64/arm64），可快速部署到各种环境。
 
 ## 系统要求
 
@@ -9,23 +9,62 @@
 - 互联网连接（用于拉取镜像和Natter最新代码）
 - 支持host网络模式的系统（Linux效果最佳）
 
-## 快速开始
+## 🚀 快速开始
 
-### 方法一：使用docker-compose（推荐）
+### 方法一：使用官方镜像（推荐）
 
-1. 进入web目录，执行：
+**快速启动：**
+
+```bash
+# 使用官方镜像快速部署
+docker run -d --name natter-web \
+  --network host \
+  --cap-add NET_ADMIN \
+  -v "$(pwd)/data:/app/data" \
+  await2719/natter-web:latest
+
+# 访问Web界面
+echo "🌐 访问地址: http://localhost:8080"
+echo "🔐 默认密码: zd2580"
+```
+
+**使用Docker Compose：**
+
+创建 `docker-compose.yml` 文件：
+
+```yaml
+version: '3'
+services:
+  natter-web:
+    image: await2719/natter-web:latest
+    container_name: natter-web
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+    environment:
+      - WEB_PORT=8080
+      - ADMIN_PASSWORD=zd2580
+      - GUEST_ENABLED=true
+      - IYUU_ENABLED=true
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+```
+
+然后运行：
 
 ```bash
 docker-compose up -d
 ```
 
-2. 访问Web界面：
+### 方法二：从源码构建
 
-```
-http://localhost:8080
-```
-
-### 方法二：直接构建和运行
+如果您需要修改代码或使用特定版本：
 
 1. 构建Docker镜像：
 
@@ -40,8 +79,21 @@ docker run -d --name natter-web \
   --network host \
   --cap-add NET_ADMIN \
   -v "$(pwd)/data:/app/data" \
-  -p 8080:8080 \
   natter-web
+```
+
+### 可用的镜像标签
+
+```bash
+# 最新稳定版
+await2719/natter-web:latest
+
+# 特定版本
+await2719/natter-web:v1.0.8
+await2719/natter-web:1.0.8
+
+# 开发版本
+await2719/natter-web:dev
 ```
 
 ## 持久化数据
