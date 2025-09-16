@@ -2697,7 +2697,7 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                     # 处理MCP示例文档访问
                     if path == "/mcp_examples/" or path == "/mcp_examples":
                         # 重定向到README.md
-                        self._serve_file("mcp_examples/README.md", "text/markdown")
+                        self._serve_file("mcp_examples/README.md", "text/markdown; charset=utf-8")
                         return
                     else:
                         # 提供mcp_examples目录下的文件
@@ -2707,13 +2707,13 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                                 os.path.join(os.path.dirname(os.path.abspath(__file__)), file_path), "rb"
                             ) as f:
                                 if file_path.endswith('.md'):
-                                    content_type = "text/markdown"
+                                    content_type = "text/markdown; charset=utf-8"
                                 elif file_path.endswith('.py'):
-                                    content_type = "text/plain"
+                                    content_type = "text/plain; charset=utf-8"
                                 elif file_path.endswith('.json'):
-                                    content_type = "application/json"
+                                    content_type = "application/json; charset=utf-8"
                                 else:
-                                    content_type = "text/plain"
+                                    content_type = "text/plain; charset=utf-8"
 
                                 self._set_headers(content_type)
                                 self.wfile.write(f.read())
@@ -2722,14 +2722,17 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                             self._error(404, "File not found in mcp_examples")
                             return
                 elif path.endswith(".md"):
-                    self._serve_file(path[1:], "text/markdown")
+                    self._serve_file(path[1:], "text/markdown; charset=utf-8")
                     return
                 elif path.endswith(".py"):
-                    self._serve_file(path[1:], "text/plain")
+                    self._serve_file(path[1:], "text/plain; charset=utf-8")
                     return
 
-            # API请求需要验证
-            if path not in ["/api/auth/login", "/api/auth/unified-login"]:
+            # API请求需要验证（排除静态文件和公开路径）
+            if (path not in ["/api/auth/login", "/api/auth/unified-login"]
+                and not path.startswith("/mcp_examples/")
+                and not path.endswith(".md")
+                and not path.endswith(".py")):
                 if not (self._authenticate() or self._authenticate_token()):
                     # 认证失败，发送401响应
                     self.send_response(401)
