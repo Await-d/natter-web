@@ -23,7 +23,7 @@ import psutil
 import secrets
 
 # 版本号定义
-VERSION = "1.0.7"
+VERSION = "1.0.8"
 
 # 确保能够访问到natter.py，优先使用环境变量定义的路径
 NATTER_PATH = os.environ.get("NATTER_PATH") or os.path.join(
