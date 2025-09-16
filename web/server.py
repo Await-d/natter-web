@@ -2655,6 +2655,9 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                 or path.endswith(".woff")
                 or path.endswith(".woff2")
                 or path.endswith(".ttf")
+                or path.startswith("/mcp_examples/")
+                or path.endswith(".md")
+                or path.endswith(".py")
             ):
                 # 为前端文件提供静态服务
                 if path == "/" or path == "":
@@ -2689,6 +2692,40 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                     return
                 elif path.endswith(".ttf"):
                     self._serve_file(path[1:], "font/ttf")
+                    return
+                elif path.startswith("/mcp_examples/"):
+                    # 处理MCP示例文档访问
+                    if path == "/mcp_examples/" or path == "/mcp_examples":
+                        # 重定向到README.md
+                        self._serve_file("mcp_examples/README.md", "text/markdown")
+                        return
+                    else:
+                        # 提供mcp_examples目录下的文件
+                        file_path = path[1:]  # 移除开头的'/'
+                        try:
+                            with open(
+                                os.path.join(os.path.dirname(os.path.abspath(__file__)), file_path), "rb"
+                            ) as f:
+                                if file_path.endswith('.md'):
+                                    content_type = "text/markdown"
+                                elif file_path.endswith('.py'):
+                                    content_type = "text/plain"
+                                elif file_path.endswith('.json'):
+                                    content_type = "application/json"
+                                else:
+                                    content_type = "text/plain"
+
+                                self._set_headers(content_type)
+                                self.wfile.write(f.read())
+                                return
+                        except FileNotFoundError:
+                            self._error(404, "File not found in mcp_examples")
+                            return
+                elif path.endswith(".md"):
+                    self._serve_file(path[1:], "text/markdown")
+                    return
+                elif path.endswith(".py"):
+                    self._serve_file(path[1:], "text/plain")
                     return
 
             # API请求需要验证
@@ -3589,8 +3626,50 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                 return
 
             self._handle_mcp_sse(data)
+        elif path.startswith("/mcp_examples/"):
+            # 处理MCP示例文档访问
+            if path == "/mcp_examples/" or path == "/mcp_examples":
+                # 重定向到README.md
+                self._serve_file("mcp_examples/README.md", "text/markdown")
+            else:
+                # 提供mcp_examples目录下的文件
+                file_path = path[1:]  # 移除开头的'/'
+                try:
+                    with open(
+                        os.path.join(os.path.dirname(os.path.abspath(__file__)), file_path), "rb"
+                    ) as f:
+                        if file_path.endswith('.md'):
+                            content_type = "text/markdown"
+                        elif file_path.endswith('.py'):
+                            content_type = "text/plain"
+                        elif file_path.endswith('.json'):
+                            content_type = "application/json"
+                        else:
+                            content_type = "text/plain"
+
+                        self._set_headers(content_type)
+                        self.wfile.write(f.read())
+                except FileNotFoundError:
+                    self._error(404, "File not found in mcp_examples")
         else:
-            self._error(404, "Not found")
+            # 尝试提供其他静态文件
+            if path == "/":
+                # 主页面
+                self._serve_file("index.html", "text/html")
+            elif path == "/login.html":
+                self._serve_file("login.html", "text/html")
+            elif path == "/guest.html":
+                self._serve_file("guest.html", "text/html")
+            elif path == "/script.js":
+                self._serve_file("script.js", "application/javascript")
+            elif path == "/style.css":
+                self._serve_file("style.css", "text/css")
+            elif path == "/await-logo.svg":
+                self._serve_file("await-logo.svg", "image/svg+xml")
+            elif path == "/favicon.svg":
+                self._serve_file("favicon.svg", "image/svg+xml")
+            else:
+                self._error(404, "Not found")
 
     def _serve_file(self, filename, content_type):
         """提供静态文件服务"""

@@ -771,7 +771,7 @@ function loadServices() {
 
 // 加载MCP状态
 function loadMCPStatus() {
-    fetch('/api/mcp/status')
+    fetchWithAuth('/api/mcp/status')
         .then(response => response.json())
         .then(data => {
             renderMCPStatus(data);
