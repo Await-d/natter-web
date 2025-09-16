@@ -2527,6 +2527,75 @@ class NatterHttpHandler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps(response).encode())
                 return
 
+            if path == "/api/mcp/status":
+                self._set_headers(200)
+                # 构建MCP状态信息
+                mcp_status = {
+                    "enabled": MCP_ENABLED,
+                    "protocols": [],
+                    "connections": {
+                        "active": len(mcp_connections),
+                        "max": MCP_MAX_CONNECTIONS
+                    },
+                    "tools": {
+                        "total": len(MCPToolRegistry._tools) if MCP_ENABLED else 0,
+                        "available": list(MCPToolRegistry._tools.keys()) if MCP_ENABLED else []
+                    }
+                }
+
+                # 添加协议信息
+                if MCP_ENABLED:
+                    mcp_status["protocols"].append({
+                        "name": "HTTP",
+                        "enabled": True,
+                        "endpoint": "/api/mcp"
+                    })
+
+                    if MCP_WEBSOCKET_ENABLED:
+                        mcp_status["protocols"].append({
+                            "name": "WebSocket",
+                            "enabled": True,
+                            "port": MCP_WEBSOCKET_PORT,
+                            "endpoint": f"ws://localhost:{MCP_WEBSOCKET_PORT}"
+                        })
+
+                    if MCP_TCP_ENABLED:
+                        mcp_status["protocols"].append({
+                            "name": "TCP",
+                            "enabled": True,
+                            "port": MCP_TCP_PORT,
+                            "endpoint": f"tcp://localhost:{MCP_TCP_PORT}"
+                        })
+
+                    if MCP_SSE_ENABLED:
+                        mcp_status["protocols"].append({
+                            "name": "SSE",
+                            "enabled": True,
+                            "endpoint": "/api/mcp/sse"
+                        })
+
+                    if MCP_STDIO_ENABLED:
+                        mcp_status["protocols"].append({
+                            "name": "stdio",
+                            "enabled": True,
+                            "endpoint": "stdin/stdout"
+                        })
+
+                # 添加连接详情
+                with mcp_connection_lock:
+                    mcp_status["connection_details"] = []
+                    for conn_id, conn_info in mcp_connections.items():
+                        mcp_status["connection_details"].append({
+                            "id": conn_id,
+                            "type": conn_info.get("type", "unknown"),
+                            "authenticated": conn_info.get("authenticated", False),
+                            "user_role": conn_info.get("user_role"),
+                            "created": conn_info.get("created", 0)
+                        })
+
+                self.wfile.write(json.dumps(mcp_status).encode())
+                return
+
             # 访客模式API - 不需要管理员认证
             if path == "/api/guest/auth":
                 # 访客密码验证

@@ -493,6 +493,14 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    // MCP状态刷新按钮
+    const refreshMcpStatusBtn = document.getElementById('refresh-mcp-status');
+    if (refreshMcpStatusBtn) {
+        refreshMcpStatusBtn.addEventListener('click', function () {
+            loadMCPStatus();
+        });
+    }
+
     // 服务详情页按钮事件
     if (refreshServiceBtn) {
         refreshServiceBtn.addEventListener('click', function () {
@@ -759,6 +767,95 @@ function loadServices() {
             console.error('加载服务列表出错:', error);
             servicesList.innerHTML = '<div class="no-services">加载服务失败，请刷新页面重试。</div>';
         });
+}
+
+// 加载MCP状态
+function loadMCPStatus() {
+    fetch('/api/mcp/status')
+        .then(response => response.json())
+        .then(data => {
+            renderMCPStatus(data);
+        })
+        .catch(error => {
+            console.error('加载MCP状态出错:', error);
+            renderMCPStatusError();
+        });
+}
+
+// 渲染MCP状态
+function renderMCPStatus(data) {
+    // 更新状态卡片
+    const enabledStatus = document.getElementById('mcp-enabled-status');
+    const protocolsCount = document.getElementById('mcp-protocols-count');
+    const connectionsCount = document.getElementById('mcp-connections-count');
+    const toolsCount = document.getElementById('mcp-tools-count');
+
+    if (enabledStatus) {
+        enabledStatus.textContent = data.enabled ? '已启用' : '已禁用';
+        enabledStatus.className = `status-value ${data.enabled ? 'enabled' : 'disabled'}`;
+    }
+
+    if (protocolsCount) {
+        protocolsCount.textContent = `${data.protocols.length} 个协议`;
+        protocolsCount.className = 'status-value';
+    }
+
+    if (connectionsCount) {
+        connectionsCount.textContent = `${data.connections.active}/${data.connections.max}`;
+        connectionsCount.className = 'status-value';
+    }
+
+    if (toolsCount) {
+        toolsCount.textContent = `${data.tools.total} 个工具`;
+        toolsCount.className = 'status-value';
+    }
+
+    // 渲染协议列表
+    const protocolsList = document.getElementById('protocols-list');
+    if (protocolsList) {
+        protocolsList.innerHTML = '';
+
+        if (data.protocols && data.protocols.length > 0) {
+            data.protocols.forEach(protocol => {
+                const protocolItem = document.createElement('div');
+                protocolItem.className = 'protocol-item';
+
+                protocolItem.innerHTML = `
+                    <div class="protocol-info">
+                        <div class="protocol-name">${protocol.name}</div>
+                        <div class="protocol-endpoint">${protocol.endpoint}</div>
+                    </div>
+                    <div class="protocol-status ${protocol.enabled ? 'enabled' : 'disabled'}">
+                        ${protocol.enabled ? '已启用' : '已禁用'}
+                    </div>
+                `;
+
+                protocolsList.appendChild(protocolItem);
+            });
+        } else {
+            protocolsList.innerHTML = '<div style="text-align: center; color: var(--secondary-color);">无可用协议</div>';
+        }
+    }
+}
+
+// 渲染MCP状态错误
+function renderMCPStatusError() {
+    const enabledStatus = document.getElementById('mcp-enabled-status');
+    const protocolsCount = document.getElementById('mcp-protocols-count');
+    const connectionsCount = document.getElementById('mcp-connections-count');
+    const toolsCount = document.getElementById('mcp-tools-count');
+    const protocolsList = document.getElementById('protocols-list');
+
+    [enabledStatus, protocolsCount, connectionsCount, toolsCount].forEach(element => {
+        if (element) {
+            element.textContent = '加载失败';
+            element.className = 'status-value loading';
+        }
+    });
+
+    if (protocolsList) {
+        protocolsList.innerHTML = '<div style="text-align: center; color: var(--danger-color);">加载协议信息失败</div>';
+    }
 }
 
 // 渲染服务列表
@@ -2858,12 +2955,18 @@ function showMainInterface() {
     // 加载服务列表
     loadServices();
 
+    // 加载MCP状态
+    loadMCPStatus();
+
     // 获取版本号
     fetchVersion();
 
     // 设置页面刷新定时器 (每10秒刷新一次列表)
     if (!window.refreshTimer) {
-        window.refreshTimer = setInterval(loadServices, 10000);
+        window.refreshTimer = setInterval(() => {
+            loadServices();
+            loadMCPStatus(); // 也定期刷新MCP状态
+        }, 10000);
     }
 }
 

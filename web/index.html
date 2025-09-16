@@ -1632,6 +1632,141 @@
             background-color: #e0a800;
             border-color: #d39e00;
         }
+
+        /* MCP状态面板样式 */
+        .mcp-status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .mcp-status-card {
+            background: white;
+            border-radius: 8px;
+            padding: 1rem;
+            box-shadow: 0 2px 4px var(--shadow-color);
+            border: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            transition: all 0.3s ease;
+        }
+
+        .mcp-status-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px var(--shadow-color);
+        }
+
+        .mcp-status-card .status-icon {
+            font-size: 1.5rem;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--light-color);
+            border-radius: 50%;
+        }
+
+        .mcp-status-card .status-info {
+            flex: 1;
+        }
+
+        .mcp-status-card .status-label {
+            font-size: 0.8rem;
+            color: var(--secondary-color);
+            margin-bottom: 0.25rem;
+        }
+
+        .mcp-status-card .status-value {
+            font-weight: bold;
+            font-size: 1rem;
+            color: var(--dark-color);
+        }
+
+        .mcp-protocols-detail {
+            background: var(--light-color);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .mcp-protocols-detail h3 {
+            margin: 0 0 1rem 0;
+            color: var(--dark-color);
+            font-size: 1rem;
+        }
+
+        .protocols-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 0.75rem;
+        }
+
+        .protocol-item {
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .protocol-info {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+        }
+
+        .protocol-name {
+            font-weight: bold;
+            color: var(--dark-color);
+        }
+
+        .protocol-endpoint {
+            font-size: 0.8rem;
+            color: var(--secondary-color);
+            font-family: monospace;
+        }
+
+        .protocol-status {
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .protocol-status.enabled {
+            background: var(--success-color);
+            color: white;
+        }
+
+        .protocol-status.disabled {
+            background: var(--secondary-color);
+            color: white;
+        }
+
+        .mcp-actions {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .status-value.enabled {
+            color: var(--success-color);
+        }
+
+        .status-value.disabled {
+            color: var(--danger-color);
+        }
+
+        .status-value.loading {
+            color: var(--secondary-color);
+        }
     </style>
 </head>
 
@@ -1661,6 +1796,53 @@
         </header>
 
         <main>
+            <section class="card fade-in" id="mcp-status-panel">
+                <h2>🔌 MCP服务状态</h2>
+                <div class="mcp-status-grid">
+                    <div class="mcp-status-card">
+                        <div class="status-icon">🚀</div>
+                        <div class="status-info">
+                            <div class="status-label">服务状态</div>
+                            <div id="mcp-enabled-status" class="status-value">加载中...</div>
+                        </div>
+                    </div>
+                    <div class="mcp-status-card">
+                        <div class="status-icon">🌐</div>
+                        <div class="status-info">
+                            <div class="status-label">支持协议</div>
+                            <div id="mcp-protocols-count" class="status-value">加载中...</div>
+                        </div>
+                    </div>
+                    <div class="mcp-status-card">
+                        <div class="status-icon">🔗</div>
+                        <div class="status-info">
+                            <div class="status-label">活跃连接</div>
+                            <div id="mcp-connections-count" class="status-value">加载中...</div>
+                        </div>
+                    </div>
+                    <div class="mcp-status-card">
+                        <div class="status-icon">🛠️</div>
+                        <div class="status-info">
+                            <div class="status-label">可用工具</div>
+                            <div id="mcp-tools-count" class="status-value">加载中...</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mcp-protocols-detail" id="mcp-protocols-detail">
+                    <h3>支持的传输协议</h3>
+                    <div class="protocols-list" id="protocols-list">
+                        <div class="loading">
+                            <div class="loading-spinner"></div>
+                            加载协议信息...
+                        </div>
+                    </div>
+                </div>
+                <div class="mcp-actions">
+                    <button id="refresh-mcp-status" class="btn btn-secondary">🔄 刷新状态</button>
+                    <button id="view-mcp-docs" class="btn btn-info" onclick="window.open('/mcp_examples/', '_blank')">📖 查看文档</button>
+                </div>
+            </section>
+
             <section class="card fade-in" id="services-panel">
                 <h2>运行中的服务</h2>
                 <div class="services-list" id="services-list">
