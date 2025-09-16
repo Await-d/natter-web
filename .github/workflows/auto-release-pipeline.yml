@@ -1,0 +1,393 @@
+name: Auto Release Pipeline
+
+on:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release-pipeline:
+    runs-on: ubuntu-latest
+    # 跳过由GitHub Actions创建的提交，避免死循环
+    if: github.event.pusher.name != 'github-actions[bot]' && !contains(github.event.head_commit.message, '[skip ci]')
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Check if version bump is needed
+      id: check
+      run: |
+        # 检测是否是合并提交
+        PARENT_COUNT=$(git rev-list --parents -n 1 HEAD | wc -w)
+        PARENT_COUNT=$((PARENT_COUNT - 1))
+        echo "Parent count: $PARENT_COUNT"
+
+        if [ "$PARENT_COUNT" -gt 1 ]; then
+          # 合并提交：获取合并进来的所有文件变更
+          echo "Detected merge commit, getting all merged changes"
+          # 获取合并基准点
+          MERGE_BASE=$(git merge-base HEAD^1 HEAD^2 2>/dev/null || echo "")
+          if [ -n "$MERGE_BASE" ]; then
+            # 获取从合并基准到 HEAD 的所有变更
+            CHANGED_FILES=$(git diff --name-only $MERGE_BASE..HEAD)
+          else
+            # 如果无法获取合并基准，使用第二个父提交
+            CHANGED_FILES=$(git diff --name-only HEAD^2..HEAD)
+          fi
+        else
+          # 普通提交：获取相对于上一个提交的变更
+          CHANGED_FILES=$(git diff --name-only HEAD~1..HEAD 2>/dev/null || git diff --name-only $(git rev-list --max-parents=0 HEAD)..HEAD)
+        fi
+
+        echo "Changed files:"
+        echo "$CHANGED_FILES"
+
+        # 检查是否只有无关文件（.md, docs/, .github/等）
+        SIGNIFICANT_CHANGES=false
+        while IFS= read -r file; do
+          # 跳过空行
+          [ -z "$file" ] && continue
+
+          # 检查是否是需要忽略的文件
+          if [[ ! "$file" =~ \.(md|txt)$ ]] &&
+             [[ ! "$file" =~ ^docs/ ]] &&
+             [[ ! "$file" =~ ^\.github/ ]] &&
+             [[ "$file" != "VERSION" ]] &&
+             [[ "$file" != ".gitignore" ]] &&
+             [[ "$file" != "LICENSE" ]]; then
+            echo "Found significant change in: $file"
+            SIGNIFICANT_CHANGES=true
+            break
+          fi
+        done <<< "$CHANGED_FILES"
+
+        if [ "$SIGNIFICANT_CHANGES" = true ]; then
+          echo "Significant changes detected, version bump needed"
+          echo "needs_bump=true" >> $GITHUB_OUTPUT
+        else
+          echo "No significant changes, skipping version bump"
+          echo "needs_bump=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Get current version
+      if: steps.check.outputs.needs_bump == 'true'
+      id: get_version
+      run: |
+        # 获取最新的tag版本
+        LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+        echo "Latest tag: $LATEST_TAG"
+        TAG_VERSION=${LATEST_TAG#v}
+
+        # 获取VERSION文件中的版本
+        FILE_VERSION=$(cat VERSION | tr -d '[:space:]')
+        echo "VERSION file: $FILE_VERSION"
+
+        # 比较tag版本和文件版本，取较大值
+        function version_gt() { test "$(printf '%s\n' "$@" | sort -V | head -n 1)" != "$1"; }
+
+        if version_gt "$FILE_VERSION" "$TAG_VERSION"; then
+          VERSION="$FILE_VERSION"
+          echo "Using VERSION file: $VERSION (newer than tag)"
+        else
+          VERSION="$TAG_VERSION"
+          echo "Using tag version: $VERSION (newer or equal to file)"
+        fi
+
+        echo "Current version: $VERSION"
+        echo "current_version=$VERSION" >> $GITHUB_OUTPUT
+
+    - name: Calculate next version
+      if: steps.check.outputs.needs_bump == 'true'
+      id: next_version
+      run: |
+        VERSION="${{ steps.get_version.outputs.current_version }}"
+
+        # 分割版本号
+        IFS='.' read -r -a version_parts <<< "$VERSION"
+        MAJOR="${version_parts[0]:-0}"
+        MINOR="${version_parts[1]:-0}"
+        PATCH="${version_parts[2]:-0}"
+
+        # 默认递增patch版本
+        NEW_PATCH=$((PATCH + 1))
+        NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
+
+        echo "New version: $NEW_VERSION"
+        echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+        echo "new_tag=v$NEW_VERSION" >> $GITHUB_OUTPUT
+
+    - name: Update VERSION file and web/server.py
+      if: steps.check.outputs.needs_bump == 'true'
+      run: |
+        # 更新VERSION文件
+        echo "${{ steps.next_version.outputs.new_version }}" > VERSION
+
+        # 更新web/server.py中的版本号
+        sed -i 's/VERSION = ".*"/VERSION = "${{ steps.next_version.outputs.new_version }}"/' web/server.py
+
+        # 配置git
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+
+        # 提交VERSION文件和server.py - 添加 [skip ci] 以避免再次触发
+        git add VERSION web/server.py
+        git commit -m "chore: sync VERSION file and server.py with release ${{ steps.next_version.outputs.new_tag }} [skip ci]"
+
+    - name: Install git-cliff
+      if: steps.check.outputs.needs_bump == 'true'
+      run: |
+        wget -q https://github.com/orhun/git-cliff/releases/download/v1.4.0/git-cliff-1.4.0-x86_64-unknown-linux-gnu.tar.gz
+        tar -xzf git-cliff-1.4.0-x86_64-unknown-linux-gnu.tar.gz
+        chmod +x git-cliff-1.4.0/git-cliff
+        sudo mv git-cliff-1.4.0/git-cliff /usr/local/bin/
+
+    - name: Generate changelog
+      if: steps.check.outputs.needs_bump == 'true'
+      id: changelog
+      run: |
+        # 获取上一个tag以来的更新日志
+        LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+        if [ -n "$LATEST_TAG" ]; then
+          # 排除VERSION文件的提交
+          CHANGELOG=$(git-cliff --config .github/cliff.toml $LATEST_TAG..HEAD --strip header 2>/dev/null | grep -v "bump version" | sed '/^$/d' || echo "- 代码优化和改进")
+        else
+          CHANGELOG=$(git-cliff --config .github/cliff.toml --strip header 2>/dev/null || echo "- 初始版本发布")
+        fi
+
+        # 如果git-cliff失败，使用git log生成简单的changelog
+        if [ -z "$CHANGELOG" ] || [ "$CHANGELOG" = "- 代码优化和改进" ]; then
+          if [ -n "$LATEST_TAG" ]; then
+            CHANGELOG=$(git log $LATEST_TAG..HEAD --oneline --no-merges | sed 's/^[a-f0-9]* /- /' | head -10)
+          else
+            CHANGELOG=$(git log --oneline --no-merges | sed 's/^[a-f0-9]* /- /' | head -10)
+          fi
+
+          if [ -z "$CHANGELOG" ]; then
+            CHANGELOG="- 代码优化和改进"
+          fi
+        fi
+
+        echo "content<<EOF" >> $GITHUB_OUTPUT
+        echo "$CHANGELOG" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+    - name: Create and push tag
+      if: steps.check.outputs.needs_bump == 'true'
+      run: |
+        NEW_TAG="${{ steps.next_version.outputs.new_tag }}"
+        git tag -a "$NEW_TAG" -m "Release $NEW_TAG"
+        git push origin HEAD:master "$NEW_TAG"
+
+    - name: Create GitHub Release
+      if: steps.check.outputs.needs_bump == 'true'
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.next_version.outputs.new_tag }}
+        name: Release ${{ steps.next_version.outputs.new_version }}
+        body: |
+          ## 🐳 Docker 镜像
+
+          ```bash
+          docker pull ${{ secrets.DOCKERHUB_USERNAME || 'await2719' }}/natter-web:${{ steps.next_version.outputs.new_tag }}
+          docker pull ${{ secrets.DOCKERHUB_USERNAME || 'await2719' }}/natter-web:latest
+          ```
+
+          ## 📦 主要更新
+
+          ${{ steps.changelog.outputs.content }}
+
+          ## 📋 完整更新日志
+
+          查看 [所有版本](https://github.com/${{ github.repository }}/releases)
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+
+    # 自动清理旧的tags和releases（保持最近50个）
+    - name: Cleanup old tags and releases
+      if: steps.check.outputs.needs_bump == 'true'
+      continue-on-error: true
+      env:
+        TAGS_TO_KEEP: 50
+      run: |
+        echo "🧹 自动清理旧版本，保持最近 $TAGS_TO_KEEP 个tag..."
+
+        # 获取所有版本tag并按版本号排序（从旧到新）
+        echo "正在获取所有tags..."
+        ALL_TAGS=$(git ls-remote --tags origin | grep -E 'refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$' | awk '{print $2}' | sed 's|refs/tags/||' | sort -V)
+
+        # 检查是否获取到tags
+        if [ -z "$ALL_TAGS" ]; then
+          echo "⚠️ 未找到任何版本tag"
+          exit 0
+        fi
+
+        TOTAL_COUNT=$(echo "$ALL_TAGS" | wc -l)
+
+        echo "📊 当前tag统计："
+        echo "- 总数: $TOTAL_COUNT"
+        echo "- 配置保留: $TAGS_TO_KEEP"
+
+        if [ "$TOTAL_COUNT" -gt "$TAGS_TO_KEEP" ]; then
+          DELETE_COUNT=$((TOTAL_COUNT - TAGS_TO_KEEP))
+          echo "- 将要删除: $DELETE_COUNT 个最旧的tag"
+
+          # 获取要删除的tags（最老的）
+          TAGS_TO_DELETE=$(echo "$ALL_TAGS" | head -n "$DELETE_COUNT")
+
+          # 显示将要删除的版本范围
+          OLDEST_TO_DELETE=$(echo "$TAGS_TO_DELETE" | head -1)
+          NEWEST_TO_DELETE=$(echo "$TAGS_TO_DELETE" | tail -1)
+          echo ""
+          echo "🗑️ 将要删除的版本范围："
+          echo "- 从: $OLDEST_TO_DELETE"
+          echo "- 到: $NEWEST_TO_DELETE"
+
+          echo ""
+          echo "开始执行删除..."
+          SUCCESS_COUNT=0
+          FAIL_COUNT=0
+
+          for tag in $TAGS_TO_DELETE; do
+            echo -n "  删除 $tag ... "
+
+            # 先检查release是否存在
+            if gh release view "$tag" >/dev/null 2>&1; then
+              # Release存在，删除release会同时删除tag
+              if gh release delete "$tag" --yes --cleanup-tag 2>/dev/null; then
+                echo "✅ (release+tag)"
+                SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+              else
+                echo "❌ (release删除失败)"
+                FAIL_COUNT=$((FAIL_COUNT + 1))
+              fi
+            else
+              # Release不存在，只删除tag
+              if git push origin --delete "$tag" 2>/dev/null; then
+                echo "✅ (仅tag)"
+                SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+              else
+                echo "⏭️ (已不存在)"
+                FAIL_COUNT=$((FAIL_COUNT + 1))
+              fi
+            fi
+          done
+
+          echo ""
+          echo "📊 清理结果："
+          echo "- 成功删除: $SUCCESS_COUNT"
+          echo "- 失败/跳过: $FAIL_COUNT"
+
+          # 重新获取并显示保留的版本范围
+          echo ""
+          echo "正在验证清理结果..."
+          REMAINING_TAGS=$(git ls-remote --tags origin | grep -E 'refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$' | awk '{print $2}' | sed 's|refs/tags/||' | sort -V)
+          REMAINING_COUNT=$(echo "$REMAINING_TAGS" | wc -l)
+          OLDEST=$(echo "$REMAINING_TAGS" | head -1)
+          NEWEST=$(echo "$REMAINING_TAGS" | tail -1)
+
+          echo "✅ 清理完成！"
+          echo ""
+          echo "📌 当前保留的版本："
+          echo "- 最旧版本: $OLDEST"
+          echo "- 最新版本: $NEWEST"
+          echo "- 版本总数: $REMAINING_COUNT"
+
+          # 验证是否达到预期
+          if [ "$REMAINING_COUNT" -le "$TAGS_TO_KEEP" ]; then
+            echo "- 状态: ✅ 符合预期（≤$TAGS_TO_KEEP）"
+          else
+            echo "- 状态: ⚠️ 超出预期（某些tag可能删除失败）"
+          fi
+        else
+          echo "✅ 当前tag数量（$TOTAL_COUNT）未超过限制（$TAGS_TO_KEEP），无需清理"
+        fi
+
+    # Docker构建步骤
+    - name: Set up QEMU
+      if: steps.check.outputs.needs_bump == 'true'
+      uses: docker/setup-qemu-action@v3
+
+    - name: Set up Docker Buildx
+      if: steps.check.outputs.needs_bump == 'true'
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Docker Hub
+      if: steps.check.outputs.needs_bump == 'true'
+      uses: docker/login-action@v3
+      with:
+        registry: docker.io
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: Build and push Docker image
+      if: steps.check.outputs.needs_bump == 'true'
+      uses: docker/build-push-action@v5
+      with:
+        context: ./web
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: |
+          ${{ secrets.DOCKERHUB_USERNAME }}/natter-web:${{ steps.next_version.outputs.new_tag }}
+          ${{ secrets.DOCKERHUB_USERNAME }}/natter-web:latest
+          ${{ secrets.DOCKERHUB_USERNAME }}/natter-web:${{ steps.next_version.outputs.new_version }}
+        labels: |
+          org.opencontainers.image.version=${{ steps.next_version.outputs.new_version }}
+          org.opencontainers.image.revision=${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Send Telegram Notification
+      if: steps.check.outputs.needs_bump == 'true' && env.TELEGRAM_BOT_TOKEN != '' && env.TELEGRAM_CHAT_ID != ''
+      env:
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      continue-on-error: true
+      run: |
+        VERSION="${{ steps.next_version.outputs.new_version }}"
+        TAG="${{ steps.next_version.outputs.new_tag }}"
+        REPO="${{ github.repository }}"
+
+        # 获取更新内容并限制长度
+        CHANGELOG="${{ steps.changelog.outputs.content }}"
+        CHANGELOG_TRUNCATED=$(echo "$CHANGELOG" | head -c 1000)
+        if [ ${#CHANGELOG} -gt 1000 ]; then
+          CHANGELOG_TRUNCATED="${CHANGELOG_TRUNCATED}..."
+        fi
+
+        # 构建消息内容
+        MESSAGE="🚀 *Natter Web 新版本发布！*"$'\n'$'\n'
+        MESSAGE+="📦 版本号: \`${VERSION}\`"$'\n'$'\n'
+        MESSAGE+="📝 *更新内容:*"$'\n'
+        MESSAGE+="${CHANGELOG_TRUNCATED}"$'\n'$'\n'
+        MESSAGE+="🐳 *Docker 部署:*"$'\n'
+        MESSAGE+="\`\`\`bash"$'\n'
+        MESSAGE+="docker pull await2719/natter-web:${TAG}"$'\n'
+        MESSAGE+="docker pull await2719/natter-web:latest"$'\n'
+        MESSAGE+="\`\`\`"$'\n'$'\n'
+        MESSAGE+="🔗 *相关链接:*"$'\n'
+        MESSAGE+="• [GitHub Release](https://github.com/${REPO}/releases/tag/${TAG})"$'\n'
+        MESSAGE+="• [完整更新日志](https://github.com/${REPO}/releases)"$'\n'
+        MESSAGE+="• [Docker Hub](https://hub.docker.com/r/await2719/natter-web)"$'\n'$'\n'
+        MESSAGE+="#NatterWeb #Update #v${VERSION//./_}"
+
+        # 使用 jq 构建 JSON 并发送
+        jq -n \
+          --arg chat_id "${TELEGRAM_CHAT_ID}" \
+          --arg text "${MESSAGE}" \
+          '{
+            chat_id: $chat_id,
+            text: $text,
+            parse_mode: "Markdown",
+            disable_web_page_preview: false
+          }' | \
+        curl -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+          -H "Content-Type: application/json" \
+          -d @-

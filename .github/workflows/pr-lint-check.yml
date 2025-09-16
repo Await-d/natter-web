@@ -1,0 +1,317 @@
+name: PR Code Quality Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - '**.py'
+      - '**.sh'
+      - '**.yml'
+      - '**.yaml'
+      - '**.json'
+      - '**.md'
+      - '**.html'
+      - '**.css'
+      - '**.js'
+      - 'Dockerfile'
+      - 'requirements.txt'
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  code-quality:
+    runs-on: ubuntu-latest
+    name: Check Code Quality
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # 安装代码质量检查工具
+          pip install black isort flake8 pylint
+
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v41
+        with:
+          files: |
+            **/*.py
+            **/*.sh
+            **/*.yml
+            **/*.yaml
+            **/*.json
+            **/*.md
+            **/*.html
+            **/*.css
+            **/*.js
+            **/Dockerfile
+            **/requirements.txt
+          files_ignore: |
+            .git/**
+            .github/**
+            logs/**
+            temp/**
+            tmp/**
+            __pycache__/**
+            *.pyc
+            .pytest_cache/**
+
+      - name: Check Python code formatting with Black
+        if: steps.changed-files.outputs.any_changed == 'true'
+        id: black-check
+        run: |
+          echo "🔍 Checking Black formatting for Python files..."
+
+          PYTHON_FILES=""
+          for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
+            if [[ "$file" =~ \.py$ ]] && [ -f "$file" ]; then
+              PYTHON_FILES="$PYTHON_FILES $file"
+            fi
+          done
+
+          if [ -n "$PYTHON_FILES" ]; then
+            echo "Checking Python files: $PYTHON_FILES"
+
+            BLACK_FAILED=false
+            BLACK_OUTPUT=""
+
+            for file in $PYTHON_FILES; do
+              echo "Checking: $file"
+              if ! black --check --diff "$file" 2>&1; then
+                BLACK_FAILED=true
+                DIFF=$(black --diff "$file" 2>/dev/null || true)
+                if [ -n "$DIFF" ]; then
+                  BLACK_OUTPUT="${BLACK_OUTPUT}❌ File needs formatting: $file\n"
+                  BLACK_OUTPUT="${BLACK_OUTPUT}\`\`\`diff\n${DIFF}\n\`\`\`\n\n"
+                fi
+              else
+                echo "✅ $file is properly formatted"
+              fi
+            done
+
+            if [ "$BLACK_FAILED" = true ]; then
+              echo "black_failed=true" >> $GITHUB_OUTPUT
+              echo -e "$BLACK_OUTPUT" > black-report.md
+              echo "❌ Some Python files are not properly formatted."
+              echo "Please run: black ."
+              exit 1
+            else
+              echo "black_failed=false" >> $GITHUB_OUTPUT
+              echo "✅ All Python files are properly formatted"
+            fi
+          else
+            echo "black_failed=false" >> $GITHUB_OUTPUT
+            echo "ℹ️ No Python files to check"
+          fi
+
+      - name: Check Python imports with isort
+        if: steps.changed-files.outputs.any_changed == 'true'
+        id: isort-check
+        run: |
+          echo "🔍 Checking import sorting with isort..."
+
+          PYTHON_FILES=""
+          for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
+            if [[ "$file" =~ \.py$ ]] && [ -f "$file" ]; then
+              PYTHON_FILES="$PYTHON_FILES $file"
+            fi
+          done
+
+          if [ -n "$PYTHON_FILES" ]; then
+            echo "Checking Python files: $PYTHON_FILES"
+
+            ISORT_FAILED=false
+            ISORT_OUTPUT=""
+
+            for file in $PYTHON_FILES; do
+              echo "Checking: $file"
+              if ! isort --check-only --diff "$file" 2>&1; then
+                ISORT_FAILED=true
+                DIFF=$(isort --diff "$file" 2>/dev/null || true)
+                if [ -n "$DIFF" ]; then
+                  ISORT_OUTPUT="${ISORT_OUTPUT}❌ File imports need sorting: $file\n"
+                  ISORT_OUTPUT="${ISORT_OUTPUT}\`\`\`diff\n${DIFF}\n\`\`\`\n\n"
+                fi
+              else
+                echo "✅ $file imports are properly sorted"
+              fi
+            done
+
+            if [ "$ISORT_FAILED" = true ]; then
+              echo "isort_failed=true" >> $GITHUB_OUTPUT
+              echo -e "$ISORT_OUTPUT" > isort-report.md
+              echo "❌ Some Python files have unsorted imports."
+              echo "Please run: isort ."
+              exit 1
+            else
+              echo "isort_failed=false" >> $GITHUB_OUTPUT
+              echo "✅ All Python imports are properly sorted"
+            fi
+          else
+            echo "isort_failed=false" >> $GITHUB_OUTPUT
+            echo "ℹ️ No Python files to check"
+          fi
+
+      - name: Run Flake8 linting
+        if: steps.changed-files.outputs.any_changed == 'true'
+        id: flake8-check
+        run: |
+          echo "🔍 Running Flake8 linting..."
+
+          PYTHON_FILES=""
+          for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
+            if [[ "$file" =~ \.py$ ]] && [ -f "$file" ]; then
+              PYTHON_FILES="$PYTHON_FILES $file"
+            fi
+          done
+
+          if [ -n "$PYTHON_FILES" ]; then
+            echo "Linting Python files: $PYTHON_FILES"
+
+            set +e
+            FLAKE8_OUTPUT=$(flake8 $PYTHON_FILES --max-line-length=88 --extend-ignore=E203,W503 2>&1)
+            FLAKE8_EXIT_CODE=$?
+            set -e
+
+            if [ $FLAKE8_EXIT_CODE -ne 0 ]; then
+              echo "flake8_failed=true" >> $GITHUB_OUTPUT
+              echo "❌ Flake8 found issues"
+
+              echo "## Flake8 Report" > flake8-report.md
+              echo "\`\`\`" >> flake8-report.md
+              echo "$FLAKE8_OUTPUT" >> flake8-report.md
+              echo "\`\`\`" >> flake8-report.md
+
+              exit 1
+            else
+              echo "flake8_failed=false" >> $GITHUB_OUTPUT
+              echo "✅ Flake8 check passed"
+            fi
+          else
+            echo "flake8_failed=false" >> $GITHUB_OUTPUT
+            echo "ℹ️ No Python files to check"
+          fi
+
+      - name: Debug PR Context
+        if: failure()
+        run: |
+          echo "PR Number: ${{ github.event.pull_request.number }}"
+          echo "Repo: ${{ github.repository }}"
+          echo "Event Name: ${{ github.event_name }}"
+          echo "Actor: ${{ github.actor }}"
+
+      - name: Comment PR with results
+        if: failure()
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            let comment = '## 🚨 代码质量检查失败\n\n';
+
+            // 读取 Black 报告
+            if (fs.existsSync('black-report.md')) {
+              const blackReport = fs.readFileSync('black-report.md', 'utf8');
+              comment += '### Black 格式化问题\n\n';
+              comment += blackReport;
+              comment += '\n**修复命令:**\n```bash\nblack .\n```\n\n';
+            }
+
+            // 读取 isort 报告
+            if (fs.existsSync('isort-report.md')) {
+              const isortReport = fs.readFileSync('isort-report.md', 'utf8');
+              comment += '### Import 排序问题\n\n';
+              comment += isortReport;
+              comment += '\n**修复命令:**\n```bash\nisort .\n```\n\n';
+            }
+
+            // 读取 Flake8 报告
+            if (fs.existsSync('flake8-report.md')) {
+              const flake8Report = fs.readFileSync('flake8-report.md', 'utf8');
+              comment += '### Flake8 代码质量问题\n\n';
+              comment += flake8Report;
+            }
+
+            comment += '\n---\n';
+            comment += '💡 **提示**: 在本地运行以下命令来自动修复大部分问题:\n';
+            comment += '```bash\n';
+            comment += '# 安装工具\n';
+            comment += 'pip install black isort flake8\n\n';
+            comment += '# 自动修复格式\n';
+            comment += 'black .          # 修复代码格式\n';
+            comment += 'isort .          # 修复import排序\n';
+            comment += 'flake8 .         # 检查代码质量\n';
+            comment += '```\n';
+
+            // 查找是否已有机器人评论
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(comment =>
+              comment.user.type === 'Bot' &&
+              comment.body.includes('代码质量检查失败')
+            );
+
+            if (botComment) {
+              // 更新现有评论
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: comment
+              });
+            } else {
+              // 创建新评论
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: comment
+              });
+            }
+
+      - name: Success comment
+        if: success() && steps.changed-files.outputs.any_changed == 'true'
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            // 查找是否已有失败的评论
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(comment =>
+              comment.user.type === 'Bot' &&
+              comment.body.includes('代码质量检查失败')
+            );
+
+            if (botComment) {
+              // 如果之前有失败评论，更新为成功
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: '## ✅ 代码质量检查通过\n\n所有文件格式正确且通过了代码质量检查！'
+              });
+            }
