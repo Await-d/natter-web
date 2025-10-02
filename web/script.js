@@ -501,6 +501,30 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    // MCP测试连接按钮
+    const testMcpConnectionBtn = document.getElementById('test-mcp-connection');
+    if (testMcpConnectionBtn) {
+        testMcpConnectionBtn.addEventListener('click', function () {
+            testMCPConnection();
+        });
+    }
+
+    // MCP列出服务按钮
+    const mcpListServicesBtn = document.getElementById('mcp-list-services');
+    if (mcpListServicesBtn) {
+        mcpListServicesBtn.addEventListener('click', function () {
+            mcpListServices();
+        });
+    }
+
+    // MCP复制端点按钮
+    const copyMcpEndpointBtn = document.getElementById('copy-mcp-endpoint');
+    if (copyMcpEndpointBtn) {
+        copyMcpEndpointBtn.addEventListener('click', function () {
+            copyMCPEndpoint();
+        });
+    }
+
     // 服务详情页按钮事件
     if (refreshServiceBtn) {
         refreshServiceBtn.addEventListener('click', function () {
@@ -856,6 +880,115 @@ function renderMCPStatusError() {
     if (protocolsList) {
         protocolsList.innerHTML = '<div style="text-align: center; color: var(--danger-color);">加载协议信息失败</div>';
     }
+}
+
+// MCP测试连接功能
+function testMCPConnection() {
+    showNotification('正在测试MCP连接...', 'info');
+
+    fetchWithAuth('/api/mcp', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            method: 'tools/list'
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.result) {
+            showNotification(`✅ MCP连接成功！可用工具: ${data.result.tools.length} 个`, 'success');
+        } else {
+            showNotification('❌ MCP连接失败', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('MCP连接测试失败:', error);
+        showNotification('❌ MCP连接测试失败: ' + error.message, 'error');
+    });
+}
+
+// MCP列出服务功能
+function mcpListServices() {
+    showNotification('正在通过MCP获取服务列表...', 'info');
+
+    fetchWithAuth('/api/mcp', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            method: 'tools/call',
+            params: {
+                name: 'natter/list_services',
+                arguments: {
+                    filter: 'all'
+                }
+            }
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.result && data.result.content) {
+            const content = data.result.content[0];
+            if (content.type === 'text') {
+                const servicesData = JSON.parse(content.text);
+                showNotification(`✅ 获取成功！共 ${servicesData.total} 个服务`, 'success');
+
+                // 在控制台输出详细信息
+                console.log('MCP服务列表:', servicesData);
+
+                // 可选：显示一个弹窗展示服务信息
+                alert(`MCP服务列表:\n总数: ${servicesData.total}\n运行中: ${servicesData.running}\n已停止: ${servicesData.stopped}\n\n详细信息请查看浏览器控制台`);
+            }
+        } else {
+            showNotification('❌ 获取服务列表失败', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('MCP列出服务失败:', error);
+        showNotification('❌ 操作失败: ' + error.message, 'error');
+    });
+}
+
+// 复制MCP API端点
+function copyMCPEndpoint() {
+    const endpoint = window.location.origin + '/api/mcp';
+
+    // 使用现代Clipboard API
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(endpoint)
+            .then(() => {
+                showNotification(`✅ 已复制MCP端点: ${endpoint}`, 'success');
+            })
+            .catch(err => {
+                console.error('复制失败:', err);
+                fallbackCopy(endpoint);
+            });
+    } else {
+        fallbackCopy(endpoint);
+    }
+}
+
+// 备用复制方法
+function fallbackCopy(text) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+
+    try {
+        document.execCommand('copy');
+        showNotification(`✅ 已复制MCP端点: ${text}`, 'success');
+    } catch (err) {
+        console.error('复制失败:', err);
+        showNotification('❌ 复制失败，请手动复制: ' + text, 'error');
+    }
+
+    document.body.removeChild(textarea);
 }
 
 // 渲染服务列表
