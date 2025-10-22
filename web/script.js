@@ -832,6 +832,41 @@ document.addEventListener('DOMContentLoaded', function () {
     } else {
         console.error('找不到分组筛选器元素');
     }
+    
+    // 快捷操作按钮事件监听器
+    const quickGroupsBtn = document.getElementById('quick-groups-btn');
+    const quickIyuuBtn = document.getElementById('quick-iyuu-btn');
+    const quickRefreshBtn = document.getElementById('quick-refresh-btn');
+    const quickTemplatesBtn = document.getElementById('quick-templates-btn');
+    
+    if (quickGroupsBtn) {
+        quickGroupsBtn.addEventListener('click', function() {
+            if (groupsManagementBtn) {
+                groupsManagementBtn.click();
+            }
+        });
+    }
+    
+    if (quickIyuuBtn) {
+        quickIyuuBtn.addEventListener('click', function() {
+            if (iyuuSettingsBtn) {
+                iyuuSettingsBtn.click();
+            }
+        });
+    }
+    
+    if (quickRefreshBtn) {
+        quickRefreshBtn.addEventListener('click', function() {
+            loadServices();
+            showNotification('已刷新服务列表', 'success');
+        });
+    }
+    
+    if (quickTemplatesBtn) {
+        quickTemplatesBtn.addEventListener('click', function() {
+            showTemplatesPanel();
+        });
+    }
 });
 
 // 加载服务列表

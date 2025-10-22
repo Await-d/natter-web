@@ -4390,6 +4390,8 @@ class ServiceGroupManager:
                         "lan_status": service_info.get("lan_status", ""),
                         "wan_status": service_info.get("wan_status", ""),
                         "nat_type": service_info.get("nat_type", ""),
+                        "group_name": "默认分组",
+                        "cmd_args": service_info.get("cmd_args", []),
                     }
                     services.append(guest_service_info)
         else:
@@ -4398,6 +4400,7 @@ class ServiceGroupManager:
                 return []
 
             group = service_groups["groups"][group_id]
+            group_name = group.get("name", "未命名分组")
             for service_id in group["services"]:
                 if service_id in running_services:
                     service_info = running_services[service_id].get_info()
@@ -4412,6 +4415,8 @@ class ServiceGroupManager:
                         "lan_status": service_info.get("lan_status", ""),
                         "wan_status": service_info.get("wan_status", ""),
                         "nat_type": service_info.get("nat_type", ""),
+                        "group_name": group_name,
+                        "cmd_args": service_info.get("cmd_args", []),
                     }
                     services.append(guest_service_info)
         return services
@@ -4474,6 +4479,8 @@ class ServiceGroupManager:
                         "lan_status": service_info.get("lan_status", ""),
                         "wan_status": service_info.get("wan_status", ""),
                         "nat_type": service_info.get("nat_type", ""),
+                        "group_name": "默认分组",
+                        "cmd_args": service_info.get("cmd_args", []),
                     }
                     services.append(guest_service_info)
         else:
@@ -4482,6 +4489,7 @@ class ServiceGroupManager:
                 return []
 
             group = service_groups["groups"][group_id]
+            group_name = group.get("name", "未命名分组")
             for service_id in group["services"]:
                 if service_id in running_services:
                     service_info = running_services[service_id].get_info()
@@ -4496,6 +4504,8 @@ class ServiceGroupManager:
                         "lan_status": service_info.get("lan_status", ""),
                         "wan_status": service_info.get("wan_status", ""),
                         "nat_type": service_info.get("nat_type", ""),
+                        "group_name": group_name,
+                        "cmd_args": service_info.get("cmd_args", []),
                     }
                     services.append(guest_service_info)
         return services
