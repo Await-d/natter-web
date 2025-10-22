@@ -35,6 +35,10 @@ let retryMode = document.getElementById('retry-mode');
 let quitOnChange = document.getElementById('quit-on-change');
 let autoRestart = document.getElementById('auto-restart');
 let serviceGroup = document.getElementById('service-group'); // 新建服务分组选择
+let groupFilter = document.getElementById('group-filter'); // 服务列表分组筛选器
+
+// 当前选择的分组筛选
+let currentGroupFilter = '';
 
 // 详情页元素
 let serviceId = document.getElementById('service-id');
@@ -778,11 +782,67 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // 加载分组列表到服务创建表单中
     loadGroupsForSelect();
+    
+    // 初始化分组筛选器
+    groupFilter = document.getElementById('group-filter');
+    if (groupFilter) {
+        // 加载分组列表
+        loadGroups();
+        
+        // 添加分组筛选change事件监听器
+        groupFilter.addEventListener('change', function () {
+            currentGroupFilter = this.value === '__default__' ? '' : this.value;
+            
+            // 特殊处理"默认分组"选项
+            if (this.value === '__default__') {
+                // 加载所有服务，然后过滤出未分组的
+                fetchWithAuth(API.services)
+                    .then(response => response.json())
+                    .then(data => {
+                        // 获取所有分组中的服务ID
+                        return fetchWithAuth(API.groups)
+                            .then(groupsResponse => groupsResponse.json())
+                            .then(groupsData => {
+                                const groupedServiceIds = new Set();
+                                if (groupsData.groups) {
+                                    groupsData.groups.forEach(group => {
+                                        if (group.services) {
+                                            group.services.forEach(sid => groupedServiceIds.add(sid));
+                                        }
+                                    });
+                                }
+                                
+                                // 过滤出未分组的服务
+                                const ungroupedServices = data.services.filter(
+                                    service => !groupedServiceIds.has(service.id)
+                                );
+                                renderServicesList(ungroupedServices);
+                            });
+                    })
+                    .catch(error => {
+                        console.error('加载未分组服务出错:', error);
+                        servicesList.innerHTML = '<div class="no-services">加载服务失败，请刷新页面重试。</div>';
+                    });
+            } else {
+                // 重新加载服务列表
+                loadServices();
+            }
+        });
+        console.log('分组筛选器事件监听器已绑定');
+    } else {
+        console.error('找不到分组筛选器元素');
+    }
 });
 
 // 加载服务列表
 function loadServices() {
-    fetchWithAuth(API.services)
+    // 根据当前选择的分组筛选服务
+    let apiUrl = API.services;
+    if (currentGroupFilter) {
+        apiUrl = `${API.groups}/services?group_id=${encodeURIComponent(currentGroupFilter)}`;
+    }
+    
+    fetchWithAuth(apiUrl)
         .then(response => response.json())
         .then(data => {
             renderServicesList(data.services);
@@ -790,6 +850,50 @@ function loadServices() {
         .catch(error => {
             console.error('加载服务列表出错:', error);
             servicesList.innerHTML = '<div class="no-services">加载服务失败，请刷新页面重试。</div>';
+        });
+}
+
+// 加载分组列表
+function loadGroups() {
+    fetchWithAuth(API.groups)
+        .then(response => response.json())
+        .then(data => {
+            if (groupFilter) {
+                // 清空现有选项（保留"全部服务"）
+                groupFilter.innerHTML = '<option value="">全部服务</option>';
+                
+                // 添加分组选项
+                if (data.groups && data.groups.length > 0) {
+                    data.groups.forEach(group => {
+                        const option = document.createElement('option');
+                        option.value = group.id;
+                        option.textContent = group.name;
+                        groupFilter.appendChild(option);
+                    });
+                }
+                
+                // 添加"默认分组"选项（显示未分组的服务）
+                const defaultOption = document.createElement('option');
+                defaultOption.value = '__default__';
+                defaultOption.textContent = '默认分组（未分组）';
+                groupFilter.appendChild(defaultOption);
+            }
+            
+            // 同时更新新建服务的分组下拉框
+            if (serviceGroup) {
+                serviceGroup.innerHTML = '<option value="">默认分组</option>';
+                if (data.groups && data.groups.length > 0) {
+                    data.groups.forEach(group => {
+                        const option = document.createElement('option');
+                        option.value = group.id;
+                        option.textContent = group.name;
+                        serviceGroup.appendChild(option);
+                    });
+                }
+            }
+        })
+        .catch(error => {
+            console.error('加载分组列表出错:', error);
         });
 }
 
